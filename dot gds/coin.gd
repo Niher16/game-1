@@ -168,6 +168,15 @@ func _collect_coin():
 	
 	_create_collection_effect()
 	
+	# --- DEBUG: Connect Coin to player progression ---
+	print("🔧 Coin: Looking for player...")
+	var player_ref = get_tree().get_first_node_in_group("player")
+	if player_ref and player_ref.progression_component:
+		print("🔧 Coin: Found player, calling add_currency(", coin_value, ")")
+		player_ref.progression_component.add_currency(coin_value)
+	else:
+		print("❌ Coin: Player or progression_component not found!")
+	
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
 

@@ -148,14 +148,17 @@ func _ready():
 	if combat_component:
 		_connect_signal_safely(combat_component, "attack_state_changed", _on_combat_attack_state_changed)
 	if progression_component:
-		_connect_signal_safely(progression_component, "show_level_up_choices", _on_show_level_up_choices)
-		_connect_signal_safely(progression_component, "stat_choice_made", _on_stat_choice_made)
-		_connect_signal_safely(progression_component, "xp_changed", _on_xp_changed)
-		_connect_signal_safely(progression_component, "coin_collected", _on_coin_collected)
-		_connect_signal_safely(progression_component, "level_up_stats", _on_level_up_stats)
+		_connect_signal_safely(progression_component, "show_level_up_choices", Callable(self, "_on_show_level_up_choices"))
+		_connect_signal_safely(progression_component, "stat_choice_made", Callable(self, "_on_stat_choice_made"))
+		_connect_signal_safely(progression_component, "xp_changed", Callable(self, "_on_xp_changed"))
+		_connect_signal_safely(progression_component, "coin_collected", Callable(self, "_on_coin_collected"))
+		_connect_signal_safely(progression_component, "level_up_stats", Callable(self, "_on_level_up_stats"))
 		
 		# ADD THIS LINE TO DEBUG CONNECTIONS
 		_verify_signal_connections()
+
+	# Add verification after signal connections
+	call_deferred("verify_signal_methods")
 
 	_reset_blink_timer()
 	var config = CharacterGenerator.generate_random_character_config()
@@ -296,12 +299,16 @@ func _pickup_health_potion(area: Area3D):
 		area.queue_free()
 
 func _pickup_xp_orb(area: Area3D):
-	var xp_value = area.get_meta('xp_value') if area.has_meta('xp_value') else 10
-	print('💙 Picking up XP orb worth: ', xp_value)
-	print('⭐ XP DEBUG: Picking up ', xp_value, ' XP')
-	print('⭐ XP before: ', progression_component.get_xp() if progression_component.has_method('get_xp') else 'unknown')
-	progression_component.add_xp(xp_value)
-	print('⭐ XP after: ', progression_component.get_xp() if progression_component.has_method('get_xp') else 'unknown')
+	var xp_value = area.get_meta("xp_value") if area.has_meta("xp_value") else 10
+	print("🔧 Player: _pickup_xp_orb called with value: ", xp_value)
+	print("🔧 progression_component exists: ", progression_component != null)
+	
+	if progression_component:
+		print("🔧 Calling progression_component.add_xp(", xp_value, ")")
+		progression_component.add_xp(xp_value)
+	else:
+		print("❌ ERROR: progression_component is null!")
+	
 	if is_instance_valid(area):
 		area.queue_free()
 
@@ -331,17 +338,12 @@ func _on_level_up_stats(health_increase: int, _damage_increase: int):
 	print("✅ Current health after heal: ", health_component.get_health())
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
-	print('🔗 Player received XP signal: ', xp, '/', xp_to_next, ' Level: ', level)
-	get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)
+	print("🔧 Player: XP signal received - ", xp, "/", xp_to_next, " Level: ", level)
+	get_tree().call_group("UI", "_on_player_xp_changed", xp, xp_to_next, level)
 
-
-
-	get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)  # ← UNCOMMENTED
-	print('🔧 XP changed - XP: ', xp, '/', xp_to_next, ' Level: ', level)
-
-func _on_coin_collected(amount: int):
-	get_tree().call_group('UI', '_on_player_coin_collected', amount)  # ← UNCOMMENTED
-	print('🔧 Coins collected: ', amount)
+func _on_coin_collected(total_currency: int):
+	print("🔧 Player: Coin signal received - Total: ", total_currency)
+	get_tree().call_group("UI", "_on_player_coin_collected", total_currency)
 
 # Animation signal handlers for movement component
 func _on_hand_animation_update(left_pos: Vector3, right_pos: Vector3, left_rot: Vector3, right_rot: Vector3) -> void:
@@ -603,48 +605,74 @@ func change_player_skin_tone(skin_color: Color):
 # ...existing code...
 
 
+# === FIXED UI ACCESS METHODS ===
+# Use progression_component directly since that's where the data and signals are
+
+func get_health() -> int:
+	return health_component.get_health() if health_component else 0
+
+func get_max_health() -> int:
+	return health_component.get_max_health() if health_component else 100
+
+func get_currency() -> int:
+	return progression_component.get_currency() if progression_component else 0
+
+func get_xp() -> int:
+	# FIX: Use progression_component directly, not stats_component
+	return progression_component.get_xp() if progression_component else 0
+
+func get_level() -> int:
+	# FIX: Use progression_component directly, not stats_component  
+	return progression_component.level if progression_component else 1
+
+func get_xp_to_next_level() -> int:
+	# FIX: Use progression_component directly, not stats_component
+	return progression_component.xp_to_next_level if progression_component else 100
+
+func get_dash_charges() -> int:
+	return movement_component.current_dash_charges if movement_component else 1
+
+func get_max_dash_charges() -> int:
+	return max_dash_charges if "max_dash_charges" in self else 1
+
+# Debug method to verify all components exist
+func debug_components():
+	print("🔍 Player Components Debug:")
+	print("  - health_component: ", health_component != null)
+	print("  - progression_component: ", progression_component != null)
+	print("  - movement_component: ", movement_component != null)
+	print("  - combat_component: ", combat_component != null)
+	print("  - stats_component: ", stats_component != null if "stats_component" in self else false)
+	if health_component:
+		print("  - Current Health: ", health_component.get_health())
+		print("  - Max Health: ", health_component.get_max_health())
+	if progression_component:
+		print("  - Currency: ", progression_component.get_currency())
+		print("  - XP: ", progression_component.get_xp())
+		print("  - Level: ", progression_component.level)
+		print("  - XP to Next: ", progression_component.xp_to_next_level)
+	print("🔍 Testing UI access methods:")
+	print("  - get_currency(): ", get_currency())
+	print("  - get_xp(): ", get_xp())
+	print("  - get_level(): ", get_level())
+	print("  - get_health(): ", get_health())
+# ...existing code...
+
+func _verify_signal_connections():
+	print("🔍 SIGNAL CONNECTION DEBUG:")
+	if progression_component:
+		print("✅ ProgressionComponent found: ", progression_component)
+		print("🔗 xp_changed signal connections: ", progression_component.get_signal_connection_list("xp_changed"))
+		print("🔗 coin_collected signal connections: ", progression_component.get_signal_connection_list("coin_collected"))
+	else:
+		print("❌ ProgressionComponent not found!")
+
+
 func test_skin_tones():
 	print("=== TESTING SKIN TONES ===")
 	for i in range(5):
 		var config = CharacterGenerator.generate_random_character_config()
 		print("Test ", i, " skin tone: ", config["skin_tone"])
-
-func get_xp() -> int:
-	return stats_component.get_xp() if stats_component else 0
-
-func get_level() -> int:
-	return stats_component.get_level() if stats_component else 1
-
-func get_xp_to_next_level() -> int:
-	return stats_component.get_xp_to_next_level() if stats_component else 100
-
-func _on_show_level_up_choices(options: Array):
-	print("🎮 Player: Received level up choices signal")
-	print("🔍 Looking for levelupui node...")
-	var level_up_ui = get_tree().get_first_node_in_group("levelupui")
-	if level_up_ui:
-		print("✅ Found LevelUpUI node: ", level_up_ui.name)
-		level_up_ui.show_upgrade_choices(options)
-	else:
-		print("❌ ERROR: LevelUpUI node not found in group 'levelupui'!")
-
-func _on_stat_choice_made(stat_name: String):
-	match stat_name:
-		"damage":
-			attack_damage += 5
-			print("✅ Attack damage increased by 5")
-		"speed":
-			speed += 1.0
-			print("✅ Speed increased by 1.0")
-		"attack_speed":
-			attack_cooldown -= 0.1
-			print("✅ Attack speed increased")
-		"health":
-			# Use health component as single source of truth
-			var new_max_health = health_component.get_max_health() + 20
-			health_component.set_max_health(new_max_health)
-			health_component.heal(20)  # Add the bonus health to current health too
-			print("✅ Max health increased by 20 to: ", new_max_health)
 
 func take_damage(amount: int, from: Node3D = null):
 	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
@@ -770,22 +798,30 @@ func _flash_red():
 			mesh_instance.material_override.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
 	)
 
-
-# --- UI API Methods (delegate to stats component) ---
-func get_health() -> int:
-	return stats_component.get_health() if stats_component else 0
-
-func get_max_health() -> int:
-	return stats_component.get_max_health() if stats_component else 100
-
-func get_currency() -> int:
-	return stats_component.get_currency() if stats_component else 0
-
-func _verify_signal_connections():
-	print("🔍 SIGNAL CONNECTION DEBUG:")
-	if progression_component:
-		print("✅ ProgressionComponent found: ", progression_component)
-		print("🔗 xp_changed signal connections: ", progression_component.get_signal_connection_list("xp_changed"))
-		print("🔗 coin_collected signal connections: ", progression_component.get_signal_connection_list("coin_collected"))
+func _on_show_level_up_choices(options: Array):
+	print("🎮 Player: Received level up choices signal with ", options.size(), " options")
+	print("🔍 Looking for levelupui node...")
+	var level_up_ui = get_tree().get_first_node_in_group("levelupui")
+	if level_up_ui:
+		print("✅ Found LevelUpUI node: ", level_up_ui.name)
+		level_up_ui.show_upgrade_choices(options)
 	else:
-		print("❌ ProgressionComponent not found!")
+		print("❌ ERROR: LevelUpUI node not found in group 'levelupui'!")
+
+func _on_stat_choice_made():
+	print("[Signal] _on_stat_choice_made called (stub)")
+	# TODO: Implement stat choice logic here
+
+func verify_signal_methods():
+	var required_methods = [
+		"_on_show_level_up_choices",
+		"_on_stat_choice_made",
+		"_on_xp_changed",
+		"_on_coin_collected",
+		"_on_level_up_stats"
+	]
+	for method in required_methods:
+		if has_method(method):
+			print("✅ Found method: ", method)
+		else:
+			print("❌ MISSING method: ", method)

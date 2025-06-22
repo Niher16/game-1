@@ -179,12 +179,21 @@ func _collect_orb():
 	"""Handle orb collection"""
 	if is_being_collected:
 		return
-	
+
 	is_being_collected = true
 	print("💙 XP Orb: Collected! Giving ", xp_value, " XP!")
-	
+
+	# --- DEBUG: Connect XP to player progression ---
+	print("🔧 XP Orb: Looking for player...")
+	var player_ref = get_tree().get_first_node_in_group("player")
+	if player_ref and player_ref.progression_component:
+		print("🔧 XP Orb: Found player, calling add_xp(", xp_value, ")")
+		player_ref.progression_component.add_xp(xp_value)
+	else:
+		print("❌ XP Orb: Player or progression_component not found!")
+
 	_create_collection_effect()
-	
+
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
 

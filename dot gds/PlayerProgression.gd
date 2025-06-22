@@ -23,33 +23,21 @@ func setup(player_ref_in: CharacterBody3D):
 	total_coins_collected = 0
 
 func add_currency(amount: int):
-	if not player_ref:
-		push_error("PlayerProgression: No valid player reference")
-		return
+	print("💰 PlayerProgression: add_currency called with: ", amount)
 	currency += amount
 	total_coins_collected += amount
-	print("💰 PlayerProgression: Emitting coin_collected signal with amount: ", amount)
-	coin_collected.emit(amount)  # ← Changed from currency to amount
+	print("💰 Total currency now: ", currency, " - Emitting signal...")
+	coin_collected.emit(currency)
 
 func add_xp(amount: int):
-	if not player_ref:
-		push_error("PlayerProgression: No valid player reference")
-		return
+	print("📈 PlayerProgression: add_xp called with: ", amount)
+	print("📈 Current XP: ", xp, " adding: ", amount)
 	xp += amount
-	print('💎 Adding XP: ', amount, ' Total: ', xp, '/', xp_to_next_level)
+	print("📈 New XP total: ", xp, "/", xp_to_next_level)
+	print("📈 Emitting xp_changed signal...")
 	xp_changed.emit(xp, xp_to_next_level, level)
-	print('📡 XP signal emitted')
-	if xp >= xp_to_next_level:
-		_level_up()
-
-
-
-	if not player_ref:
-		push_error("PlayerProgression: No valid player reference")
-		return
-	xp += amount
-	print("⭐ PlayerProgression: Emitting xp_changed signal - XP: ", xp, "/", xp_to_next_level, " Level: ", level)
-	xp_changed.emit(xp, xp_to_next_level, level)
+	print("📈 XP signal emitted!")
+	
 	if xp >= xp_to_next_level:
 		_level_up()
 
