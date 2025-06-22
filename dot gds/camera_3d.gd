@@ -44,7 +44,7 @@ var rotation_x: float = deg_to_rad(-10.0)  # Current vertical rotation (default:
 var rotation_y: float = 0.0  # Current horizontal rotation
 
 # --- Smooth Momentum Variables ---
-var target_rotation_x: float = deg_to_rad(+10.0)  # Where rotation_x wants to be (default: -10 degrees)
+var target_rotation_x: float = deg_to_rad(-10.0)  # Where rotation_x wants to be (default: -10 degrees)
 var target_rotation_y: float = 0.0  # Where rotation_y wants to be
 var rotation_velocity_x: float = 0.0  # Current rotation speed for momentum
 var rotation_velocity_y: float = 0.0  # Current rotation speed for momentum
