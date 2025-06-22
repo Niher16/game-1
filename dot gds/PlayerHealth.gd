@@ -87,6 +87,7 @@ func update_invulnerability(delta: float):
 
 # 🔧 FIXED: Enhanced damage flash with proper timer and reset
 func _show_damage_feedback(damage_amount: int):
+	print("DEBUG: _show_damage_feedback called with:", damage_amount, " stack:", get_stack())
 	var mesh = _get_mesh_instance()
 	if not player_ref or not is_instance_valid(player_ref):
 		print("⚠️ Player reference invalid - can't show damage flash")
@@ -113,9 +114,10 @@ func _show_damage_feedback(damage_amount: int):
 	# Show damage numbers if the damage system exists
 	var tree = player_ref.get_tree() if player_ref else null
 	if tree:
-		var damage_system = tree.get_first_node_in_group("damage_numbers")
-		if damage_system and damage_system.has_method("show_damage"):
-			damage_system.show_damage(damage_amount, player_ref, "massive")
+		var damage_nodes = tree.get_nodes_in_group("damage_numbers")
+		print("DEBUG: damage_numbers group count: ", damage_nodes.size())
+		if damage_nodes.size() > 0 and damage_nodes[0].has_method("show_damage"):
+			damage_nodes[0].show_damage(damage_amount, player_ref, "massive")
 	if player_ref.has_node("DamageSound"):
 		var damage_sound = player_ref.get_node("DamageSound")
 		if damage_sound and damage_sound.has_method("play"):

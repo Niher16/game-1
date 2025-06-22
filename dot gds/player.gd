@@ -516,10 +516,11 @@ func _input(_event):
 		print("[Debug] is_inside_tree(): ", is_inside_tree())
 		_spawn_debug_ally()
 	# DEBUG: Test damage numbers with ENTER (ui_accept)
-	if Input.is_action_just_pressed("ui_accept"):
-		for node in get_tree().get_nodes_in_group("damage_numbers"):
-			if node.has_method("call_show_damage"):
-				node.call_show_damage(25, self, "normal")
+	# Disabled to prevent confusion: only real damage will show numbers now
+	# if Input.is_action_just_pressed("ui_accept"):
+	# 	for node in get_tree().get_nodes_in_group("damage_numbers"):
+	# 		if node.has_method("call_show_damage"):
+	# 			node.call_show_damage(25, self, "normal")
 
 func _spawn_debug_ally():
 	# Check if node is NOT in scene tree before proceeding
