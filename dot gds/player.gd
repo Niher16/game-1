@@ -197,7 +197,11 @@ func _create_visual():
 	else:
 		mesh_instance = existing_mesh
 		print("🎨 Using existing MeshInstance3D node")
-	# Only create MeshInstance3D if it doesn't exist; do not call CharacterAppearanceManager or create_random_character here
+	# Ensure material_override is set so _flash_red works
+	if not mesh_instance.material_override:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
+		mesh_instance.material_override = mat
 	print("✅ Player visual created successfully!")
 
 func _setup_attack_system():
