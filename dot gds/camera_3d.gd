@@ -40,11 +40,11 @@ extends Camera3D
 # --- Private Variables (Don't touch these in editor) ---
 var player: Node3D  # Reference to the player we're following
 var is_rotating: bool = false  # True when right mouse button is held
-var rotation_x: float = 0.0  # Current vertical rotation
+var rotation_x: float = deg_to_rad(-10.0)  # Current vertical rotation (default: -10 degrees for less top-down)
 var rotation_y: float = 0.0  # Current horizontal rotation
 
 # --- Smooth Momentum Variables ---
-var target_rotation_x: float = 0.0  # Where rotation_x wants to be
+var target_rotation_x: float = deg_to_rad(+10.0)  # Where rotation_x wants to be (default: -10 degrees)
 var target_rotation_y: float = 0.0  # Where rotation_y wants to be
 var rotation_velocity_x: float = 0.0  # Current rotation speed for momentum
 var rotation_velocity_y: float = 0.0  # Current rotation speed for momentum
@@ -80,22 +80,23 @@ func _find_player() -> void:
 		# Try again after a short delay
 		get_tree().create_timer(0.5).timeout.connect(_find_player)
 
+# Handles all input for camera control (Middle Mouse rotates, Right Click does nothing)
 func _input(event: InputEvent) -> void:
-	"""Handles all input for camera control"""
-	# Right mouse button for camera rotation ONLY
+	# Middle mouse button for camera rotation ONLY
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			is_rotating = event.pressed
 			if is_rotating:
 				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 			else:
 				Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		# Mouse wheel for zooming (no middle mouse required)
+		# Mouse wheel for zooming
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_zoom_camera(-zoom_speed)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_zoom_camera(zoom_speed)
-	# Mouse movement for rotation (only when right mouse held)
+		# Ignore right mouse button (do nothing)
+	# Mouse movement for rotation (only when middle mouse held)
 	elif event is InputEventMouseMotion and is_rotating:
 		_rotate_camera(event.relative)
 	# Keyboard shortcuts
@@ -223,11 +224,9 @@ func _zoom_camera(zoom_change: float) -> void:
 
 func _reset_camera_rotation() -> void:
 	"""Resets camera rotation to default position with smooth transition"""
-	
-	# Reset targets for smooth transition to default
-	target_rotation_x = 0.0
+	# Reset targets for smooth transition to default (less top-down)
+	target_rotation_x = deg_to_rad(-30.0)
 	target_rotation_y = 0.0
-	
 	# Clear any momentum
 	rotation_velocity_x = 0.0
 	rotation_velocity_y = 0.0
