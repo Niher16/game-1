@@ -17,11 +17,26 @@ var unit_label: Label
 var speed_label: Label
 
 func _ready():
-	add_to_group("UI")
-	print("✅ UI node added to group 'UI'")
+	add_to_group('UI')
+	print('✅ UI added to UI group')
+
+	# Verify group membership
+	await get_tree().process_frame
+	var ui_nodes = get_tree().get_nodes_in_group('UI')
+	print('🔍 UI Group contains: ', ui_nodes.size(), ' nodes')
+	for node in ui_nodes:
+		print('  - ', node.name, ' at path: ', node.get_path())
+
+	# Test if call_group would work
+	print('🧪 Testing call_group mechanism...')
+	get_tree().call_group('UI', '_test_group_call')
+
 	_setup_ui()
 	_find_references()
 	_find_spawner_with_retry()
+
+func _test_group_call():
+	print('✅ call_group test successful - UI can receive group calls')
 
 func _setup_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -155,6 +170,7 @@ func _find_spawner_with_retry():
 		timer.start()
 
 func _on_player_xp_changed(xp: int, xp_to_next: int, level: int):
+	print('🎯 UI DEBUG: _on_player_xp_changed called with: ', xp, '/', xp_to_next, ' Level: ', level)
 	if xp_bar:
 		xp_bar.max_value = xp_to_next
 		xp_bar.value = xp
@@ -163,12 +179,14 @@ func _on_player_xp_changed(xp: int, xp_to_next: int, level: int):
 	_update_xp()
 
 func _on_player_coin_collected(_amount: int):
-	print("UI: coin_collected signal received")
+	print('🎯 UI DEBUG: _on_player_coin_collected called with amount: ', _amount)
+	print('UI: coin_collected signal received')
 	_update_coins()
 
 func _on_player_health_changed(current: int, max_health: int):
+	print('🎯 UI DEBUG: _on_player_health_changed called with: ', current, '/', max_health)
 	if health_label:
-		health_label.text = "❤️ Health: " + str(current) + "/" + str(max_health)
+		health_label.text = '❤️ Health: ' + str(current) + '/' + str(max_health)
 		# Change color based on health percentage
 		var health_percentage = float(current) / float(max_health) if max_health > 0 else 0.0
 		if health_percentage <= 0.25:
@@ -181,12 +199,33 @@ func _on_player_health_changed(current: int, max_health: int):
 func _process(_delta):
 	if not player:
 		return
-	_update_health()
-	_update_coins()
+	# Force update all UI elements every frame as backup
+	_force_update_health()
+	_force_update_coins()
+	_force_update_xp()
 	_update_wave()
 	_update_dash()
-	_update_xp()
 	_update_speed()
+
+func _force_update_health():
+	if player and health_label and player.has_method('get_health'):
+		var current_health = player.get_health()
+		var max_health = player.get_max_health()
+		health_label.text = '❤️ Health: ' + str(current_health) + '/' + str(max_health)
+
+func _force_update_coins():
+	if player and coin_label and player.has_method('get_currency'):
+		coin_label.text = '💰 Coins: ' + str(player.get_currency())
+
+func _force_update_xp():
+	if player and xp_bar and xp_label:
+		if player.has_method('get_xp'):
+			var current_xp = player.get_xp()
+			var xp_needed = player.get_xp_to_next_level()
+			var current_level = player.get_level()
+			xp_bar.max_value = xp_needed
+			xp_bar.value = current_xp
+			xp_label.text = 'XP: %d/%d (Lv.%d)' % [current_xp, xp_needed, current_level]
 
 func _update_health():
 	if player.has_method("get_health"):

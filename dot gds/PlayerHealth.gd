@@ -66,10 +66,14 @@ func take_damage(amount: int, _from: Node3D = null):
 		_show_damage_feedback(amount)
 
 func heal(heal_amount: int):
+	print('🩹 HEAL DEBUG: Attempting to heal for ', heal_amount, ' HP')
+	print('🩹 Current health before: ', current_health, '/', max_health)
 	if current_health <= 0 or current_health >= max_health:
+		print('🩹 Already at full health, no healing needed')
 		return
 	var old_health = current_health
 	current_health = min(current_health + heal_amount, max_health)
+	print('🩹 Health after healing: ', current_health, '/', max_health)
 	if current_health != old_health:
 		health_changed.emit(current_health, max_health)
 		_show_heal_feedback(heal_amount)

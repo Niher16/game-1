@@ -130,7 +130,11 @@ func _ready():
 
 	# Connect signals ONCE at the end
 	if health_component:
-		_connect_signal_safely(health_component, "health_changed", _on_health_changed)
+		if health_component.has_signal("health_changed"):
+			_connect_signal_safely(health_component, "health_changed", _on_health_changed)
+			print("✅ Health signal connected successfully")
+		else:
+			print("❌ Health component missing health_changed signal!")
 		_connect_signal_safely(health_component, "player_died", _on_player_died)
 		_connect_signal_safely(health_component, "health_depleted", _on_health_depleted)
 		print("✅ All health signals connected")
@@ -286,18 +290,18 @@ func _pickup_health_potion(area: Area3D):
 		area.queue_free()
 
 func _pickup_xp_orb(area: Area3D):
-	var xp_value = area.get_meta("xp_value") if area.has_meta("xp_value") else 10
+	var xp_value = area.get_meta('xp_value') if area.has_meta('xp_value') else 10
+	print('⭐ XP DEBUG: Picking up ', xp_value, ' XP')
+	print('⭐ XP before: ', progression_component.get_xp() if progression_component.has_method('get_xp') else 'unknown')
 	progression_component.add_xp(xp_value)
+	print('⭐ XP after: ', progression_component.get_xp() if progression_component.has_method('get_xp') else 'unknown')
 	if is_instance_valid(area):
 		area.queue_free()
 
 # --- Health System Component Handlers ---
 func _on_health_changed(current_health: int, max_health: int):
-	print("🔧 Health changed - Current: ", current_health, " Max: ", max_health)
-	# Update UI or other systems as needed
-	if ui:
-		# Make sure UI gets updated with new health values
-		get_tree().call_group("UI", "_on_player_health_changed", current_health, max_health)
+	print('🔧 Health changed - Current: ', current_health, ' Max: ', max_health)
+	# get_tree().call_group('UI', '_on_player_health_changed', current_health, max_health)  # Direct connection now
 
 func _on_health_depleted():
 	# Handle logic when health reaches zero (game over, respawn, etc.)
@@ -319,12 +323,12 @@ func _on_level_up_stats(health_increase: int, _damage_increase: int):
 	print("✅ Current health after heal: ", health_component.get_health())
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
-	# Forward XP signal to UI
-	get_tree().call_group("UI", "_on_player_xp_changed", xp, xp_to_next, level)
+	# get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)  # Direct connection now
+	print('🔧 XP changed - XP: ', xp, '/', xp_to_next, ' Level: ', level)
 
 func _on_coin_collected(amount: int):
-	# Forward coin signal to UI  
-	get_tree().call_group("UI", "_on_player_coin_collected", amount)
+	# get_tree().call_group('UI', '_on_player_coin_collected', amount)  # Direct connection now
+	print('🔧 Coins collected: ', amount)
 
 # Animation signal handlers for movement component
 func _on_hand_animation_update(left_pos: Vector3, right_pos: Vector3, left_rot: Vector3, right_rot: Vector3) -> void:
@@ -720,6 +724,27 @@ func _connect_signal_safely(source_object, signal_name: String, target_callable:
 		else:
 			print("⚠️ Signal already connected: ", signal_name)
 
+
+func _connect_component_signals():
+	# Connect directly to UI instead of using call_group
+	var ui_node = get_tree().get_first_node_in_group('UI')
+	if ui_node:
+		print('✅ Found UI node, connecting direct signals')
+		if health_component and health_component.has_signal('health_changed'):
+			if not health_component.health_changed.is_connected(ui_node._on_player_health_changed):
+				health_component.health_changed.connect(ui_node._on_player_health_changed)
+				print('✅ Connected health_changed directly to UI')
+		if progression_component:
+			if progression_component.has_signal('xp_changed'):
+				if not progression_component.xp_changed.is_connected(ui_node._on_player_xp_changed):
+					progression_component.xp_changed.connect(ui_node._on_player_xp_changed)
+					print('✅ Connected xp_changed directly to UI')
+			if progression_component.has_signal('coin_collected'):
+				if not progression_component.coin_collected.is_connected(ui_node._on_player_coin_collected):
+					progression_component.coin_collected.connect(ui_node._on_player_coin_collected)
+					print('✅ Connected coin_collected directly to UI')
+	else:
+		print('❌ UI node not found for direct connection!')
 
 func _flash_red():
 	if not mesh_instance or not is_instance_valid(mesh_instance):
