@@ -156,6 +156,21 @@ func show_damage(damage_amount: int, entity: Node3D, damage_type: String = "norm
 	if not is_instance_valid(entity):
 		push_error("DamageNumbers: Entity is not valid!")
 		return
+
+	# Detect if entity is an ally and override color to red
+	var is_ally = entity.is_in_group("allies")
+	var color_type = damage_type
+	if is_ally:
+		color_type = "massive"  # Use red for allies
+
+	print("DamageNumbers: Showing damage ", damage_amount, " on ", entity.name)
+	_create_or_update_label(entity, str(damage_amount), color_type)
+
+
+
+	if not is_instance_valid(entity):
+		push_error("DamageNumbers: Entity is not valid!")
+		return
 	
 	print("DamageNumbers: Showing damage ", damage_amount, " on ", entity.name)
 	_create_or_update_label(entity, str(damage_amount), damage_type)

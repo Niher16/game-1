@@ -632,6 +632,32 @@ func take_damage(amount: int, from: Node3D = null):
 		# Apply knockback if movement_component exists
 		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
 			movement_component.apply_knockback_from_enemy(from)
+		# Flash red when taking damage
+		_flash_red()
+	else:
+		print("❌ ERROR: health_component not found or missing take_damage method!")
+
+
+
+	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
+	if health_component and health_component.has_method("take_damage"):
+		health_component.take_damage(amount, from)
+		# Apply knockback if movement_component exists
+		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
+			movement_component.apply_knockback_from_enemy(from)
+		# Flash red when taking damage
+		_flash_red()
+	else:
+		print("❌ ERROR: health_component not found or missing take_damage method!")
+
+
+
+	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
+	if health_component and health_component.has_method("take_damage"):
+		health_component.take_damage(amount, from)
+		# Apply knockback if movement_component exists
+		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
+			movement_component.apply_knockback_from_enemy(from)
 	else:
 		print("❌ ERROR: health_component not found or missing take_damage method!")
 
@@ -689,3 +715,15 @@ func _connect_signal_safely(source_object, signal_name: String, target_callable:
 			print("✅ Connected signal: ", signal_name)
 		else:
 			print("⚠️ Signal already connected: ", signal_name)
+
+
+func _flash_red():
+	if not mesh_instance or not is_instance_valid(mesh_instance):
+		return
+	if not mesh_instance.material_override:
+		return
+	mesh_instance.material_override.albedo_color = Color(1,0,0)
+	get_tree().create_timer(0.5).timeout.connect(func():
+		if mesh_instance and is_instance_valid(mesh_instance) and mesh_instance.material_override:
+			mesh_instance.material_override.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
+	)
