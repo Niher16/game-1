@@ -36,27 +36,39 @@ func add_xp(amount: int):
 		push_error("PlayerProgression: No valid player reference")
 		return
 	xp += amount
+	print('💎 Adding XP: ', amount, ' Total: ', xp, '/', xp_to_next_level)
+	xp_changed.emit(xp, xp_to_next_level, level)
+	print('📡 XP signal emitted')
+	if xp >= xp_to_next_level:
+		_level_up()
+
+
+
+	if not player_ref:
+		push_error("PlayerProgression: No valid player reference")
+		return
+	xp += amount
 	print("⭐ PlayerProgression: Emitting xp_changed signal - XP: ", xp, "/", xp_to_next_level, " Level: ", level)
 	xp_changed.emit(xp, xp_to_next_level, level)
 	if xp >= xp_to_next_level:
 		_level_up()
 
 func _level_up():
-	print("🔥 LEVEL UP TRIGGERED - Current level: ", level)
+	if xp >= xp_to_next_level:
+		print('🔥 LEVEL UP! XP: ', xp, ' Required: ', xp_to_next_level)
 	xp -= xp_to_next_level
 	level += 1
 	xp_to_next_level = int(xp_to_next_level * xp_growth)
-	
-	print("📊 Generating upgrade options...")
+	print('📈 New level: ', level, ' XP to next: ', xp_to_next_level)
+	print('📊 XP after level up: ', xp)
+	print('📊 Generating upgrade options...')
 	var upgrade_options = _generate_upgrade_options()
-	print("✅ Generated ", upgrade_options.size(), " options: ", upgrade_options)
-	
-	print("⏸️ Pausing game...")
+	print('✅ Generated ', upgrade_options.size(), ' options: ', upgrade_options)
+	print('⏸️ Pausing game...')
 	get_tree().paused = true
-	
-	print("📡 Emitting show_level_up_choices signal with options...")
+	print('📢 Emitting show_level_up_choices signal with options...')
 	show_level_up_choices.emit(upgrade_options)
-	print("✅ Signal emitted successfully")
+	print('✅ Signal emitted successfully')
 
 
 func get_currency() -> int:

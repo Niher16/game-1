@@ -20,11 +20,35 @@ func _ready():
 	add_to_group('UI')
 	print('✅ UI added to UI group')
 
-	# Verify group membership
+	# Print all nodes in the UI group and their scripts
 	await get_tree().process_frame
 	var ui_nodes = get_tree().get_nodes_in_group('UI')
 	print('🔍 UI Group contains: ', ui_nodes.size(), ' nodes')
 	for node in ui_nodes:
+		print('  - UI group node: ', node, ' name: ', node.name, ' script: ', node.get_script())
+
+	# Test if call_group would work
+	print('🧪 Testing call_group mechanism...')
+	get_tree().call_group('UI', '_test_group_call')
+
+	# Manual test call for XP update
+	print('🧪 Manually calling _on_player_xp_changed for test')
+	_on_player_xp_changed(42, 100, 2)
+
+	_setup_ui()
+	_find_references()
+	_find_spawner_with_retry()
+
+
+
+	add_to_group('UI')
+	print('✅ UI added to UI group')
+
+	# Verify group membership
+	await get_tree().process_frame
+	var ui_nodes_2 = get_tree().get_nodes_in_group('UI')
+	print('🔍 UI Group contains: ', ui_nodes_2.size(), ' nodes')
+	for node in ui_nodes_2:
 		print('  - ', node.name, ' at path: ', node.get_path())
 
 	# Test if call_group would work
@@ -151,6 +175,32 @@ func _find_references():
 			if ally.has_signal("ally_died") and not ally.is_connected("ally_died", Callable(self, "_on_ally_died")):
 				ally.connect("ally_died", Callable(self, "_on_ally_died"))
 		print("UI: Connected ally signals")
+		# --- Force full UI update after UI is ready and player is found ---
+		await get_tree().process_frame
+		print('🟦 Calling force_full_ui_update from _find_references')
+		force_full_ui_update()
+		print('🟦 Returned from force_full_ui_update in _find_references')
+	else:
+		print("UI: Player not found!")
+		await get_tree().create_timer(1.0).timeout
+		_find_references()
+
+
+
+	print("UI: Finding references...")
+	player = get_tree().get_first_node_in_group("player")
+	if player:
+		print("UI: Found player, connecting signals...")
+		var allies = get_tree().get_nodes_in_group("allies")
+		for ally in allies:
+			if not ally.is_connected("ally_added", Callable(self, "_on_ally_added")):
+				ally.connect("ally_added", Callable(self, "_on_ally_added"))
+			if not ally.is_connected("ally_removed", Callable(self, "_on_ally_removed")):
+				ally.connect("ally_removed", Callable(self, "_on_ally_removed"))
+			# Connect ally_died signal for unit counter
+			if ally.has_signal("ally_died") and not ally.is_connected("ally_died", Callable(self, "_on_ally_died")):
+				ally.connect("ally_died", Callable(self, "_on_ally_died"))
+		print("UI: Connected ally signals")
 	else:
 		print("UI: Player not found!")
 		await get_tree().create_timer(1.0).timeout
@@ -170,6 +220,33 @@ func _find_spawner_with_retry():
 		timer.start()
 
 func _on_player_xp_changed(xp: int, xp_to_next: int, level: int):
+	print('🎯 UI XP Update: ', xp, '/', xp_to_next, ' Level: ', level)
+	print('🟦 UI node name: ', name, ' path: ', get_path())
+	if xp_bar:
+		print('🟩 xp_bar exists, updating values')
+		xp_bar.max_value = xp_to_next
+		xp_bar.value = xp
+	else:
+		print('🟥 xp_bar is null!')
+	if xp_label:
+		print('🟩 xp_label exists, updating text')
+		xp_label.text = "XP: %d/%d (Lv.%d)" % [xp, xp_to_next, level]
+	else:
+		print('🟥 xp_label is null!')
+	_update_xp()
+	print('🟦 _on_player_xp_changed finished')
+
+
+	print('🎯 UI XP Update: ', xp, '/', xp_to_next, ' Level: ', level)
+	if xp_bar:
+		xp_bar.max_value = xp_to_next
+		xp_bar.value = xp
+	if xp_label:
+		xp_label.text = "XP: %d/%d (Lv.%d)" % [xp, xp_to_next, level]
+	_update_xp()
+
+
+
 	print('🎯 UI DEBUG: _on_player_xp_changed called with: ', xp, '/', xp_to_next, ' Level: ', level)
 	if xp_bar:
 		xp_bar.max_value = xp_to_next
@@ -339,3 +416,25 @@ func show_message(text: String):
 	var tween = create_tween()
 	tween.tween_property(_message_label, "modulate:a", 0.0, 2.0)
 	tween.tween_callback(Callable(_message_label, "queue_free"))
+
+
+func force_full_ui_update():
+	print('🟦 force_full_ui_update called')
+	print('🟦 player:', player)
+	print('🟦 xp_bar:', xp_bar)
+	print('🟦 xp_label:', xp_label)
+	if player:
+		print('🟦 player.has_method(get_xp):', player.has_method('get_xp'))
+		print('🟦 player.has_method(get_xp_to_next_level):', player.has_method('get_xp_to_next_level'))
+		print('🟦 player.has_method(get_level):', player.has_method('get_level'))
+	if player and xp_bar and xp_label and player.has_method('get_xp') and player.has_method('get_xp_to_next_level') and player.has_method('get_level'):
+		print('🟦 Forcing XP UI update from force_full_ui_update')
+		_on_player_xp_changed(player.get_xp(), player.get_xp_to_next_level(), player.get_level())
+	else:
+		print('🟥 XP UI update conditions not met')
+	if player and health_label and player.has_method('get_health') and player.has_method('get_max_health'):
+		print('🟦 Forcing health UI update from force_full_ui_update')
+		_on_player_health_changed(player.get_health(), player.get_max_health())
+	if player and coin_label and player.has_method('get_currency'):
+		print('🟦 Forcing coin UI update from force_full_ui_update')
+		_on_player_coin_collected(player.get_currency())

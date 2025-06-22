@@ -297,6 +297,7 @@ func _pickup_health_potion(area: Area3D):
 
 func _pickup_xp_orb(area: Area3D):
 	var xp_value = area.get_meta('xp_value') if area.has_meta('xp_value') else 10
+	print('💙 Picking up XP orb worth: ', xp_value)
 	print('⭐ XP DEBUG: Picking up ', xp_value, ' XP')
 	print('⭐ XP before: ', progression_component.get_xp() if progression_component.has_method('get_xp') else 'unknown')
 	progression_component.add_xp(xp_value)
@@ -330,6 +331,11 @@ func _on_level_up_stats(health_increase: int, _damage_increase: int):
 	print("✅ Current health after heal: ", health_component.get_health())
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
+	print('🔗 Player received XP signal: ', xp, '/', xp_to_next, ' Level: ', level)
+	get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)
+
+
+
 	get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)  # ← UNCOMMENTED
 	print('🔧 XP changed - XP: ', xp, '/', xp_to_next, ' Level: ', level)
 
