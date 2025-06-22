@@ -178,10 +178,10 @@ func _on_player_xp_changed(xp: int, xp_to_next: int, level: int):
 		xp_label.text = "XP: %d/%d (Lv.%d)" % [xp, xp_to_next, level]
 	_update_xp()
 
-func _on_player_coin_collected(_amount: int):
-	print('🎯 UI DEBUG: _on_player_coin_collected called with amount: ', _amount)
-	print('UI: coin_collected signal received')
-	_update_coins()
+func _on_player_coin_collected(amount: int):
+	print("UI: coin_collected signal received - amount: ", amount)
+	if player and coin_label and player.has_method("get_currency"):
+		coin_label.text = "💰 Coins: " + str(player.get_currency())
 
 func _on_player_health_changed(current: int, max_health: int):
 	print('🎯 UI DEBUG: _on_player_health_changed called with: ', current, '/', max_health)
@@ -199,13 +199,10 @@ func _on_player_health_changed(current: int, max_health: int):
 func _process(_delta):
 	if not player:
 		return
-	# Force update all UI elements every frame as backup
-	_force_update_health()
-	_force_update_coins()
-	_force_update_xp()
 	_update_wave()
 	_update_dash()
 	_update_speed()
+	# Removed _update_health(), _update_coins(), _update_xp() - these use signals now
 
 func _force_update_health():
 	if player and health_label and player.has_method('get_health'):

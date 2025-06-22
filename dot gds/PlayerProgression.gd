@@ -28,13 +28,15 @@ func add_currency(amount: int):
 		return
 	currency += amount
 	total_coins_collected += amount
-	coin_collected.emit(currency)
+	print("💰 PlayerProgression: Emitting coin_collected signal with amount: ", amount)
+	coin_collected.emit(amount)  # ← Changed from currency to amount
 
 func add_xp(amount: int):
 	if not player_ref:
 		push_error("PlayerProgression: No valid player reference")
 		return
 	xp += amount
+	print("⭐ PlayerProgression: Emitting xp_changed signal - XP: ", xp, "/", xp_to_next_level, " Level: ", level)
 	xp_changed.emit(xp, xp_to_next_level, level)
 	if xp >= xp_to_next_level:
 		_level_up()

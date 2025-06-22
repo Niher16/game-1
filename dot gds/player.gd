@@ -153,6 +153,9 @@ func _ready():
 		_connect_signal_safely(progression_component, "xp_changed", _on_xp_changed)
 		_connect_signal_safely(progression_component, "coin_collected", _on_coin_collected)
 		_connect_signal_safely(progression_component, "level_up_stats", _on_level_up_stats)
+		
+		# ADD THIS LINE TO DEBUG CONNECTIONS
+		_verify_signal_connections()
 
 	_reset_blink_timer()
 	var config = CharacterGenerator.generate_random_character_config()
@@ -281,11 +284,14 @@ func can_heal() -> bool:
 	return health_component.get_health() < health_component.get_max_health()
 
 func _pickup_health_potion(area: Area3D):
+	print("🧪 Attempting to pickup health potion - Current health: ", health_component.get_health(), "/", health_component.get_max_health())
 	if not can_heal():
-		# Show feedback for full health
-		print("Already at full health!")
+		print("🧪 Already at full health - skipping heal")
 		return
-	health_component.heal(health_component.heal_amount_from_potion)
+	var heal_amount = health_component.heal_amount_from_potion
+	print("🧪 Healing for: ", heal_amount, " HP")
+	health_component.heal(heal_amount)
+	print("🧪 Health after heal: ", health_component.get_health(), "/", health_component.get_max_health())
 	if is_instance_valid(area):
 		area.queue_free()
 
@@ -301,7 +307,8 @@ func _pickup_xp_orb(area: Area3D):
 # --- Health System Component Handlers ---
 func _on_health_changed(current_health: int, max_health: int):
 	print('🔧 Health changed - Current: ', current_health, ' Max: ', max_health)
-	# get_tree().call_group('UI', '_on_player_health_changed', current_health, max_health)  # Direct connection now
+	print("🔧 Calling UI group with health update")  # ← Add this line
+	get_tree().call_group("UI", "_on_player_health_changed", current_health, max_health)  # Direct connection now
 
 func _on_health_depleted():
 	# Handle logic when health reaches zero (game over, respawn, etc.)
@@ -323,11 +330,11 @@ func _on_level_up_stats(health_increase: int, _damage_increase: int):
 	print("✅ Current health after heal: ", health_component.get_health())
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
-	# get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)  # Direct connection now
+	get_tree().call_group('UI', '_on_player_xp_changed', xp, xp_to_next, level)  # ← UNCOMMENTED
 	print('🔧 XP changed - XP: ', xp, '/', xp_to_next, ' Level: ', level)
 
 func _on_coin_collected(amount: int):
-	# get_tree().call_group('UI', '_on_player_coin_collected', amount)  # Direct connection now
+	get_tree().call_group('UI', '_on_player_coin_collected', amount)  # ← UNCOMMENTED
 	print('🔧 Coins collected: ', amount)
 
 # Animation signal handlers for movement component
@@ -756,3 +763,23 @@ func _flash_red():
 		if mesh_instance and is_instance_valid(mesh_instance) and mesh_instance.material_override:
 			mesh_instance.material_override.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
 	)
+
+
+# --- UI API Methods (delegate to stats component) ---
+func get_health() -> int:
+	return stats_component.get_health() if stats_component else 0
+
+func get_max_health() -> int:
+	return stats_component.get_max_health() if stats_component else 100
+
+func get_currency() -> int:
+	return stats_component.get_currency() if stats_component else 0
+
+func _verify_signal_connections():
+	print("🔍 SIGNAL CONNECTION DEBUG:")
+	if progression_component:
+		print("✅ ProgressionComponent found: ", progression_component)
+		print("🔗 xp_changed signal connections: ", progression_component.get_signal_connection_list("xp_changed"))
+		print("🔗 coin_collected signal connections: ", progression_component.get_signal_connection_list("coin_collected"))
+	else:
+		print("❌ ProgressionComponent not found!")
