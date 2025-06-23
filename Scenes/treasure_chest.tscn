@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b16lcy2ltkfdr"]
-
-[ext_resource type="Script" uid="uid://co42sp0mjyfmw" path="res://dot gds/treasure_chest.gd" id="1_me2ib"]
-
-[node name="Treasure Chest" type="StaticBody3D"]
-script = ExtResource("1_me2ib")

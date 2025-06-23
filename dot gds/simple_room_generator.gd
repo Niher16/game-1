@@ -49,9 +49,6 @@ var floor_material: StandardMaterial3D
 var enemy_spawner: Node3D
 var player: Node3D
 
-# PackedScene for treasure chest
-var treasure_chest_scene: PackedScene
-
 # Change preload to regular variables
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
@@ -67,12 +64,8 @@ func _ready():
 	# _setup_lighting()  # DISABLED - conflicting with main_scene_setup lighting
 	print("🔆 Lighting handled by main_scene_setup.gd")
 	
-	# Load the treasure chest scene
-	if ResourceLoader.exists("res://Scenes/treasure_chest.tscn"):
-		treasure_chest_scene = load("res://Scenes/treasure_chest.tscn")
-	else:
-		treasure_chest_scene = null
-		print("⚠️ Treasure chest scene not found")
+	# Treasure chests removed - using crates and barrels for loot instead
+	print("🗑️ Treasure chests disabled - cleaner dungeon generation")
 
 	# Add loading for destructible objects
 	if ResourceLoader.exists("res://Scenes/DestructibleCrate.tscn"):
@@ -163,8 +156,7 @@ func generate_starting_room():
 	# Move player to room center
 	_move_player_to_room(starting_room)
 	
-	# Spawn a chest randomly in the first room
-	_spawn_treasure_chest_random_in_room(starting_room)
+	# 🗑️ Treasure chests disabled - cleaner dungeon generation
 	_spawn_destructible_objects_in_room(starting_room)  # NEW: Spawn destructibles
 
 	# --- TORCH PLACEMENT LOGIC (FIXED) ---
@@ -555,7 +547,7 @@ func _on_wave_completed(wave_number: int):
 		# Tell the enemy spawner to use this new room for the next wave
 		if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 			enemy_spawner.set_newest_spawning_room(new_room)
-		_spawn_treasure_chest_random_in_room(new_room)
+		# 🗑️ Treasure chests disabled - cleaner dungeon generation
 		_spawn_destructible_objects_in_room(new_room)
 		_spawn_torches_in_room(new_room)
 		print("🛡️ New room generated and set as spawning area!")
@@ -744,46 +736,6 @@ func get_boundary_info() -> Dictionary:
 		"safe_zone_size": map_size - Vector2((boundary_thickness + safe_zone_margin) * 2, (boundary_thickness + safe_zone_margin) * 2)
 	}
 
-# (NEW) Spawn a treasure chest at a random position in the given room
-func _spawn_treasure_chest_random_in_room(room: Rect2):
-	if not treasure_chest_scene:
-		print("⚠️ Treasure chest scene not found, cannot spawn chest.")
-		return
-	if not is_inside_tree():
-		await ready
-	# Pick a random position inside the room (avoid walls)
-	var min_x = int(room.position.x) + 1
-	var max_x = int(room.position.x + room.size.x) - 2
-	var min_y = int(room.position.y) + 1
-	var max_y = int(room.position.y + room.size.y) - 2
-	var tries = 10
-	var pos = null
-	while tries > 0:
-		var rx = randi_range(min_x, max_x)
-		var ry = randi_range(min_y, max_y)
-		if _is_valid_pos(rx, ry) and terrain_grid[rx][ry] == TileType.FLOOR:
-			pos = Vector2(rx, ry)
-			break
-		tries -= 1
-	if pos == null:
-		# fallback to room center
-		pos = room.position + room.size / 2
-	var chest = treasure_chest_scene.instantiate()
-	add_child(chest)
-	chest.global_position = Vector3(
-		(pos.x - map_size.x / 2) * 2.0,
-		.3, # Spawn the chest higher up
-		(pos.y - map_size.y / 2) * 2.0
-	)
-
-# Utility: Check if a position is occupied by a chest
-func _is_position_occupied_by_chest(pos: Vector3) -> bool:
-	for child in get_children():
-		if child.name.begins_with("Treasure") or child.is_in_group("treasure_chest"):
-			if child.global_position.distance_to(pos) < 2.0:
-				return true
-	return false
-
 func _spawn_destructible_objects_in_room(room: Rect2):
 	"""Spawn destructible crates and barrels in room with no overlap with each other or chests"""
 	# Add null checks for scenes
@@ -795,9 +747,9 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 	var placed_positions: Array = []
 	var min_distance = 2.0  # Minimum distance between objects
 
-	# Gather chest positions in this room to avoid overlap
+	# Gather crate and barrel positions in this room to avoid overlap
 	for child in get_children():
-		if child.name.begins_with("Treasure") or child.is_in_group("treasure_chest"):
+		if child.name.begins_with("Crate") or child.is_in_group("crate") or child.name.begins_with("Barrel") or child.is_in_group("barrel"):
 			if room.has_point(_world_to_grid(child.global_position)):
 				placed_positions.append(child.global_position)
 

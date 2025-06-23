@@ -3,7 +3,7 @@ extends Node
 class_name loot_manager
 
 @export var weapon_pickup_scene: PackedScene = preload("res://Scenes/weapon_pickup.tscn")
-@export var armor_pickup_scene: PackedScene = preload("res://Scenes/armor_pickup.tscn")
+@export var armor_pickup_scene: PackedScene # No preload
 @export var health_potion_scene: PackedScene = preload("res://Scenes/health_potion.tscn")
 @export var coin_scene: PackedScene = preload("res://Scenes/coin.tscn")
 @export var xp_orb_scene: PackedScene = preload("res://Scenes/xp_orb.tscn")
@@ -28,35 +28,36 @@ class_name loot_manager
 		"avoid_duplicates": true
 	},
 	"armor": {
-		"drop_chance": 0.03,
+		"drop_chance": 0.0,  # Changed from 0.03 to 0.0
 		"avoid_duplicates": true
 	}
 }
 
-@export var chest_loot_config = {
-	"coin": {
-		"drop_chance": 1.0,
-		"amount_min": 200,
-		"amount_max": 500
-	},
-	"health_potion": {
-		"drop_chance": 1.0,
-		"heal_amount": 75
-	},
-	"xp_orb": {
-		"drop_chance": 1.0,
-		"xp_amount_min": 150,
-		"xp_amount_max": 300
-	},
-	"weapon": {
-		"drop_chance": 0.8,
-		"avoid_duplicates": true
-	},
-	"armor": {
-		"drop_chance": 0.5,
-		"avoid_duplicates": true
-	}
-}
+# CHEST LOOT REMOVAL: This config is now unused, kept for reference only
+# @export var chest_loot_config = {
+# 	"coin": {
+# 		"drop_chance": 1.0,
+# 		"amount_min": 200,
+# 		"amount_max": 500
+# 	},
+# 	"health_potion": {
+# 		"drop_chance": 1.0,
+# 		"heal_amount": 75
+# 	},
+# 	"xp_orb": {
+# 		"drop_chance": 1.0,
+# 		"xp_amount_min": 150,
+# 		"xp_amount_max": 300
+# 	},
+# 	"weapon": {
+# 		"drop_chance": 0.8,
+# 		"avoid_duplicates": true
+# 	},
+# 	"armor": {
+# 		"drop_chance": 0.0,  # Changed from 0.5 to 0.0
+# 		"avoid_duplicates": true
+# 	}
+# }
 
 # --- XP Manager Safe Reference System ---
 # (Removed problematic @onready var xp_manager_node line)
@@ -105,6 +106,9 @@ func _launch_with_physics(loot_item: Node, spawn_position: Vector3):
 	var parent = loot_item.get_parent()
 	loot_item.queue_free()
 	parent.add_child(physics_body)
+	
+	# NOW set the position after it's in the scene tree
+	physics_body.global_position = spawn_position + Vector3(0, 0.5, 0)
 
 	# Apply launch forces
 	var direction = Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
@@ -183,56 +187,32 @@ func drop_enemy_loot(position: Vector3, _enemy_node: Node = null):
 	# Weapon
 	if randf() <= config["weapon"]["drop_chance"]:
 		_drop_weapon_with_physics(position, parent_node)
-	if randf() <= config["armor"]["drop_chance"]:
-		_drop_armor_with_physics(position, parent_node)
+	# if randf() <= config["armor"]["drop_chance"]:
+	#     _drop_armor_with_physics(position, parent_node)
 
-func drop_chest_loot(position: Vector3, _chest_node: Node = null):
-	var config = chest_loot_config
-	var parent_node = _get_drop_parent()
-	if not parent_node:
-		push_error("No parent node for chest loot drop!")
-		return
-	if not coin_scene or not health_potion_scene or not weapon_pickup_scene or not armor_pickup_scene:
-		push_error("One or more loot scenes are missing! Loot drop aborted.")
-		return
-	# Coins
-	if randf() <= config["coin"]["drop_chance"]:
-		var coin_amount = randi_range(config["coin"]["amount_min"], config["coin"]["amount_max"])
-		_create_physics_coin(position, parent_node, coin_amount)
-	# Health Potion
-	if randf() <= config["health_potion"]["drop_chance"]:
-		_drop_health_potion(position, parent_node)
-	# XP Orb
-	if randf() <= config["xp_orb"]["drop_chance"]:
-		var xp_amount = randi_range(config["xp_orb"]["xp_amount_min"], config["xp_orb"]["xp_amount_max"])
-		_create_physics_xp_orb({"xp_amount_min": xp_amount, "xp_amount_max": xp_amount}, position, parent_node)
-	# Weapon
-	if randf() <= config["weapon"]["drop_chance"]:
-		_drop_weapon_with_physics(position, parent_node)
-	if randf() <= config["armor"]["drop_chance"]:
-		_drop_armor_with_physics(position, parent_node)
+# CHEST LOOT REMOVAL: This function is now obsolete and will be removed
+# func drop_chest_loot(position: Vector3, _chest_node: Node = null):
+# 	pass
 
 func _drop_armor_with_physics(position: Vector3, parent: Node):
+	# Early return if armor system isn't ready
 	if not armor_pickup_scene:
-		push_error("No armor pickup scene available!")
+		print("⚠️ Armor system not implemented yet - skipping armor drop")
 		return
-	# --- Armor Pool Empty Protection ---
 	if not ArmorPool:
-		push_error("ArmorPool not available!")
+		print("⚠️ ArmorPool not available - skipping armor drop")
 		return
 	if not ArmorPool.has_method("get_random_armor"):
-		push_error("ArmorPool missing get_random_armor() method!")
+		print("⚠️ ArmorPool missing methods - skipping armor drop")
 		return
-	if ArmorPool.get_armor_count and ArmorPool.get_armor_count() == 0:
-		push_error("[ERROR] ArmorPool is empty! No armor to drop.")
-		return
+	# Only proceed if everything is properly set up
 	var armor_resource = ArmorPool.get_random_armor()
 	if not armor_resource:
-		push_error("No armor available from pool!")
+		print("⚠️ No armor available from pool")
 		return
 	var armor_pickup_instance = armor_pickup_scene.instantiate()
 	if not armor_pickup_instance:
-		push_error("Failed to instantiate armor pickup!")
+		print("⚠️ Failed to instantiate armor pickup")
 		return
 	parent.add_child(armor_pickup_instance)
 	armor_pickup_instance.set_armor_resource(armor_resource)
@@ -275,10 +255,12 @@ func _drop_health_potion(position: Vector3, parent: Node):
 
 
 # Helper: Create a RigidBody3D with loot visuals and metadata
-func _create_safe_physics_body(original_data: Dictionary, spawn_position: Vector3) -> RigidBody3D:
+func _create_safe_physics_body(original_data: Dictionary, _spawn_position: Vector3) -> RigidBody3D:
 	var body := RigidBody3D.new()
-	body.global_position = spawn_position
 	body.name = "LootPhysicsBody"
+	
+	# DON'T set global_position here - the node isn't in the tree yet!
+	# We'll set it after adding to parent in _launch_with_physics
 	
 	# Set collision layers
 	body.collision_layer = 1 << 7  # Layer 8
@@ -300,7 +282,7 @@ func _create_safe_physics_body(original_data: Dictionary, spawn_position: Vector
 			mesh_instance.scale = original_data["scale"]
 		body.add_child(mesh_instance)
 	
-	# CRITICAL: Create collision shape (this was missing!)
+	# Create collision shape
 	var collision := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
 	shape.radius = 0.2
