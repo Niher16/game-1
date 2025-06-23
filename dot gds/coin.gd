@@ -215,3 +215,11 @@ func set_coin_value(value: int):
 	"""Set the coin value"""
 	coin_value = value
 	set_meta("coin_value", value)
+
+
+# Godot 4.1+ best practice: Standardized getter/setter for coin value
+func set_amount(value: int):
+	set_coin_value(value)
+
+func get_amount() -> int:
+	return coin_value

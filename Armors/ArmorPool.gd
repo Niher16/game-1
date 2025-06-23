@@ -55,6 +55,7 @@ func _load_all_armors() -> void:
 
 func _add_armor_to_pool(armor_path: String):
 	"""Add an armor resource to the specified pool by its rarity property"""
+	# Prevents errors if armor files haven't been created yet by checking existence before loading.
 	if ResourceLoader.exists(armor_path):
 		var armor = load(armor_path)
 		if armor and armor.has_property("armor_name") and armor.has_property("armor_type"):
@@ -67,7 +68,8 @@ func _add_armor_to_pool(armor_path: String):
 				armor_pools[rarity].append(armor)
 				print("📦 Added ", armor.armor_name, " to ", rarity, " pool")
 	else:
-		print("⚠️ Armor not found: ", armor_path)
+		# Friendly debug message if file doesn't exist
+		print("⚠️ Armor file not found (not loaded): ", armor_path)
 
 # Returns a random armor resource from the specified rarity pool.
 # If no rarity is specified, chooses from all pools.
