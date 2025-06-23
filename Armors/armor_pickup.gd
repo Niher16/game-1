@@ -1,5 +1,9 @@
 # armor_pickup.gd - Enhanced armor pickup, structure matches weapon_pickup.gd
+class_name armor_pickup
 extends Area3D
+
+# Preload the armor pickup scene for instancing
+@export var armor_scene: PackedScene = preload("res://Scenes/armor_pickup.tscn")
 
 static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -> bool:
 	if not mesh_target:
