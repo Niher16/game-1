@@ -135,24 +135,40 @@ func _find_references():
 	player = get_tree().get_first_node_in_group("player")
 	if player:
 		print("UI: Found player!")
-		# Don't try to connect signals directly - player uses call_group instead
-		# Connect ally signals
+		# Connect ally signals for all existing allies
 		var allies = get_tree().get_nodes_in_group("allies")
 		for ally in allies:
 			_connect_ally_signals(ally)
 		print("UI: Connected ally signals")
+		# Listen for new allies being added to the scene tree (fixed connect signature)
+		get_tree().connect("node_added", Callable(self, "_on_node_added"), CONNECT_DEFERRED)
 	else:
 		print("UI: Player not found!")
 		await get_tree().create_timer(1.0).timeout
 		_find_references()
 
 func _connect_ally_signals(ally):
+	if not is_instance_valid(ally):
+		return
+	# Connect ally_added, ally_removed, ally_died signals with safety checks
 	if ally.has_signal("ally_added") and not ally.is_connected("ally_added", Callable(self, "_on_ally_added")):
 		ally.connect("ally_added", Callable(self, "_on_ally_added"))
 	if ally.has_signal("ally_removed") and not ally.is_connected("ally_removed", Callable(self, "_on_ally_removed")):
 		ally.connect("ally_removed", Callable(self, "_on_ally_removed"))
 	if ally.has_signal("ally_died") and not ally.is_connected("ally_died", Callable(self, "_on_ally_died")):
 		ally.connect("ally_died", Callable(self, "_on_ally_died"))
+	# Optionally, handle ally removal from scene
+	if not ally.is_connected("tree_exited", Callable(self, "_on_ally_removed")):
+		ally.connect("tree_exited", Callable(self, "_on_ally_removed"))
+
+func _on_node_added(node):
+	# Safety: Only process if node is still valid
+	if not is_instance_valid(node):
+		return
+	# If a new ally is added to the scene, connect its signals
+	if node.is_in_group("allies"):
+		_connect_ally_signals(node)
+		_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _find_spawner_with_retry():
 	spawner = get_tree().get_first_node_in_group("spawner")
