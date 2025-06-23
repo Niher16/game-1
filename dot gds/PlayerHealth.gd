@@ -117,7 +117,7 @@ func _show_damage_feedback(damage_amount: int):
 			damage_sound.play()
 
 # 🔧 FIXED: Enhanced heal flash with proper timer
-func _show_heal_feedback(heal_amount: int):
+func _show_heal_feedback(_heal_amount: int):
 	var mesh = _get_mesh_instance()
 	if not player_ref or not mesh or not mesh.material_override:
 		return

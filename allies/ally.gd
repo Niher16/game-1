@@ -263,11 +263,6 @@ func take_damage(amount: int, _source = null):
 
 	if health_component:
 		health_component.take_damage(amount, _source)
-	else:
-		# fallback: just flash and show damage
-		if get_tree().get_first_node_in_group("damage_numbers"):
-			get_tree().get_first_node_in_group("damage_numbers").show_damage(amount, self, "massive")
-		_flash_red()
 
 func _on_health_depleted():
 	ally_died.emit()

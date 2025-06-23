@@ -21,7 +21,6 @@ WeaponManager="*res://dot gds/WeaponManager.gd"
 WeaponPool="*res://dot gds/WeaponPool.gd"
 WeaponAnimationManager="*res://dot gds/WeaponAnimationManager.gd"
 DashEffectsManager="*res://dot gds/DashEffectsManager.gd"
-DamageNumbers="*res://dot gds/damage_numbers.gd"
 
 [game]
 
