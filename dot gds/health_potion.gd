@@ -1,4 +1,4 @@
-# health_potion.gd - Simple glowing health potion with proper physics support
+# health_potion.gd - Fixed version with proper color and healing
 extends Area3D
 
 # Health potion settings
@@ -22,9 +22,8 @@ var time_alive: float = 0.0
 var mesh_instance: MeshInstance3D
 var potion_material: StandardMaterial3D
 
-# Make _ready use await without async keyword
 func _ready():
-	print("🧪 Health Potion: Creating simple glowing potion bottle...")
+	print("🧪 Health Potion: Creating red glowing potion bottle...")
 	add_to_group("health_potion")
 	set_meta("heal_amount", heal_amount)
 	collision_layer = 4
@@ -39,29 +38,37 @@ func _ready():
 		set_meta("pickup_disabled", not player.can_heal())
 		_update_visual_state()
 
-# Replace the _create_simple_bottle function with the fixed version (no async keyword)
+# FIXED: Enhanced bottle creation with guaranteed red color
 func _create_simple_bottle():
 	# Create MeshInstance3D first
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "PotionMesh"
 	add_child(mesh_instance)
+	
 	# Create and assign mesh FIRST
 	var bottle_mesh = CapsuleMesh.new()
 	bottle_mesh.radius = 0.12
 	bottle_mesh.height = 0.4
 	mesh_instance.mesh = bottle_mesh
+	
 	# WAIT for next frame before setting materials
 	await get_tree().process_frame
-	# NOW create and set materials safely
+	
+	# NOW create and set materials safely with BRIGHT RED color
 	potion_material = StandardMaterial3D.new()
-	potion_material.albedo_color = Color(1.0, 0.2, 0.2, 0.85)
+	potion_material.albedo_color = Color(1.0, 0.1, 0.1, 0.9)  # Brighter red, less transparent
 	potion_material.emission_enabled = true
-	potion_material.emission = Color(1.0, 0.1, 0.1) * glow_intensity
+	potion_material.emission = Color(1.0, 0.0, 0.0) * glow_intensity  # Pure red emission
 	potion_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	potion_material.roughness = 0.3
-	potion_material.metallic = 0.1
-	# Safe assignment
-	mesh_instance.material_override = potion_material
+	potion_material.roughness = 0.2  # More shiny
+	potion_material.metallic = 0.0   # Less metallic for clearer color
+	
+	# Force material application with safety checks
+	if mesh_instance and mesh_instance.mesh:
+		mesh_instance.material_override = potion_material
+		print("✅ Red material applied to health potion")
+	
+	# Create cork (brown top)
 	var cork = MeshInstance3D.new()
 	cork.name = "Cork"
 	mesh_instance.add_child(cork)
@@ -75,6 +82,8 @@ func _create_simple_bottle():
 	cork_material.albedo_color = Color(0.4, 0.25, 0.1)
 	cork_material.roughness = 0.8
 	cork.material_override = cork_material
+	
+	# Create collision shape
 	var collision = CollisionShape3D.new()
 	var capsule_shape = CapsuleShape3D.new()
 	capsule_shape.radius = 0.15
@@ -115,7 +124,8 @@ func _animate_potion(delta):
 	var glow_multiplier = 0.6 + (pulse * 0.8)
 	if get_meta("pickup_disabled", false):
 		glow_multiplier *= 0.4
-	potion_material.emission = Color(1.0, 0.1, 0.1) * glow_intensity * glow_multiplier
+	# Maintain bright red glow
+	potion_material.emission = Color(1.0, 0.0, 0.0) * glow_intensity * glow_multiplier
 	var alpha_pulse = 0.8 + (sin(time_alive * pulse_speed * 1.5) * 0.15)
 	potion_material.albedo_color.a = alpha_pulse
 
@@ -137,11 +147,23 @@ func _move_toward_player(delta):
 	var direction_to_player = (player.global_position - global_position).normalized()
 	global_position += direction_to_player * vacuum_speed * delta
 
+# FIXED: Actually heal the player when collected
 func _collect_potion():
 	if is_being_collected:
 		return
 	is_being_collected = true
 	print("🧪 Health Potion: Collected! Healing for ", heal_amount, " HP!")
+	
+	# FIX: Actually heal the player here!
+	if player and player.has_method("take_damage"):  # Player exists and has damage system
+		if player.health_component and player.health_component.has_method("heal"):
+			player.health_component.heal(heal_amount)  # Actually heal the player!
+			print("✅ Player healed for ", heal_amount, " HP!")
+		else:
+			print("❌ Player health_component not found!")
+	else:
+		print("❌ Player not found or missing take_damage method!")
+	
 	_create_collection_effect()
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
@@ -162,8 +184,8 @@ func _create_pickup_delay_effect(delay_time: float):
 	if potion_material:
 		var tween = create_tween()
 		tween.set_loops(int(delay_time * 2))
-		var dim_emission = Color(1.0, 0.1, 0.1) * (glow_intensity * 0.3)
-		var normal_emission = Color(1.0, 0.1, 0.1) * (glow_intensity * 0.7)
+		var dim_emission = Color(1.0, 0.0, 0.0) * (glow_intensity * 0.3)  # Keep red
+		var normal_emission = Color(1.0, 0.0, 0.0) * (glow_intensity * 0.7)  # Keep red
 		tween.tween_property(potion_material, "emission", dim_emission, 0.25)
 		tween.tween_property(potion_material, "emission", normal_emission, 0.25)
 
@@ -179,8 +201,6 @@ func _on_body_entered(body):
 			# Show feedback for full health
 			if body.has_method("show_message"):
 				body.show_message("Already at full health!")
-			set_meta("pickup_disabled", true)
-			_update_visual_state()
 
 # Utility: Get or create StandardMaterial3D for a MeshInstance3D
 func get_or_create_material(mesh: MeshInstance3D) -> StandardMaterial3D:
@@ -207,7 +227,7 @@ func _update_visual_state():
 			if get_meta("pickup_disabled", false):
 				mat.albedo_color = Color(0.5, 0.5, 0.5, 0.5) # Greyed out, semi-transparent
 			else:
-				mat.albedo_color = Color(1, 0.2, 0.2, 0.85) # Normal color
+				mat.albedo_color = Color(1.0, 0.1, 0.1, 0.9) # Bright red
 
 static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -> bool:
 	if not mesh_target:
