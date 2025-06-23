@@ -16,13 +16,13 @@ static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -
 	return true
 
 # Preloaded mesh constants for armor types
-const HELM_MESH = preload("res://Armors/helm_iron.tres")
-const CHEST_MESH = preload("res://Armors/chest_leather.tres")
-const SHOULDERS_MESH = preload("res://Armors/shoulders_steel.tres")
-const BOOTS_MESH = preload("res://Armors/boots_mythril.tres")
+# const HELM_MESH = preload("res://Armors/helm_iron.tres")
+# const CHEST_MESH = preload("res://Armors/chest_leather.tres")
+# const SHOULDERS_MESH = preload("res://Armors/shoulders_steel.tres")
+# const BOOTS_MESH = preload("res://Armors/boots_mythril.tres")
 
 # Armor resource assigned to this pickup
-@export var armor_resource: ArmorResource = null
+@export var armor_resource: Resource = null
 
 # Enhanced visual settings
 @export var glow_intensity: float = 1.5
@@ -110,7 +110,7 @@ func _clear_armor_parts():
 func _create_helm_visual():
 	_clear_armor_parts()
 	var helm_mesh_instance = MeshInstance3D.new()
-	helm_mesh_instance.mesh = HELM_MESH
+	# helm_mesh_instance.mesh = HELM_MESH
 	var helm_material = StandardMaterial3D.new()
 	helm_material.albedo_color = Color(0.7, 0.7, 0.8)
 	helm_material.metallic = 0.8
@@ -128,7 +128,7 @@ func _create_helm_visual():
 func _create_chest_visual():
 	_clear_armor_parts()
 	var chest_mesh_instance = MeshInstance3D.new()
-	chest_mesh_instance.mesh = CHEST_MESH
+	# chest_mesh_instance.mesh = CHEST_MESH
 	var chest_material = StandardMaterial3D.new()
 	chest_material.albedo_color = Color(0.8, 0.6, 0.4)
 	chest_material.metallic = 0.5
@@ -146,7 +146,7 @@ func _create_chest_visual():
 func _create_shoulders_visual():
 	_clear_armor_parts()
 	var shoulders_mesh_instance = MeshInstance3D.new()
-	shoulders_mesh_instance.mesh = SHOULDERS_MESH
+	# shoulders_mesh_instance.mesh = SHOULDERS_MESH
 	var shoulders_material = StandardMaterial3D.new()
 	shoulders_material.albedo_color = Color(0.7, 0.7, 0.7)
 	shoulders_material.metallic = 0.7
@@ -164,7 +164,7 @@ func _create_shoulders_visual():
 func _create_boots_visual():
 	_clear_armor_parts()
 	var boots_mesh_instance = MeshInstance3D.new()
-	boots_mesh_instance.mesh = BOOTS_MESH
+	# boots_mesh_instance.mesh = BOOTS_MESH
 	var boots_material = StandardMaterial3D.new()
 	boots_material.albedo_color = Color(0.6, 0.8, 0.7)
 	boots_material.metallic = 0.6
