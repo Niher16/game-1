@@ -1,0 +1,10 @@
+[gd_resource type="ArmorResource" load_steps=6 format=3]
+
+armor_name = "Iron Helm"
+armor_type = 0 # HELM
+durability = 100
+protection_amount = 15
+armor_mesh = ExtResource( 1 ) # Replace with your mesh resource
+rarity = 1 # UNCOMMON
+
+[ext_resource path="res://models/helm_iron_mesh.tres" type="Mesh" id=1]

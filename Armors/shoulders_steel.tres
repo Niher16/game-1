@@ -1,0 +1,10 @@
+[gd_resource type="ArmorResource" load_steps=2 format=3]
+
+armor_name = "Steel Shoulders"
+armor_type = 2 # SHOULDERS
+durability = 120
+protection_amount = 18
+armor_mesh = ExtResource( 1 )
+rarity = 2 # RARE
+
+[ext_resource path="res://models/shoulders_steel_mesh.tres" type="Mesh" id=1]
