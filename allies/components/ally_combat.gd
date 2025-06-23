@@ -101,8 +101,3 @@ func _deal_damage(target: Node3D):
 	if target.has_method("take_damage"):
 		target.take_damage(attack_damage)
 		attack_hit.emit(target)
-	
-	# Show damage numbers
-	var damage_system = get_tree().get_first_node_in_group("damage_numbers")
-	if damage_system and damage_system.has_method("show_damage"):
-		damage_system.show_damage(attack_damage, target, "normal")

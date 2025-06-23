@@ -111,13 +111,6 @@ func _show_damage_feedback(damage_amount: int):
 	scale_tween.set_parallel(true)
 	scale_tween.tween_property(mesh, "scale", Vector3(1.1, 0.9, 1.1), 0.1)
 	scale_tween.tween_property(mesh, "scale", Vector3.ONE, 0.1).set_delay(0.1)
-	# Show damage numbers if the damage system exists
-	var tree = player_ref.get_tree() if player_ref else null
-	if tree:
-		var damage_nodes = tree.get_nodes_in_group("damage_numbers")
-		print("DEBUG: damage_numbers group count: ", damage_nodes.size())
-		if damage_nodes.size() > 0 and damage_nodes[0].has_method("show_damage"):
-			damage_nodes[0].show_damage(damage_amount, player_ref, "massive")
 	if player_ref.has_node("DamageSound"):
 		var damage_sound = player_ref.get_node("DamageSound")
 		if damage_sound and damage_sound.has_method("play"):
@@ -137,12 +130,6 @@ func _show_heal_feedback(heal_amount: int):
 		if mesh2 and mesh2.material_override:
 			mesh2.material_override.albedo_color = original_color
 	)
-	# Show heal numbers
-	var tree = player_ref.get_tree() if player_ref else null
-	if tree:
-		var heal_system = tree.get_first_node_in_group("damage_numbers")
-		if heal_system and heal_system.has_method("show_heal"):
-			heal_system.show_heal(heal_amount, player_ref)
 
 # 🔧 NEW: Process function to handle flash timer
 func _process(delta: float):

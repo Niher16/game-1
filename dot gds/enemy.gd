@@ -663,10 +663,6 @@ func take_damage(amount: int):
 	if is_dead:
 		return
 	
-	var damage_system = get_tree().get_first_node_in_group("damage_numbers")
-	if damage_system:
-		damage_system.show_damage(amount, self)
-	
 	health -= amount
 	damage_flash_timer = 0.3
 	_flash_damage()

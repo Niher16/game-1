@@ -29,11 +29,6 @@ func take_damage(amount: int, attacker: Node = null):
 	current_health = max(0, current_health - amount)
 	health_changed.emit(current_health, max_health)
 	
-	# Show damage numbers if system exists
-	var damage_system = get_tree().get_first_node_in_group("damage_numbers")
-	if damage_system and damage_system.has_method("show_damage"):
-		damage_system.show_damage(amount, ally_ref, "normal")
-	
 	# Knockback from attacker
 	if attacker and current_health > 0:
 		_apply_knockback(attacker)
