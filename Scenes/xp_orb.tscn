@@ -8,4 +8,5 @@
 script = ExtResource("1_4esmx")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+visible = false
 mesh = SubResource("TorusMesh_vmcme")
