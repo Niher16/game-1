@@ -2,6 +2,19 @@
 class_name armor_pickup
 extends Area3D
 
+# Armor types for pickup system - simple shapes for now
+# TODO: Replace with actual mesh files later when art is ready
+# HELM = helmet/head protection
+# CHEST = body armor/chestplate  
+# SHOULDERS = shoulder guards/pauldrons
+# BOOTS = foot protection/greaves
+enum ArmorType {
+    HELM = 0,
+    CHEST = 1, 
+    SHOULDERS = 2,
+    BOOTS = 3
+}
+
 # Preload the armor pickup scene for instancing
 @export var armor_scene: PackedScene = preload("res://Scenes/armor_pickup.tscn")
 
@@ -13,6 +26,19 @@ static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -
 		push_warning("🚨 Material is null - creating default material")
 		material = StandardMaterial3D.new()
 	mesh_target.material_override = material
+	return true
+
+func safe_setup_armor_material(mesh_instance: MeshInstance3D, base_color: Color) -> bool:
+	if not mesh_instance or not mesh_instance.mesh:
+		push_warning('🚨 Armor mesh_instance is null - cannot set material')
+		return false
+	var material = StandardMaterial3D.new()
+	material.albedo_color = base_color
+	material.metallic = 0.3
+	material.roughness = 0.7
+	material.emission_enabled = true
+	material.emission = base_color * 0.2  # Subtle glow
+	mesh_instance.material_override = material
 	return true
 
 # Preloaded mesh constants for armor types
@@ -84,13 +110,13 @@ func _setup_enhanced_visual():
 		return
 	_clear_armor_parts()
 	match armor_resource.armor_type:
-		HELM:
+		ArmorType.HELM:
 			_create_helm_visual()
-		CHEST:
+		ArmorType.CHEST:
 			_create_chest_visual()
-		SHOULDERS:
+		ArmorType.SHOULDERS:
 			_create_shoulders_visual()
-		BOOTS:
+		ArmorType.BOOTS:
 			_create_boots_visual()
 		_:
 			_create_default_armor_visual()
@@ -109,79 +135,23 @@ func _clear_armor_parts():
 
 func _create_helm_visual():
 	_clear_armor_parts()
-	var helm_mesh_instance = MeshInstance3D.new()
-	# helm_mesh_instance.mesh = HELM_MESH
-	var helm_material = StandardMaterial3D.new()
-	helm_material.albedo_color = Color(0.7, 0.7, 0.8)
-	helm_material.metallic = 0.8
-	helm_material.roughness = 0.2
-	helm_material.emission_enabled = true
-	helm_material.emission = Color(0.5, 0.7, 1.0) * glow_intensity
-	helm_material.rim_enabled = true
-	helm_material.rim = 0.7
-	safe_set_material(helm_mesh_instance, helm_material)
-	helm_mesh_instance.position = Vector3(0, 0.5, 0)
-	helm_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
-	add_child(helm_mesh_instance)
-	armor_parts.append(helm_mesh_instance)
+	_create_simple_armor_visual(ArmorType.HELM)
 
 func _create_chest_visual():
 	_clear_armor_parts()
-	var chest_mesh_instance = MeshInstance3D.new()
-	# chest_mesh_instance.mesh = CHEST_MESH
-	var chest_material = StandardMaterial3D.new()
-	chest_material.albedo_color = Color(0.8, 0.6, 0.4)
-	chest_material.metallic = 0.5
-	chest_material.roughness = 0.3
-	chest_material.emission_enabled = true
-	chest_material.emission = Color(0.8, 0.6, 0.4) * glow_intensity * 0.2
-	chest_material.rim_enabled = true
-	chest_material.rim = 0.6
-	safe_set_material(chest_mesh_instance, chest_material)
-	chest_mesh_instance.position = Vector3(0, 0.5, 0)
-	chest_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
-	add_child(chest_mesh_instance)
-	armor_parts.append(chest_mesh_instance)
+	_create_simple_armor_visual(ArmorType.CHEST)
 
 func _create_shoulders_visual():
 	_clear_armor_parts()
-	var shoulders_mesh_instance = MeshInstance3D.new()
-	# shoulders_mesh_instance.mesh = SHOULDERS_MESH
-	var shoulders_material = StandardMaterial3D.new()
-	shoulders_material.albedo_color = Color(0.7, 0.7, 0.7)
-	shoulders_material.metallic = 0.7
-	shoulders_material.roughness = 0.25
-	shoulders_material.emission_enabled = true
-	shoulders_material.emission = Color(0.7, 0.7, 0.7) * glow_intensity * 0.2
-	shoulders_material.rim_enabled = true
-	shoulders_material.rim = 0.7
-	safe_set_material(shoulders_mesh_instance, shoulders_material)
-	shoulders_mesh_instance.position = Vector3(0, 0.5, 0)
-	shoulders_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
-	add_child(shoulders_mesh_instance)
-	armor_parts.append(shoulders_mesh_instance)
+	_create_simple_armor_visual(ArmorType.SHOULDERS)
 
 func _create_boots_visual():
 	_clear_armor_parts()
-	var boots_mesh_instance = MeshInstance3D.new()
-	# boots_mesh_instance.mesh = BOOTS_MESH
-	var boots_material = StandardMaterial3D.new()
-	boots_material.albedo_color = Color(0.6, 0.8, 0.7)
-	boots_material.metallic = 0.6
-	boots_material.roughness = 0.3
-	boots_material.emission_enabled = true
-	boots_material.emission = Color(0.6, 0.8, 0.7) * glow_intensity * 0.2
-	boots_material.rim_enabled = true
-	boots_material.rim = 0.6
-	safe_set_material(boots_mesh_instance, boots_material)
-	boots_mesh_instance.position = Vector3(0, 0.5, 0)
-	boots_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
-	add_child(boots_mesh_instance)
-	armor_parts.append(boots_mesh_instance)
+	_create_simple_armor_visual(ArmorType.BOOTS)
 
 func _create_default_armor_visual():
 	_clear_armor_parts()
-	_create_helm_visual()
+	_create_simple_armor_visual(ArmorType.HELM)
 
 func _create_floating_text():
 	floating_text = Label3D.new()
@@ -282,3 +252,27 @@ func _create_pickup_delay_effect(delay_time: float):
 				var normal_emission = material.emission
 				tween.tween_property(material, "emission", dim_emission, 0.25)
 				tween.tween_property(material, "emission", normal_emission, 0.25)
+
+func _create_simple_armor_visual(armor_type: ArmorType):
+	var local_mesh_instance = MeshInstance3D.new()
+	var base_color = Color.WHITE
+	match armor_type:
+		ArmorType.HELM:
+			local_mesh_instance.mesh = SphereMesh.new()
+			local_mesh_instance.mesh.radius = 0.3
+			base_color = Color.STEEL_BLUE
+		ArmorType.CHEST:
+			local_mesh_instance.mesh = BoxMesh.new()
+			local_mesh_instance.mesh.size = Vector3(0.6, 0.8, 0.4)
+			base_color = Color.DARK_GRAY
+		ArmorType.SHOULDERS:
+			local_mesh_instance.mesh = CapsuleMesh.new()
+			local_mesh_instance.mesh.radius = 0.2
+			local_mesh_instance.mesh.height = 0.5
+			base_color = Color.DIM_GRAY
+		ArmorType.BOOTS:
+			local_mesh_instance.mesh = BoxMesh.new()
+			local_mesh_instance.mesh.size = Vector3(0.3, 0.2, 0.5)
+			base_color = Color.SADDLE_BROWN
+	safe_setup_armor_material(local_mesh_instance, base_color)
+	add_child(local_mesh_instance)
