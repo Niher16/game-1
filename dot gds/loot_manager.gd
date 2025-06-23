@@ -57,16 +57,26 @@ class_name loot_manager
 	}
 }
 
+# --- XP Manager Safe Reference System ---
+# Onready variable to safely reference the XP manager node if it exists in the scene tree.
+# This prevents repeated get_node() lookups and allows for fallback behavior if missing.
+@onready var xp_manager_node: Node = get_node("xp_manager") if has_node("xp_manager") else null
+
 func _launch_with_physics(loot_item: Node, spawn_position: Vector3):
 	if not loot_item:
 		push_error("loot_item is null in _launch_with_physics!")
 		return
 	loot_item.global_transform.origin = spawn_position
+	# --- Physics Body Safety Checks ---
 	if loot_item.has_node("RigidBody3D"):
 		var body = loot_item.get_node("RigidBody3D")
-		body.global_transform.origin = spawn_position
-		var impulse = Vector3(randf_range(-2,2), randf_range(4,7), randf_range(-2,2))
-		body.apply_impulse(Vector3.ZERO, impulse)
+		if body and is_instance_valid(body):
+			body.global_transform.origin = spawn_position
+			var impulse = Vector3(randf_range(-2,2), randf_range(4,7), randf_range(-2,2))
+			body.apply_impulse(Vector3.ZERO, impulse)
+			print("[DEBUG] Applied impulse to loot_item at ", spawn_position)
+		else:
+			push_error("RigidBody3D node is invalid on loot_item!")
 	else:
 		push_error("loot_item has no RigidBody3D for physics!")
 
@@ -83,16 +93,64 @@ func _create_physics_coin(position: Vector3, parent: Node, amount: int):
 		return
 	parent.add_child(coin_instance)
 	coin_instance.global_transform.origin = position
+	# Godot 4.1+ null safety and method check
+	if coin_instance and is_instance_valid(coin_instance):
+		if safe_set_property(coin_instance, "set_coin_value", amount):
+			print("[DEBUG] set_coin_value method used for coin:", amount)
+		else:
+			coin_instance.set_meta("coin_value", amount)
+			print("[DEBUG] set_meta fallback for coin_value:", amount)
+	else:
+		push_error("Coin instance invalid after instantiation!")
+	# Confirm coin spawn for debugging
+	print("💰 Spawned coin pickup:", amount)
+
+	# Remove duplicate var declaration, reuse coin_instance
+	if not coin_scene:
+		push_error("No coin scene available!")
+		return
+	if not parent:
+		push_error("No parent node for coin spawn!")
+		return
+	coin_instance = coin_scene.instantiate()
+	if not coin_instance:
+		push_error("Failed to instantiate coin!")
+		return
+	parent.add_child(coin_instance)
+	coin_instance.global_transform.origin = position
+	# Godot 4.1+ null safety and method check
+	if coin_instance and is_instance_valid(coin_instance):
+		if coin_instance.has_method("set_coin_value"):
+			coin_instance.set_coin_value(amount)
+			print("[DEBUG] set_coin_value method used for coin:", amount)
+		else:
+			coin_instance.set_meta("coin_value", amount)
+			print("[DEBUG] set_meta fallback for coin_value:", amount)
+	else:
+		push_error("Coin instance invalid after instantiation!")
+	# Confirm coin spawn for debugging
+	print("💰 Spawned coin pickup:", amount)
+
+	if not coin_scene:
+		push_error("No coin scene available!")
+		return
+	if not parent:
+		push_error("No parent node for coin spawn!")
+		return
+	coin_instance = coin_scene.instantiate()
+	if not coin_instance:
+		push_error("Failed to instantiate coin!")
+		return
+	parent.add_child(coin_instance)
+	coin_instance.global_transform.origin = position
 	if coin_instance.has_method("set_amount"):
 		coin_instance.set_amount(amount)
 	else:
 		coin_instance.amount = amount
 	# Set coin value to match treasure/enemy worth (Godot 4.1+)
-	if coin_instance.has_property("coin_value"):
-		coin_instance.coin_value = amount
-		print("[DEBUG] Setting coin value to:", amount)
-	else:
-		push_warning("Coin missing coin_value property! Check coin.gd for correct export variable.")
+	# Removed has_property usage for Godot 4.1+
+	coin_instance.set_meta("coin_value", amount)
+	print("[DEBUG] set_meta fallback for coin_value:", amount)
 	# Confirm coin spawn for debugging
 	print("💰 Spawned coin pickup:", amount)
 
@@ -133,12 +191,12 @@ func drop_enemy_loot(position: Vector3, _enemy_node: Node = null):
 	# XP Orb
 	if randf() <= config["xp_orb"]["drop_chance"]:
 		var xp_amount = randi_range(config["xp_orb"]["xp_amount_min"], config["xp_orb"]["xp_amount_max"])
-		var xp_manager = _get_node("xp_manager")
-		if xp_manager:
-			xp_manager.add_xp(xp_amount)
+		# --- Safe XP Manager Usage ---
+		if xp_manager_node and is_instance_valid(xp_manager_node):
+			xp_manager_node.add_xp(xp_amount)
 			print("✨ Dropped XP Orb: ", xp_amount)
 		else:
-			push_error("xp_manager node not found!")
+			push_error("[ERROR] xp_manager node not found or invalid! XP not awarded. (enemy loot)")
 	# Weapon
 	if randf() <= config["weapon"]["drop_chance"]:
 		_drop_weapon_with_physics(position, parent_node)
@@ -164,12 +222,12 @@ func drop_chest_loot(position: Vector3, _chest_node: Node = null):
 	# XP Orb
 	if randf() <= config["xp_orb"]["drop_chance"]:
 		var xp_amount = randi_range(config["xp_orb"]["xp_amount_min"], config["xp_orb"]["xp_amount_max"])
-		var xp_manager = _get_node("xp_manager")
-		if xp_manager:
-			xp_manager.add_xp(xp_amount)
+		# --- Safe XP Manager Usage ---
+		if xp_manager_node and is_instance_valid(xp_manager_node):
+			xp_manager_node.add_xp(xp_amount)
 			print("✨ Dropped XP Orb: ", xp_amount)
 		else:
-			push_error("xp_manager node not found!")
+			push_error("[ERROR] xp_manager node not found or invalid! XP not awarded. (chest loot)")
 	# Weapon
 	if randf() <= config["weapon"]["drop_chance"]:
 		_drop_weapon_with_physics(position, parent_node)
@@ -180,8 +238,15 @@ func _drop_armor_with_physics(position: Vector3, parent: Node):
 	if not armor_pickup_scene:
 		push_error("No armor pickup scene available!")
 		return
+	# --- Armor Pool Empty Protection ---
 	if not ArmorPool:
 		push_error("ArmorPool not available!")
+		return
+	if not ArmorPool.has_method("get_random_armor"):
+		push_error("ArmorPool missing get_random_armor() method!")
+		return
+	if ArmorPool.get_armor_count and ArmorPool.get_armor_count() == 0:
+		push_error("[ERROR] ArmorPool is empty! No armor to drop.")
 		return
 	var armor_resource = ArmorPool.get_random_armor()
 	if not armor_resource:
@@ -220,3 +285,15 @@ func _drop_health_potion(position: Vector3, parent: Node):
 	parent.add_child(potion_instance)
 	potion_instance.global_transform.origin = position
 	print("🧪 Dropped health potion at ", position)
+
+
+# Godot 4.1+ compatibility wrapper for safe property/method setting
+func safe_set_property(object: Node, method_name: String, value) -> bool:
+	if object and is_instance_valid(object) and object.has_method(method_name):
+		object.call(method_name, value)
+		return true
+	return false
+
+# --- Debug Logging System ---
+# All push_error and print statements above provide clear, context-rich debug info for missing nodes, empty pools, and invalid objects.
+# This helps identify and fix issues quickly in Godot 4.1+ projects.

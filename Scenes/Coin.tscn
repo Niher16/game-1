@@ -1,6 +1,11 @@
-[gd_scene load_steps=2 format=3 uid="uid://lhcwwxb1gkpn"]
+[gd_scene load_steps=3 format=3 uid="uid://lhcwwxb1gkpn"]
 
 [ext_resource type="Script" uid="uid://r10li1jlnb4y" path="res://dot gds/coin.gd" id="1_qrc3l"]
 
+[sub_resource type="SphereMesh" id="SphereMesh_qrc3l"]
+
 [node name="Coin" type="Area3D"]
 script = ExtResource("1_qrc3l")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_qrc3l")
