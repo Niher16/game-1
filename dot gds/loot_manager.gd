@@ -63,9 +63,9 @@ class_name loot_manager
 # (Removed problematic @onready var xp_manager_node line)
 @onready var xp_manager = null
 
-var launch_force_min = 10.0
-var launch_force_max = 20.0
-var upward_force = 5.0
+var launch_force_min = 1.0
+var launch_force_max = 2.0
+var upward_force = 0.5
 var pickup_delay = 0.5 # Delay before pickup is available
 
 func _launch_with_physics(loot_item: Node, spawn_position: Vector3):
