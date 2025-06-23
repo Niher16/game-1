@@ -1,3 +1,3 @@
-[gd_scene load_steps=1 format=3 uid="uid://new_scene_1750706356752"]
+[gd_scene format=3 uid="uid://bkk7p4lipgoy"]
 
 [node name="armor_pickup" type="Area3D"]

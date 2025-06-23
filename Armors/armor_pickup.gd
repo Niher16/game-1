@@ -9,10 +9,10 @@ extends Area3D
 # SHOULDERS = shoulder guards/pauldrons
 # BOOTS = foot protection/greaves
 enum ArmorType {
-    HELM = 0,
-    CHEST = 1, 
-    SHOULDERS = 2,
-    BOOTS = 3
+	HELM = 0,
+	CHEST = 1, 
+	SHOULDERS = 2,
+	BOOTS = 3
 }
 
 # Preload the armor pickup scene for instancing
@@ -28,8 +28,8 @@ static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -
 	mesh_target.material_override = material
 	return true
 
-func safe_setup_armor_material(mesh_instance: MeshInstance3D, base_color: Color) -> bool:
-	if not mesh_instance or not mesh_instance.mesh:
+func safe_setup_armor_material(target_mesh_instance: MeshInstance3D, base_color: Color) -> bool:
+	if not target_mesh_instance or not target_mesh_instance.mesh:
 		push_warning('🚨 Armor mesh_instance is null - cannot set material')
 		return false
 	var material = StandardMaterial3D.new()
@@ -38,7 +38,7 @@ func safe_setup_armor_material(mesh_instance: MeshInstance3D, base_color: Color)
 	material.roughness = 0.7
 	material.emission_enabled = true
 	material.emission = base_color * 0.2  # Subtle glow
-	mesh_instance.material_override = material
+	target_mesh_instance.material_override = material
 	return true
 
 # Preloaded mesh constants for armor types
