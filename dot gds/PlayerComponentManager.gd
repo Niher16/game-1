@@ -5,11 +5,14 @@ class_name PlayerComponentManager
 # Manages additional player components (inventory, effects, etc)
 var components := {}
 
-# Add a property to hold the controller reference
-var _controller: CharacterBody3D
+@export var _controller: CharacterBody3D  # Properly typed controller reference
 
-func initialize(controller):
-	self._controller = controller
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:
+		push_error("PlayerComponentManager: Controller cannot be null")
+		return
+	_controller = new_controller
+	print("✅ PlayerComponentManager: Controller initialized successfully")
 
 func register_component(component_name: String, component):
 	components[component_name] = component

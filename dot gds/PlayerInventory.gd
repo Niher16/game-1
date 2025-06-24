@@ -8,8 +8,14 @@ signal item_removed(item)
 
 var items := []
 
-func initialize(controller):
-	self.controller = controller
+@export var controller: CharacterBody3D  # Properly typed controller reference
+
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:  # Null safety check
+		push_error("PlayerInventory: Controller cannot be null")
+		return
+	controller = new_controller  # Now properly typed assignment
+	print("✅ PlayerInventory: Controller initialized successfully")
 
 func add_item(item):
 	items.append(item)

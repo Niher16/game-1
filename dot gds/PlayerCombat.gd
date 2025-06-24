@@ -3,15 +3,19 @@ extends Node
 class_name PlayerCombat
 
 # Handles player combat logic
-var controller
+@export var controller: CharacterBody3D  # Properly typed controller reference
 signal attack_performed
 
 var attack_damage := 10
 var attack_cooldown := 1.0
 var can_attack := true
 
-func initialize(new_controller):
-	self.controller = new_controller
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:  # Null safety check
+		push_error("PlayerCombat: Controller cannot be null")
+		return
+	controller = new_controller  # Now properly typed assignment
+	print("✅ PlayerCombat: Controller initialized successfully")
 
 func perform_attack():
 	if can_attack:

@@ -3,14 +3,18 @@ extends Node
 class_name PlayerHealth
 
 # Handles player health logic
-var controller
+@export var controller: CharacterBody3D  # Properly typed controller reference
 var max_health := 100
 var current_health := 100
 signal health_changed(current_health, max_health)
 signal player_died
 
-func initialize(new_controller):
-	self.controller = new_controller
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:  # Null safety check
+		push_error("PlayerHealth: Controller cannot be null")
+		return
+	controller = new_controller  # Now properly typed assignment
+	print("✅ PlayerHealth: Controller initialized successfully")
 	current_health = max_health
 
 func take_damage(amount: int):

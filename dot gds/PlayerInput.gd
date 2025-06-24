@@ -5,10 +5,14 @@ class_name PlayerInput
 # Handles all player input
 var move_vector := Vector2.ZERO
 var look_vector := Vector2.ZERO
-var controller = null # Store reference to PlayerController
+@export var controller: CharacterBody3D  # Properly typed controller reference
 
-func initialize(_controller):
-	controller = _controller
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:
+		push_error("PlayerInput: Controller cannot be null")
+		return
+	controller = new_controller
+	print("✅ PlayerInput: Controller initialized successfully")
 
 func _unhandled_input(event):
 	# Keyboard movement

@@ -7,9 +7,14 @@ var health := 100
 var speed := 5.0
 var damage := 10
 
-func initialize(_controller):
-	# Reference to PlayerController if needed
-	pass
+@export var controller: CharacterBody3D  # Properly typed controller reference
+
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:
+		push_error("PlayerStats: Controller cannot be null")
+		return
+	controller = new_controller
+	print("✅ PlayerStats: Controller initialized successfully")
 
 func upgrade_stat(stat: String, value):
 	# Upgrade a stat by value

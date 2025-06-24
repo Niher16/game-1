@@ -5,9 +5,14 @@ class_name PlayerStateMachine
 # Handles player state transitions
 var current_state := "idle"
 
-func initialize(_controller):
-	# Reference to PlayerController if needed
-	pass
+@export var controller: CharacterBody3D  # Properly typed controller reference
+
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:
+		push_error("PlayerStateMachine: Controller cannot be null")
+		return
+	controller = new_controller
+	print("✅ PlayerStateMachine: Controller initialized successfully")
 
 func set_state(new_state: String):
 	current_state = new_state

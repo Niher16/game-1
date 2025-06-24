@@ -12,8 +12,14 @@ var level := 1
 var xp_to_next := 100
 var currency := 0
 
-func initialize(controller):
-	self.controller = controller
+@export var controller: CharacterBody3D  # Properly typed controller reference
+
+func initialize(new_controller: CharacterBody3D) -> void:
+	if not new_controller:  # Null safety check
+		push_error("PlayerProgression: Controller cannot be null")
+		return
+	controller = new_controller  # Now properly typed assignment
+	print("✅ PlayerProgression: Controller initialized successfully")
 
 func add_xp(amount: int):
 	xp += amount
