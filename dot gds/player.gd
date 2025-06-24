@@ -45,6 +45,7 @@ var right_foot: MeshInstance3D
 @onready var stats_component: PlayerStats = get_node_or_null("PlayerStats")
 @onready var ui = get_tree().get_root().find_child("HealthUI", true, false)
 @onready var ally_command_manager = preload("res://allies/components/AllyCommandManager.gd").new()
+@onready var armor_component = get_node_or_null("PlayerArmor")
 
 # Player state
 var is_dead := false
@@ -127,6 +128,15 @@ func _ready():
 			"foot_step_strength": foot_step_strength,
 			"side_step_modifier": side_step_modifier
 		})
+
+	# NEW: Setup armor component
+	if armor_component and armor_component.has_method("setup"):
+		armor_component.setup(self)
+		if armor_component.has_signal("armor_changed"):
+			armor_component.connect("armor_changed", Callable(self, "_on_armor_changed"))
+		print("✅ Armor component ready")
+	else:
+		print("❌ PlayerArmor node missing!")
 
 	# Connect signals ONCE at the end
 	if health_component:
@@ -848,3 +858,28 @@ func _unhandled_input(event):
 		_spawn_test_potion()
 	if event.is_action_pressed("ui_select"):  # Enter key  
 		take_damage(20)  # Test damage
+	if event.is_action_pressed("ui_cancel"):  # Escape key
+		randomize_character()  # Test randomize character
+	if event.is_action_pressed("ui_up"):  # W key
+		movement_component.move_character(Vector3.FORWARD)
+	if event.is_action_pressed("ui_down"):  # S key
+		movement_component.move_character(Vector3.BACK)
+	if event.is_action_pressed("ui_left"):  # A key
+		movement_component.move_character(Vector3.LEFT)
+	if event.is_action_pressed("ui_right"):  # D key
+		movement_component.move_character(Vector3.RIGHT)
+	if event.is_action_pressed("test_armor"):  # T key (for armor testing)
+		_test_armor()
+
+func _test_armor():
+	print("=== TESTING ARMOR ===")
+	var helmet = load("res://Armors/leather_helmet.tres")
+	if helmet and armor_component and armor_component.has_method("equip_armor"):
+		armor_component.equip_armor(helmet)
+		print("🛡️ Equipped helmet - taking test damage...")
+		health_component.take_damage(50)
+		get_tree().create_timer(2.0).timeout.connect(
+			func():
+				print("🛡️ Unequipping helmet...")
+				armor_component.unequip_armor()
+		)

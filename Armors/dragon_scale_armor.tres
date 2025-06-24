@@ -1,0 +1,13 @@
+[gd_resource type="ArmorResource" format=3 uid="uid://pujhhpqj7als"]
+
+[resource]
+resource_local_to_scene = false
+resource_name = ""
+armor_name = "Dragon Scale Armor"
+armor_value = 40
+armor_type = "chestplate"
+description = "Legendary armor made from dragon scales."
+rarity = "legendary"
+weight = 5.0
+max_durability = 300
+current_durability = 300

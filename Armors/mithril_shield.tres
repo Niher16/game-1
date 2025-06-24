@@ -1,0 +1,11 @@
+[gd_resource type="ArmorResource" load_steps=2 format=3]
+
+[resource]
+armor_name = "Mithril Shield"
+armor_value = 20
+armor_type = "shield"
+description = "A rare shield made of mithril."
+rarity = "epic"
+weight = 2.5
+max_durability = 150
+current_durability = 150

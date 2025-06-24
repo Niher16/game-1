@@ -1,0 +1,11 @@
+[gd_resource type="ArmorResource" load_steps=2 format=3]
+
+[resource]
+armor_name = "Steel Boots"
+armor_value = 8
+armor_type = "boots"
+description = "Heavy steel boots."
+rarity = "rare"
+weight = 2.0
+max_durability = 80
+current_durability = 80

@@ -1,0 +1,13 @@
+[gd_resource type="ArmorResource" format=3 uid="uid://cvfca1sjtvfmf"]
+
+[resource]
+resource_local_to_scene = false
+resource_name = ""
+armor_name = "Iron Chestplate"
+armor_value = 15
+armor_type = "chestplate"
+description = "A sturdy iron chestplate."
+rarity = "uncommon"
+weight = 3.5
+max_durability = 120
+current_durability = 120

@@ -90,17 +90,25 @@ func take_damage(amount: int, _from_source: Node = null):
 	if current_health <= 0:
 		print("💀 Already dead - no more damage")
 		return
+	# Armor integration
+	var reduction := 0.0
+	if player and player.has_node("PlayerArmor"):
+		var armor_component = player.get_node("PlayerArmor")
+		if armor_component.has_method("get_damage_reduction"):
+			reduction = armor_component.get_damage_reduction()
+	var reduced_amount = int(amount * (1.0 - reduction))
 	var old_health = current_health
-	current_health = max(current_health - amount, 0)
+	current_health = max(current_health - reduced_amount, 0)
 	invulnerable_time = INVULNERABLE_DURATION
-	print("💔 Took ", amount, " damage (", old_health, " -> ", current_health, ")")
+	print("🛡️ Armor reduced damage: ", amount, " → ", reduced_amount, " (", int(reduction*100), "% reduction)")
+	print("💔 Took ", reduced_amount, " damage (", old_health, " -> ", current_health, ")")
 	health_changed.emit(current_health, max_health)
 	_update_health_ui(current_health, max_health)
 	# Check for death
 	if current_health <= 0:
 		_handle_death()
 	else:
-		_show_damage_effect(amount)
+		_show_damage_effect(reduced_amount)
 
 func _handle_death():
 	"""Handles player death"""

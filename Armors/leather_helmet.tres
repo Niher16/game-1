@@ -1,0 +1,13 @@
+[gd_resource type="ArmorResource" format=3 uid="uid://bujh37mlxhhf2"]
+
+[resource]
+resource_local_to_scene = false
+resource_name = ""
+armor_name = "Leather Helmet"
+armor_value = 5
+armor_type = "helmet"
+description = "A basic leather helmet."
+rarity = "common"
+weight = 1.0
+max_durability = 50
+current_durability = 50

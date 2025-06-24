@@ -259,3 +259,6 @@ script = ExtResource("8_f1ek2")
 
 [node name="PlayerStats" type="Node" parent="."]
 script = ExtResource("9_tx1dd")
+
+[node name="PlayerArmor" type="Node" parent="."]
+script = ExtResource("res://dot gds/PlayerArmor.gd")
