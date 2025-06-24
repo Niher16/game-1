@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_hmu7q")
 armor_name = "Mithril Shield"
-armor_type = 3 # Shield
-armor_material = 3 # Mithril
-armor_value = 22
+armor_type = 3
+armor_material = 0
+armor_value = 10
 damage_reduction_bonus = 0.12
 durability = 150
 weight = 1.5

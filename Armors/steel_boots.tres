@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_nc4us")
 armor_name = "Steel Boots"
-armor_type = 4 # Boots
-armor_material = 1 # Steel
-armor_value = 12
+armor_type = 4
+armor_material = 0
+armor_value = 10
 damage_reduction_bonus = 0.06
 durability = 90
 weight = 1.2

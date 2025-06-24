@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_b1egs")
 armor_name = "Dragon Scale Armor"
-armor_type = 2 # Chest
-armor_material = 2 # Dragon Scale
-armor_value = 40
+armor_type = 2
+armor_material = 0
+armor_value = 10
 damage_reduction_bonus = 0.15
 durability = 200
 weight = 2.5

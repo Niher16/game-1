@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_sijjc")
 armor_name = "Leather Helmet"
-armor_type = 0 # Helmet
-armor_material = 0 # Leather
-armor_value = 7
+armor_type = 0
+armor_material = 0
+armor_value = 10
 damage_reduction_bonus = 0.03
 durability = 60
 weight = 0.7

@@ -162,7 +162,7 @@ func get_pool_stats() -> Dictionary:
 
 # --- Integration with existing loot system ---
 
-func add_armor_to_loot_drop(drop_position: Vector3, source: Node = null):
+func add_armor_to_loot_drop(drop_position: Vector3, _source: Node = null):
 	"""Add armor to existing loot drops"""
 	var armor = get_random_armor()
 	if armor:
