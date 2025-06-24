@@ -405,3 +405,10 @@ func _create_physics_xp_orb(loot_data: Dictionary, position: Vector3, parent: No
 	print("✅ Created XP orb with ", xp_amount, " XP")
 	# Apply physics launch
 	_launch_with_physics(orb, position)
+
+# Spawns a health potion at the given position (no physics, instant drop)
+func spawn_health_potion(pos: Vector3):
+	var potion_scene = preload("res://scenes/health_potion.tscn")
+	var potion = potion_scene.instantiate()
+	get_tree().current_scene.add_child(potion)
+	potion.global_position = pos

@@ -685,10 +685,9 @@ func _flash_damage():
 func die():
 	if is_dead:
 		return
-	
 	is_dead = true
 	print("💀 Slime died!")
-	
+
 	# Simple death animation
 	if mesh_instance and is_instance_valid(mesh_instance):
 		var tween = create_tween()
@@ -697,18 +696,23 @@ func die():
 		tween.parallel().tween_property(mesh_instance, "scale:z", base_scale.z * 1.5, 0.4)
 		if slime_material:
 			tween.parallel().tween_property(slime_material, "albedo_color:a", 0.0, 0.6)
-	
+
 	# Drop loot
 	if LootManager:
 		LootManager.drop_enemy_loot(global_position, self)
-	
+
+	# 30% chance to spawn a health potion (new logic)
+	on_enemy_death()
+
 	if randf() < 0.05:
 		_drop_weapon()
-	
+
 	enemy_died.emit()
-	
+
 	await get_tree().create_timer(0.3).timeout
 	queue_free()
+
+# Remove or comment out any old health potion drop logic elsewhere in this script
 
 func _drop_weapon():
 	if LootManager and LootManager.has_method("drop_weapon"):
@@ -716,3 +720,9 @@ func _drop_weapon():
 			LootManager.drop_weapon(global_position, self.weapon_resource)
 		else:
 			LootManager.drop_weapon(global_position)
+
+# Utility: Call this on enemy death to possibly spawn a health potion
+func on_enemy_death():
+	if randf() < 0.3:  # 30% chance
+		if LootManager and LootManager.has_method("spawn_health_potion"):
+			LootManager.spawn_health_potion(global_position)

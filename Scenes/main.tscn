@@ -50,6 +50,7 @@ offset_bottom = 40.0
 script = ExtResource("3_dnx86")
 
 [node name="Player" parent="." instance=ExtResource("4_00g5k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.01096, 0)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 script = ExtResource("6_cbln3")

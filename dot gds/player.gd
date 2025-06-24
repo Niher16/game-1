@@ -815,3 +815,36 @@ func verify_signal_methods():
 			print("✅ Found method: ", method)
 		else:
 			print("❌ MISSING method: ", method)
+
+# --- Health Potion Integration Methods ---
+# Health system reference (already declared as health_component)
+
+func heal(amount: int):
+	"""Heals the player - called by health potions"""
+	if health_component:
+		health_component.heal(amount)
+
+
+func show_message(text: String):
+	"""Shows a message to the player"""
+	print("📢 Message: ", text)
+	# Add your UI message system here if you have one
+
+# Handle health changes (already present as _on_health_changed)
+# Handle player death (already present as _on_player_died)
+
+# Example of how to spawn health potions (for testing)
+func _spawn_test_potion():
+	"""Spawns a health potion for testing"""
+	var potion_scene = preload("res://scenes/health_potion.tscn")
+	var potion = potion_scene.instantiate()
+	get_parent().add_child(potion)
+	potion.global_position = global_position + Vector3(2, 1, 0)
+	print("🧪 Test potion spawned!")
+
+# Call this in _unhandled_input for testing
+func _unhandled_input(event):
+	if event.is_action_pressed("ui_accept"):  # Space key
+		_spawn_test_potion()
+	if event.is_action_pressed("ui_select"):  # Enter key  
+		take_damage(20)  # Test damage

@@ -1,191 +1,156 @@
-# PlayerHealth.gd - FIXED VERSION with working red damage flash
+# PlayerHealth.gd - Clean health system for Godot 4.1
 extends Node
 class_name PlayerHealth
 
+## Emitted when health changes (current_health, max_health)
 signal health_changed(current_health: int, max_health: int)
+
+## Emitted when player dies
 signal player_died
-signal health_depleted
 
-var current_health: int
-var max_health: int
-var last_damage_time: float
-var invulnerability_timer: float
+# Health values
+var current_health: int = 100
+var max_health: int = 100
 
-# 🔧 NEW: Variables for damage flash effect
-var original_color: Color = Color.WHITE
-var is_flashing: bool = false
-var flash_timer: float = 0.0
-# Flash effect variables
-var flash_count: int = 0
-const MAX_FLASHES: int = 3
-const FLASH_ON_COLOR: Color = Color(1.0, 0.2, 0.2, 1.0)
-const FLASH_OFF_COLOR: Color = Color(0.3, 0.3, 0.3, 1.0) # fallback, not used
-const FLASH_TOTAL_DURATION: float = 0.5
-const FLASH_INTERVAL: float = FLASH_TOTAL_DURATION / (MAX_FLASHES * 2)
-const INVULNERABILITY_DURATION := 0.5
-const heal_amount_from_potion := 30
+# Damage protection
+var invulnerable_time: float = 0.0
+const INVULNERABLE_DURATION: float = 0.5
 
-var player_ref: CharacterBody3D
+# Reference to player
+var player: CharacterBody3D
 
-# Utility to get the mesh node safely
-func _get_mesh_instance() -> MeshInstance3D:
-	if player_ref:
-		return player_ref.get_node_or_null("MeshInstance3D")
-	return null
+func _ready():
+	print("💖 PlayerHealth system ready")
 
-func setup(player_ref_in: CharacterBody3D, starting_health: int):
-	player_ref = player_ref_in
+func setup(player_ref: CharacterBody3D, starting_health: int = 100):
+	"""Initialize the health system"""
+	player = player_ref
 	max_health = starting_health
 	current_health = starting_health
-	last_damage_time = 0.0
-	invulnerability_timer = 0.0
-	flash_timer = 0.0
-	is_flashing = false
-	# Store the original color for resetting later
-	var mesh = _get_mesh_instance()
-	if mesh and mesh.material_override:
-		original_color = mesh.material_override.albedo_color
-		print("🎨 Stored original player color: ", original_color)
-	print("🔧 PlayerHealth setup complete - Max: ", max_health, " Current: ", current_health)
+	invulnerable_time = 0.0
+	
+	print("💖 Health system setup - Max: ", max_health, " Current: ", current_health)
 	health_changed.emit(current_health, max_health)
 
-func take_damage(amount: int, _from: Node3D = null):
-	print("🔧 PlayerHealth: take_damage called - amount: ", amount, " current_health: ", current_health, " invuln_timer: ", invulnerability_timer)
-	if current_health <= 0 or invulnerability_timer > 0:
-		print("🔧 Damage blocked - health: ", current_health, " invuln: ", invulnerability_timer)
-		return
-	var old_health = current_health
-	current_health = max(current_health - amount, 0)
-	last_damage_time = Time.get_ticks_msec() / 1000.0
-	invulnerability_timer = INVULNERABILITY_DURATION
-	print("🔧 Health changed from ", old_health, " to ", current_health)
-	health_changed.emit(current_health, max_health)
-	if current_health <= 0:
-		_handle_player_death()
-	if current_health != old_health:
-		_show_damage_feedback(amount)
-
-func heal(heal_amount: int):
-	print('🩹 HEAL DEBUG: Attempting to heal for ', heal_amount, ' HP')
-	print('🩹 Current health before: ', current_health, '/', max_health)
-	if current_health <= 0 or current_health >= max_health:
-		print('🩹 Already at full health, no healing needed')
-		return
-	var old_health = current_health
-	current_health = min(current_health + heal_amount, max_health)
-	print('🩹 Health after healing: ', current_health, '/', max_health)
-	if current_health != old_health:
-		health_changed.emit(current_health, max_health)
-		_show_heal_feedback(heal_amount)
-
-func update_invulnerability(delta: float):
-	if invulnerability_timer > 0:
-		invulnerability_timer -= delta
-		# Return true if still invulnerable, false if finished
-		return invulnerability_timer > 0
-	return false
-
-# 🔧 FIXED: Enhanced damage flash with proper timer and reset
-func _show_damage_feedback(damage_amount: int):
-	print("DEBUG: _show_damage_feedback called with:", damage_amount, " stack:", get_stack())
-	var mesh = _get_mesh_instance()
-	if not player_ref or not is_instance_valid(player_ref):
-		print("⚠️ Player reference invalid - can't show damage flash")
-		return
-	if not mesh or not is_instance_valid(mesh):
-		print("⚠️ Player MeshInstance3D invalid - can't show damage flash")
-		return
-	if not mesh.material_override:
-		print("⚠️ Player material_override missing - can't show damage flash")
-		return
-	if is_flashing:
-		return
-	# Always update original_color to current mesh color before flashing
-	original_color = mesh.material_override.albedo_color
-	is_flashing = true
-	flash_count = 0
-	flash_timer = FLASH_INTERVAL
-	mesh.material_override.albedo_color = FLASH_ON_COLOR
-	# Optional: Add slight scale punch for extra feedback
-	var scale_tween = create_tween()
-	scale_tween.set_parallel(true)
-	scale_tween.tween_property(mesh, "scale", Vector3(1.1, 0.9, 1.1), 0.1)
-	scale_tween.tween_property(mesh, "scale", Vector3.ONE, 0.1).set_delay(0.1)
-	if player_ref.has_node("DamageSound"):
-		var damage_sound = player_ref.get_node("DamageSound")
-		if damage_sound and damage_sound.has_method("play"):
-			damage_sound.play()
-
-# 🔧 FIXED: Enhanced heal flash with proper timer
-func _show_heal_feedback(_heal_amount: int):
-	var mesh = _get_mesh_instance()
-	if not player_ref or not mesh or not mesh.material_override:
-		return
-	# Always update original_color to current mesh color before flashing
-	original_color = mesh.material_override.albedo_color
-	mesh.material_override.albedo_color = Color(0.3, 1.0, 0.3, 1.0)
-	# Reset color after brief delay
-	get_tree().create_timer(0.2).timeout.connect(func():
-		var mesh2 = _get_mesh_instance()
-		if mesh2 and mesh2.material_override:
-			mesh2.material_override.albedo_color = original_color
-	)
-
-# 🔧 NEW: Process function to handle flash timer
-func _process(delta: float):
-	update_invulnerability(delta)
-	# Handle damage flash timer
-	if is_flashing:
-		flash_timer -= delta
-		if flash_timer <= 0.0:
-			var mesh = _get_mesh_instance()
-			if mesh and mesh.material_override:
-				if flash_count % 2 == 0:
-					mesh.material_override.albedo_color = original_color
-				else:
-					mesh.material_override.albedo_color = FLASH_ON_COLOR
-				flash_count += 1
-				if flash_count < MAX_FLASHES * 2:
-					flash_timer = FLASH_INTERVAL
-				else:
-					_reset_player_color()
-
-# 🔧 NEW: Function to reset player color back to original
-func _reset_player_color():
-	if not is_flashing:
-		return
-	is_flashing = false
-	flash_timer = 0.0
-	var mesh = _get_mesh_instance()
-	if mesh and mesh.material_override:
-		mesh.material_override.albedo_color = original_color
-		print("🎨 Reset player color back to: ", original_color)
-
-# 🔧 EXISTING FUNCTIONS (unchanged)
-func _handle_player_death():
-	print("💀 Player death triggered! Emitting signals...")
-	health_depleted.emit()
-	player_died.emit()
+func _process(delta):
+	"""Update invulnerability timer"""
+	if invulnerable_time > 0:
+		invulnerable_time -= delta
 
 func get_health() -> int:
+	"""Returns current health"""
 	return current_health
 
 func get_max_health() -> int:
+	"""Returns maximum health"""
 	return max_health
 
+func set_max_health(new_max: int):
+	"""Sets new maximum health"""
+	max_health = new_max
+	# Don't exceed new max
+	if current_health > max_health:
+		current_health = max_health
+	health_changed.emit(current_health, max_health)
+	print("💖 Max health set to: ", max_health)
+
+func can_heal() -> bool:
+	"""Returns true if player can be healed"""
+	return current_health < max_health and current_health > 0
+
+func _update_health_ui(current: int, health_max: int):
+	# Update UI if possible
+	if player and player.has_method("update_health_ui"):
+		player.update_health_ui(current, health_max)
+	# Optionally, call UI group directly if needed
+	get_tree().call_group("UI", "_on_player_health_changed", current, health_max)
+
+func heal(amount: int):
+	"""Heals the player by specified amount"""
+	if current_health <= 0:
+		print("💀 Cannot heal - player is dead")
+		return
+	if current_health >= max_health:
+		print("💚 Already at full health")
+		return
+	var old_health = current_health
+	current_health = min(current_health + amount, max_health)
+	print("💖 Healed for ", amount, " HP (", old_health, " -> ", current_health, ")")
+	health_changed.emit(current_health, max_health)
+	_update_health_ui(current_health, max_health)
+	# Visual feedback
+	_show_heal_effect(amount)
+
+func take_damage(amount: int, _from_source: Node = null):
+	"""Damages the player by specified amount"""
+	# Check invulnerability
+	if invulnerable_time > 0:
+		print("🛡️ Damage blocked - still invulnerable")
+		return
+	if current_health <= 0:
+		print("💀 Already dead - no more damage")
+		return
+	var old_health = current_health
+	current_health = max(current_health - amount, 0)
+	invulnerable_time = INVULNERABLE_DURATION
+	print("💔 Took ", amount, " damage (", old_health, " -> ", current_health, ")")
+	health_changed.emit(current_health, max_health)
+	_update_health_ui(current_health, max_health)
+	# Check for death
+	if current_health <= 0:
+		_handle_death()
+	else:
+		_show_damage_effect(amount)
+
+func _handle_death():
+	"""Handles player death"""
+	print("💀 Player died!")
+	player_died.emit()
+	
+	# Add death effects here
+	if player and player.has_method("_on_death"):
+		player._on_death()
+
+func _show_heal_effect(amount: int):
+	"""Shows visual feedback for healing"""
+	print("✨ Heal effect: +", amount, " HP")
+	
+	# Try to show floating text if system exists
+	if player and player.has_method("show_floating_text"):
+		player.show_floating_text("+" + str(amount), Color.GREEN)
+	
+	# Flash green if possible
+	if player and player.has_node("MeshInstance3D"):
+		var mesh = player.get_node("MeshInstance3D")
+		if mesh.material_override:
+			var tween = create_tween()
+			var original_color = mesh.material_override.albedo_color
+			tween.tween_property(mesh.material_override, "albedo_color", Color.GREEN, 0.1)
+			tween.tween_property(mesh.material_override, "albedo_color", original_color, 0.2)
+
+func _show_damage_effect(amount: int):
+	"""Shows visual feedback for damage"""
+	print("💥 Damage effect: -", amount, " HP")
+	
+	# Try to show floating text if system exists
+	if player and player.has_method("show_floating_text"):
+		player.show_floating_text("-" + str(amount), Color.RED)
+	
+	# Flash red if possible
+	if player and player.has_node("MeshInstance3D"):
+		var mesh = player.get_node("MeshInstance3D")
+		if mesh.material_override:
+			var tween = create_tween()
+			var original_color = mesh.material_override.albedo_color
+			tween.tween_property(mesh.material_override, "albedo_color", Color.RED, 0.1)
+			tween.tween_property(mesh.material_override, "albedo_color", original_color, 0.3)
+
+func is_invulnerable() -> bool:
+	"""Returns true if player is currently invulnerable"""
+	return invulnerable_time > 0
+
 func get_health_percentage() -> float:
-	return float(current_health) / float(max_health) if max_health > 0 else 0.0
-
-func set_max_health(new_max_health: int):
-	max_health = new_max_health
-	current_health = min(current_health, max_health)
-	health_changed.emit(current_health, max_health)
-
-func _setup_health_system():
-	current_health = max_health
-	last_damage_time = 0.0
-	health_changed.emit(current_health, max_health)
-
-func _initialize_base_stats():
-	# Add health-related base stat initialization if needed
-	pass
+	"""Returns health as percentage (0.0 to 1.0)"""
+	if max_health <= 0:
+		return 0.0
+	return float(current_health) / float(max_health)
