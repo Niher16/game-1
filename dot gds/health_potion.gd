@@ -28,12 +28,7 @@ func _ready():
 
 func _create_bottle():
 	mesh_instance = MeshInstance3D.new()
-	add_child(mesh_instance)
-	var bottle_mesh = CapsuleMesh.new()
-	bottle_mesh.radius = 0.12
-	bottle_mesh.height = 0.4
-	mesh_instance.mesh = bottle_mesh
-	await get_tree().process_frame
+	# Create and assign material BEFORE adding to scene
 	potion_material = StandardMaterial3D.new()
 	potion_material.albedo_color = Color(1.0, 0.1, 0.1, 0.9)
 	potion_material.emission_enabled = true
@@ -41,6 +36,11 @@ func _create_bottle():
 	potion_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	potion_material.roughness = 0.2
 	mesh_instance.material_override = potion_material
+	add_child(mesh_instance)
+	var bottle_mesh = CapsuleMesh.new()
+	bottle_mesh.radius = 0.12
+	bottle_mesh.height = 0.4
+	mesh_instance.mesh = bottle_mesh
 	# Cork
 	var cork = MeshInstance3D.new()
 	mesh_instance.add_child(cork)
@@ -61,6 +61,10 @@ func _create_bottle():
 	collision.position = Vector3(0, 0.03, 0)
 	collision.shape = capsule_shape
 	add_child(collision)
+
+
+
+	# (Duplicate bottle creation code removed to prevent redeclaration errors)
 
 func _find_player():
 	player = get_tree().get_first_node_in_group("player")
