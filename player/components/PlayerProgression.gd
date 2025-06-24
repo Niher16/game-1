@@ -1,4 +1,5 @@
 extends Node
+class_name PlayerProgression
 
 # Get player node reference using get_parent() in Godot 4
 @onready var player_ref = get_parent()

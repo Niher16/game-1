@@ -1,14 +1,14 @@
-[gd_scene load_steps=24 format=3 uid="uid://c0irx50ye3ekq"]
+[gd_scene load_steps=24 format=3 uid="uid://davx6xri0n0vt"]
 
-[ext_resource type="Script" uid="uid://bt47480nh31yn" path="res://dot gds/player.gd" id="1_4flbx"]
-[ext_resource type="Script" uid="uid://cqexju0dcbsij" path="res://dot gds/PlayerMovement.gd" id="2_cvnsp"]
-[ext_resource type="Script" uid="uid://chx8k2542vhd2" path="res://dot gds/PlayerCombat.gd" id="3_6t5aa"]
+[ext_resource type="Script" uid="uid://bt47480nh31yn" path="res://player/player.gd" id="1_4flbx"]
+[ext_resource type="Script" uid="uid://cqexju0dcbsij" path="res://player/PlayerMovement.gd" id="2_cvnsp"]
+[ext_resource type="Script" uid="uid://chx8k2542vhd2" path="res://player/components/PlayerCombat.gd" id="3_6t5aa"]
 [ext_resource type="ArrayMesh" uid="uid://dpkhctk1q0bpg" path="res://3d Models/Sword/broadsword.obj" id="4_fkybt"]
 [ext_resource type="ArrayMesh" uid="uid://dagubfxbsoacu" path="res://3d Models/Bow/bow_01.obj" id="5_x3wgy"]
-[ext_resource type="Script" uid="uid://dq5lkmafnvuay" path="res://dot gds/PlayerHealth.gd" id="7_3smsa"]
-[ext_resource type="Script" uid="uid://bl4cu5bh7eb27" path="res://dot gds/PlayerProgression.gd" id="8_8erm5"]
-[ext_resource type="Script" uid="uid://dbv3aogrn67ce" path="res://dot gds/PlayerInventory.gd" id="8_f1ek2"]
-[ext_resource type="Script" uid="uid://chb3wyyytaqlj" path="res://dot gds/PlayerStats.gd" id="9_tx1dd"]
+[ext_resource type="Script" uid="uid://dq5lkmafnvuay" path="res://player/components/PlayerHealth.gd" id="7_3smsa"]
+[ext_resource type="Script" uid="uid://bl4cu5bh7eb27" path="res://player/components/PlayerProgression.gd" id="8_8erm5"]
+[ext_resource type="Script" uid="uid://dbv3aogrn67ce" path="res://player/components/PlayerInventory.gd" id="8_f1ek2"]
+[ext_resource type="Script" uid="uid://chb3wyyytaqlj" path="res://player/components/PlayerStats.gd" id="9_tx1dd"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6t5aa"]
 albedo_color = Color(0, 0, 0, 1)
@@ -145,21 +145,21 @@ tracks/2/path = NodePath("RightHandAnchor")
 tracks/2/interp = 1
 tracks/2/loop_wrap = true
 tracks/2/keys = PackedFloat32Array(0, 1, 0.44, -0.2, 0, 0.101749, 1, 0.284252, -0.2, 0.197986, 0.2, 1, 0.330743, -0.243873, -0.343082, 0.266667, 1, -0.316441, -0.243873, -0.269195, 0.5, 1, 0.44, -0.2, 0)
-tracks/3/type = "rotation_3d"
+tracks/3:type = "rotation_3d"
 tracks/3/imported = false
 tracks/3/enabled = true
 tracks/3/path = NodePath("RightHandAnchor")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = PackedFloat32Array(0, 1, 0, 0, 0, 1, 0.101749, 1, 0.0478704, -0.318942, 0.105996, 0.940611, 0.2, 1, 0.155533, 0.415421, 0.0735297, 0.893212, 0.264793, 1, 0.0656986, 0.970525, -0.0623529, 0.22333, 0.266667, 1, 0, 0, 0, 1)
-tracks/4/type = "scale_3d"
+tracks/4:type = "scale_3d"
 tracks/4/imported = false
 tracks/4/enabled = true
 tracks/4/path = NodePath("RightHandAnchor")
 tracks/4/interp = 1
 tracks/4/loop_wrap = true
 tracks/4/keys = PackedFloat32Array(0.2, 1, 1, 1, 1, 0.264793, 1, 1, 1, 1)
-tracks/5/type = "scale_3d"
+tracks/5:type = "scale_3d"
 tracks/5/imported = false
 tracks/5/enabled = true
 tracks/5/path = NodePath("WeaponAttachPoint/SwordNode")

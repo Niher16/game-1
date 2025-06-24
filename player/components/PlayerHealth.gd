@@ -1,5 +1,6 @@
 # PlayerHealth.gd - Clean health system for Godot 4.1
 extends Node
+class_name PlayerHealth
 
 ## Emitted when health changes (current_health, max_health)
 signal health_changed(current_health: int, max_health: int)

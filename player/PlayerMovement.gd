@@ -1,4 +1,5 @@
 extends Node
+class_name PlayerMovement
 
 @export var can_move: bool = true # Godot 4.1+ best practice: allows player.gd to enable/disable movement safely
 

@@ -4,6 +4,8 @@ extends Node
 # - Player faces POSITIVE Z direction (forward)
 # - All attack animations should use POSITIVE Z for forward movement
 # - Negative Z = backwards, Positive Z = forwards
+class_name PlayerCombat
+
 # Signals for combat events and animation coordination
 signal attack_started(combo_index: int)
 signal attack_finished(combo_index: int)

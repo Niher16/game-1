@@ -1,4 +1,5 @@
 extends Node
+class_name PlayerInventoryComponent
 
 signal item_added(item)
 signal item_removed(item)
