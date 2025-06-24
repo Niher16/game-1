@@ -244,12 +244,6 @@ static func _create_feet(character: CharacterBody3D, cfg := {}, skin_material: S
 		character.add_child(foot)
 		foot.name = foot_name
 		print("✅ Created foot: ", foot.name, " at position: ", foot.position, " actual name: ", foot.name)
-
-		# Add attach point for boots/foot armor
-		var attach_point = Marker3D.new()
-		attach_point.name = foot_name + "_attach_point"
-		foot.add_child(attach_point)
-		attach_point.transform.origin = Vector3(0, 0, 0) # Adjust as needed
 		
 static func get_eye_z_position(body_radius: float) -> float:
 	# For skinny (radius ~0.15): Z = -0.15 (closer to center)

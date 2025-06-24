@@ -259,11 +259,3 @@ script = ExtResource("8_f1ek2")
 
 [node name="PlayerStats" type="Node" parent="."]
 script = ExtResource("9_tx1dd")
-
-[node name="helmet_attach_point" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.744506, 0)
-
-[node name="chest_attach_point" type="Node3D" parent="."]
-
-[node name="shield_attach_point" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.432648, -0.256211, -0.0968374)

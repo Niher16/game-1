@@ -21,8 +21,6 @@ WeaponManager="*res://dot gds/WeaponManager.gd"
 WeaponPool="*res://dot gds/WeaponPool.gd"
 WeaponAnimationManager="*res://dot gds/WeaponAnimationManager.gd"
 DashEffectsManager="*res://dot gds/DashEffectsManager.gd"
-ArmorPool="*res://Armors/ArmorPool.gd"
-ArmorManager="*res://Armors/ArmorManager.gd"
 
 [game]
 

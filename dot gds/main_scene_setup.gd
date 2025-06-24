@@ -8,62 +8,12 @@ var world_environment: WorldEnvironment
 func _ready():
 	print("🎮 Main Scene: Starting (torch-only lighting)...")
 	
-	# Add LevelUpUI to scene with proper initialization
-	call_deferred("_initialize_levelup_ui")
-	
-	# Instantiate enemy spawner from scene early
-	var spawner_scene = load("res://Scenes/spawner.tscn")
-	if spawner_scene:
-		var spawner = spawner_scene.instantiate()
-		spawner.name = "EnemySpawner"
-		add_child(spawner)
-		spawner.add_to_group("spawner")
-		print("✅ Enemy spawner instantiated from Scenes/spawner.tscn")
-	else:
-		print("❌ Could not load Scenes/spawner.tscn!")
-
-	# Remove any existing WorldEnvironment nodes first
-	var existing_env = get_tree().get_first_node_in_group("world_environment") 
-	if existing_env:
-		existing_env.queue_free()
-		print("🗑️ Removed conflicting WorldEnvironment")
-
-	# --- DARK ATMOSPHERIC LIGHTING (SINGLE SOURCE) ---
-	var world_env = WorldEnvironment.new()
-	var environment = Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.13, 0.10, 0.05)  # Slightly warmer
-	environment.ambient_light_energy = 0.13  # Brighter ambient
-	environment.ambient_light_color = Color(0.38, 0.22, 0.10)  # Even warmer
-
-	# Add subtle bloom effect for glowing torches and highlights
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.18
-	environment.glow_strength = 0.7
-	environment.glow_bloom = 0.5
-	world_env.environment = environment
-	add_child(world_env)
-
-	# NO directional light - torches only!
-	print("🌙 Dark atmosphere with torch-only lighting active")
-
-	# Create systems step by step
-	call_deferred("_create_simple_systems")
-
-func _initialize_levelup_ui():
-	"""Initialize LevelUpUI properly to prevent startup visibility issues"""
+	# Add LevelUpUI to scene
 	var levelup_ui_scene = load("res://Scenes/LevelUpUI.gd.tscn")
 	if levelup_ui_scene:
 		var levelup_ui = levelup_ui_scene.instantiate()
-		# Ensure it's hidden before adding to scene
-		levelup_ui.visible = false
-		levelup_ui.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 		get_tree().current_scene.add_child(levelup_ui)
-		# Double-check it's hidden after adding
-		if levelup_ui.visible:
-			levelup_ui.visible = false
-			print("🔧 Force-hidden LevelUpUI after instantiation")
-		print("✅ LevelUpUI instantiated and properly hidden")
+		print("✅ LevelUpUI instantiated and added to scene")
 	else:
 		print("❌ Could not load LevelUpUI scene!")
 	

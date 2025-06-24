@@ -114,7 +114,7 @@ func _collect_potion():
 		var hc = player.health_component
 		if hc and hc.has_method("heal"):
 			hc.heal(heal_amount)
-	_create_collection_effect()
+	# _create_collection_effect()  # Disabled to prevent player color change
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
 

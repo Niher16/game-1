@@ -705,26 +705,6 @@ func perform_dash():
 	is_dashing = false
 	state = PlayerState.IDLE
 	dash_ended.emit()
-	# Dash Shield perk: temporary invincibility after dash
-	if "has_dash_shield" in player and player.has_dash_shield:
-		_activate_dash_shield()
-
-func _activate_dash_shield():
-	"""Provide temporary invincibility after dash - dash shield perk"""
-	print("🛡️ DASH SHIELD ACTIVATED!")
-	if player.health_component and player.health_component.has_method("set_invulnerable"):
-		player.health_component.set_invulnerable(true)
-		var shield_timer = Timer.new()
-		shield_timer.wait_time = 1.0
-		shield_timer.one_shot = true
-		player.add_child(shield_timer)
-		shield_timer.timeout.connect(func():
-			if player.health_component:
-				player.health_component.set_invulnerable(false)
-			shield_timer.queue_free()
-			print("🛡️ Dash shield expired")
-		)
-		shield_timer.start()
 
 func handle_dash_cooldown(_delta: float):
 	var max_charges = get_safe_max_dash_charges()

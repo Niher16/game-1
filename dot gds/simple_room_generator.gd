@@ -152,9 +152,6 @@ func generate_starting_room():
 	
 	# Generate walls (boundary walls will be marked as permanent)
 	_generate_all_walls_with_boundary_protection()
-	# --- FIX: Remove walls that overlap with carved floor ---
-	_remove_walls_by_grid_lookup()
-	print("[DEBUG] Called _remove_walls_by_grid_lookup after wall generation and carving.")
 	
 	# Move player to room center
 	_move_player_to_room(starting_room)

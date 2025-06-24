@@ -19,8 +19,6 @@ const INVULNERABLE_DURATION: float = 0.5
 # Reference to player
 var player: CharacterBody3D
 
-var health_regen_timer := 0.0
-
 func _ready():
 	print("💖 PlayerHealth system ready")
 
@@ -38,16 +36,6 @@ func _process(delta):
 	"""Update invulnerability timer"""
 	if invulnerable_time > 0:
 		invulnerable_time -= delta
-	# Health regeneration perk
-	var regen_rate = 0
-	if player and "health_regen_rate" in player:
-		regen_rate = player.health_regen_rate
-	if regen_rate > 0 and get_health() < get_max_health():
-		health_regen_timer += delta
-		if health_regen_timer >= 1.0:
-			heal(regen_rate)
-			health_regen_timer = 0.0
-			print("❤️ Health regenerated: +" + str(regen_rate) + " HP")
 
 func get_health() -> int:
 	"""Returns current health"""
@@ -93,21 +81,8 @@ func heal(amount: int):
 	# Visual feedback
 	_show_heal_effect(amount)
 
-func set_invulnerable(invuln: bool):
-	"""Set invulnerability state - used by dash shield perk"""
-	self._is_invulnerable = invuln
-	if invuln:
-		print("🛡️ Player is now invulnerable")
-	else:
-		print("🛡️ Player invulnerability ended")
-
-func is_custom_invulnerable() -> bool:
-	return self._is_invulnerable if "_is_invulnerable" in self else false
-
 func take_damage(amount: int, _from_source: Node = null):
-	if is_custom_invulnerable():
-		print("🛡️ Damage blocked by invulnerability!")
-		return
+	"""Damages the player by specified amount"""
 	# Check invulnerability
 	if invulnerable_time > 0:
 		print("🛡️ Damage blocked - still invulnerable")
@@ -115,25 +90,17 @@ func take_damage(amount: int, _from_source: Node = null):
 	if current_health <= 0:
 		print("💀 Already dead - no more damage")
 		return
-	# Armor integration
-	var reduction := 0.0
-	if player and player.has_node("PlayerArmor"):
-		var armor_component = player.get_node("PlayerArmor")
-		if armor_component.has_method("get_damage_reduction"):
-			reduction = armor_component.get_damage_reduction()
-	var reduced_amount = int(amount * (1.0 - reduction))
 	var old_health = current_health
-	current_health = max(current_health - reduced_amount, 0)
+	current_health = max(current_health - amount, 0)
 	invulnerable_time = INVULNERABLE_DURATION
-	print("🛡️ Armor reduced damage: ", amount, " → ", reduced_amount, " (", int(reduction*100), "% reduction)")
-	print("💔 Took ", reduced_amount, " damage (", old_health, " -> ", current_health, ")")
+	print("💔 Took ", amount, " damage (", old_health, " -> ", current_health, ")")
 	health_changed.emit(current_health, max_health)
 	_update_health_ui(current_health, max_health)
 	# Check for death
 	if current_health <= 0:
 		_handle_death()
 	else:
-		_show_damage_effect(reduced_amount)
+		_show_damage_effect(amount)
 
 func _handle_death():
 	"""Handles player death"""

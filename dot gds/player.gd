@@ -207,11 +207,14 @@ func _create_visual():
 	else:
 		mesh_instance = existing_mesh
 		print("🎨 Using existing MeshInstance3D node")
-	# Ensure material_override is set so _flash_red works
+	# Ensure material_override is set and unique so dash and effects never share it
 	if not mesh_instance.material_override:
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
 		mesh_instance.material_override = mat
+	else:
+		# Always duplicate the material to guarantee uniqueness
+		mesh_instance.material_override = mesh_instance.material_override.duplicate()
 	print("✅ Player visual created successfully!")
 
 func _setup_attack_system():
@@ -630,17 +633,6 @@ func get_dash_charges() -> int:
 func get_max_dash_charges() -> int:
 	return max_dash_charges if "max_dash_charges" in self else 1
 
-func get_max_allies() -> int:
-	if "max_allies" in self:
-		return self.max_allies
-	return 3
-
-func refill_dash_charges():
-	"""Refill dash charges - called when dash charge perk is taken"""
-	if movement_component and movement_component.has_method("refill_charges"):
-		movement_component.refill_charges()
-		print("🚀 Dash charges refilled!")
-
 # Debug method to verify all components exist
 func debug_components():
 	print("🔍 Player Components Debug:")
@@ -789,15 +781,8 @@ func _connect_component_signals():
 		print('❌ UI node not found for direct connection!')
 
 func _flash_red():
-	if not mesh_instance or not is_instance_valid(mesh_instance):
-		return
-	if not mesh_instance.material_override:
-		return
-	mesh_instance.material_override.albedo_color = Color(1,0,0)
-	get_tree().create_timer(0.5).timeout.connect(func():
-		if mesh_instance and is_instance_valid(mesh_instance) and mesh_instance.material_override:
-			mesh_instance.material_override.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
-	)
+	# Disabled to prevent player turning red on damage or dash
+	pass
 
 func _on_show_level_up_choices(options: Array):
 	print("🎮 Player: Received level up choices signal with ", options.size(), " options")
@@ -826,3 +811,34 @@ func verify_signal_methods():
 			print("✅ Found method: ", method)
 		else:
 			print("❌ MISSING method: ", method)
+
+# --- Health Potion Integration Methods ---
+# Health system reference (already declared as health_component)
+
+func heal(amount: int):
+	"""Heals the player - called by health potions"""
+	if health_component:
+		health_component.heal(amount)
+
+
+func show_message(text: String):
+	"""Shows a message to the player"""
+	print("📢 Message: ", text)
+	# Add your UI message system here if you have one
+
+# Handle health changes (already present as _on_health_changed)
+# Handle player death (already present as _on_player_died)
+
+# Example of how to spawn health potions (for testing)
+func _spawn_test_potion():
+	"""Spawns a health potion for testing"""
+	var potion_scene = preload("res://scenes/health_potion.tscn")
+	var potion = potion_scene.instantiate()
+	get_parent().add_child(potion)
+	potion.global_position = global_position + Vector3(2, 1, 0)
+	print("🧪 Test potion spawned!")
+
+# Call this in _unhandled_input for testing
+func _unhandled_input(_event):
+	# No test actions for space or enter
+	pass

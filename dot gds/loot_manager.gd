@@ -3,7 +3,6 @@ extends Node
 class_name loot_manager
 
 @export var weapon_pickup_scene: PackedScene = preload("res://Scenes/weapon_pickup.tscn")
-@export var armor_pickup_scene: PackedScene # No preload
 @export var health_potion_scene: PackedScene = preload("res://Scenes/health_potion.tscn")
 @export var coin_scene: PackedScene = preload("res://Scenes/coin.tscn")
 @export var xp_orb_scene: PackedScene = preload("res://Scenes/xp_orb.tscn")
@@ -26,38 +25,8 @@ class_name loot_manager
 	"weapon": {
 		"drop_chance": 0.05,
 		"avoid_duplicates": true
-	},
-	"armor": {
-		"drop_chance": 0.0,  # Changed from 0.03 to 0.0
-		"avoid_duplicates": true
 	}
 }
-
-# CHEST LOOT REMOVAL: This config is now unused, kept for reference only
-# @export var chest_loot_config = {
-# 	"coin": {
-# 		"drop_chance": 1.0,
-# 		"amount_min": 200,
-# 		"amount_max": 500
-# 	},
-# 	"health_potion": {
-# 		"drop_chance": 1.0,
-# 		"heal_amount": 75
-# 	},
-# 	"xp_orb": {
-# 		"drop_chance": 1.0,
-# 		"xp_amount_min": 150,
-# 		"xp_amount_max": 300
-# 	},
-# 	"weapon": {
-# 		"drop_chance": 0.8,
-# 		"avoid_duplicates": true
-# 	},
-# 	"armor": {
-# 		"drop_chance": 0.0,  # Changed from 0.5 to 0.0
-# 		"avoid_duplicates": true
-# 	}
-# }
 
 # --- XP Manager Safe Reference System ---
 # (Removed problematic @onready var xp_manager_node line)
@@ -187,38 +156,10 @@ func drop_enemy_loot(position: Vector3, _enemy_node: Node = null):
 	# Weapon
 	if randf() <= config["weapon"]["drop_chance"]:
 		_drop_weapon_with_physics(position, parent_node)
-	# if randf() <= config["armor"]["drop_chance"]:
-	#     _drop_armor_with_physics(position, parent_node)
 
 # CHEST LOOT REMOVAL: This function is now obsolete and will be removed
 # func drop_chest_loot(position: Vector3, _chest_node: Node = null):
 # 	pass
-
-func _drop_armor_with_physics(position: Vector3, parent: Node):
-	# Early return if armor system isn't ready
-	if not armor_pickup_scene:
-		print("⚠️ Armor system not implemented yet - skipping armor drop")
-		return
-	if not ArmorPool:
-		print("⚠️ ArmorPool not available - skipping armor drop")
-		return
-	if not ArmorPool.has_method("get_random_armor"):
-		print("⚠️ ArmorPool missing methods - skipping armor drop")
-		return
-	# Only proceed if everything is properly set up
-	var armor_resource = ArmorPool.get_random_armor()
-	if not armor_resource:
-		print("⚠️ No armor available from pool")
-		return
-	var armor_pickup_instance = armor_pickup_scene.instantiate()
-	if not armor_pickup_instance:
-		print("⚠️ Failed to instantiate armor pickup")
-		return
-	parent.add_child(armor_pickup_instance)
-	armor_pickup_instance.set_armor_resource(armor_resource)
-	armor_pickup_instance.set_meta("from_physics", true)
-	_launch_with_physics(armor_pickup_instance, position)
-	print("🛡️ Dropped armor with physics: ", armor_resource.armor_name)
 
 func _get_drop_parent() -> Node:
 	# Try to find the main scene or current scene first
