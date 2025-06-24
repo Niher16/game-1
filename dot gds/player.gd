@@ -630,6 +630,17 @@ func get_dash_charges() -> int:
 func get_max_dash_charges() -> int:
 	return max_dash_charges if "max_dash_charges" in self else 1
 
+func get_max_allies() -> int:
+	if "max_allies" in self:
+		return self.max_allies
+	return 3
+
+func refill_dash_charges():
+	"""Refill dash charges - called when dash charge perk is taken"""
+	if movement_component and movement_component.has_method("refill_charges"):
+		movement_component.refill_charges()
+		print("🚀 Dash charges refilled!")
+
 # Debug method to verify all components exist
 func debug_components():
 	print("🔍 Player Components Debug:")

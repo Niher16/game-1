@@ -600,3 +600,46 @@ func _ready():
 	else:
 		print("[PlayerCombat] WeaponAnimationPlayer node found.")
 	set_process(true)
+
+func calculate_attack_damage() -> int:
+	var base_damage = player.attack_damage
+	var final_damage = base_damage
+	# Berserker perk: +50% damage when health is below 25%
+	if "has_berserker" in player and player.has_berserker:
+		var health_component = player.health_component
+		if health_component:
+			var health_percent = health_component.get_health_percentage()
+			if health_percent <= 0.25:
+				final_damage = int(final_damage * 1.5)
+				print("🔥 BERSERKER MODE ACTIVATED! Damage: ", base_damage, " -> ", final_damage)
+	return final_damage
+
+func calculate_attack_speed() -> float:
+	var base_cooldown = player.attack_cooldown
+	var final_cooldown = base_cooldown
+	if "has_berserker" in player and player.has_berserker:
+		var health_component = player.health_component
+		if health_component:
+			var health_percent = health_component.get_health_percentage()
+			if health_percent <= 0.25:
+				final_cooldown = final_cooldown * 0.5
+				print("⚡ BERSERKER ATTACK SPEED! Cooldown: ", base_cooldown, " -> ", final_cooldown)
+	return final_cooldown
+
+func check_critical_hit() -> bool:
+	var crit_chance = 0
+	if "crit_chance" in player:
+		crit_chance = player.crit_chance
+	if crit_chance > 0:
+		var roll = randi() % 100
+		if roll < crit_chance:
+			print("💥 CRITICAL HIT! (", crit_chance, "% chance)")
+			return true
+	return false
+
+func perform_attack():
+	var damage = calculate_attack_damage()
+	var is_crit = check_critical_hit()
+	if is_crit:
+		damage = int(damage * 2.0)
+	print("⚔️ Attack damage: ", damage, " (Crit: ", is_crit, ")")

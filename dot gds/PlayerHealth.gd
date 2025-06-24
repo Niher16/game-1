@@ -19,6 +19,8 @@ const INVULNERABLE_DURATION: float = 0.5
 # Reference to player
 var player: CharacterBody3D
 
+var health_regen_timer := 0.0
+
 func _ready():
 	print("💖 PlayerHealth system ready")
 
@@ -36,6 +38,16 @@ func _process(delta):
 	"""Update invulnerability timer"""
 	if invulnerable_time > 0:
 		invulnerable_time -= delta
+	# Health regeneration perk
+	var regen_rate = 0
+	if player and "health_regen_rate" in player:
+		regen_rate = player.health_regen_rate
+	if regen_rate > 0 and get_health() < get_max_health():
+		health_regen_timer += delta
+		if health_regen_timer >= 1.0:
+			heal(regen_rate)
+			health_regen_timer = 0.0
+			print("❤️ Health regenerated: +" + str(regen_rate) + " HP")
 
 func get_health() -> int:
 	"""Returns current health"""
@@ -81,8 +93,21 @@ func heal(amount: int):
 	# Visual feedback
 	_show_heal_effect(amount)
 
+func set_invulnerable(invuln: bool):
+	"""Set invulnerability state - used by dash shield perk"""
+	self._is_invulnerable = invuln
+	if invuln:
+		print("🛡️ Player is now invulnerable")
+	else:
+		print("🛡️ Player invulnerability ended")
+
+func is_custom_invulnerable() -> bool:
+	return self._is_invulnerable if "_is_invulnerable" in self else false
+
 func take_damage(amount: int, _from_source: Node = null):
-	"""Damages the player by specified amount"""
+	if is_custom_invulnerable():
+		print("🛡️ Damage blocked by invulnerability!")
+		return
 	# Check invulnerability
 	if invulnerable_time > 0:
 		print("🛡️ Damage blocked - still invulnerable")
