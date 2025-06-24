@@ -1,13 +1,22 @@
-[gd_resource type="ArmorResource" format=3 uid="uid://pujhhpqj7als"]
+[gd_resource type="Resource" script_class="ArmorResource" load_steps=2 format=3 uid="uid://csy0lqh3cfrb5"]
+
+[ext_resource type="Script" uid="uid://dtap8te6jisaq" path="res://Armors/ArmorResource.gd" id="1_b1egs"]
 
 [resource]
-resource_local_to_scene = false
-resource_name = ""
+script = ExtResource("1_b1egs")
 armor_name = "Dragon Scale Armor"
+armor_type = 2 # Chest
+armor_material = 2 # Dragon Scale
 armor_value = 40
-armor_type = "chestplate"
-description = "Legendary armor made from dragon scales."
-rarity = "legendary"
-weight = 5.0
-max_durability = 300
-current_durability = 300
+damage_reduction_bonus = 0.15
+durability = 200
+weight = 2.5
+magic_resistance = 0.2
+fire_resistance = 0.5
+poison_resistance = 0.2
+visual_scene_path = ""
+description = "Legendary chest armor made from dragon scales. Offers high protection and resistances."
+rarity = 4
+value = 500
+level_requirement = 15
+metadata/_custom_type_script = "uid://dtap8te6jisaq"

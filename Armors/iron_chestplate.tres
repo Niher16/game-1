@@ -1,13 +1,22 @@
-[gd_resource type="ArmorResource" format=3 uid="uid://cvfca1sjtvfmf"]
+[gd_resource type="Resource" script_class="ArmorResource" load_steps=2 format=3 uid="uid://xh8lg3fnow2q"]
+
+[ext_resource type="Script" uid="uid://dtap8te6jisaq" path="res://Armors/ArmorResource.gd" id="1_2x8tu"]
 
 [resource]
-resource_local_to_scene = false
-resource_name = ""
+script = ExtResource("1_2x8tu")
 armor_name = "Iron Chestplate"
-armor_value = 15
-armor_type = "chestplate"
-description = "A sturdy iron chestplate."
-rarity = "uncommon"
-weight = 3.5
-max_durability = 120
-current_durability = 120
+armor_type = 2 # Chest
+armor_material = 1 # Iron
+armor_value = 18
+damage_reduction_bonus = 0.08
+durability = 120
+weight = 3.0
+magic_resistance = 0.05
+fire_resistance = 0.05
+poison_resistance = 0.0
+visual_scene_path = ""
+description = "A sturdy iron chestplate. Provides solid protection against physical attacks."
+rarity = 2
+value = 120
+level_requirement = 5
+metadata/_custom_type_script = "uid://dtap8te6jisaq"

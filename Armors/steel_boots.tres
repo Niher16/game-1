@@ -1,11 +1,22 @@
-[gd_resource type="ArmorResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ArmorResource" load_steps=2 format=3 uid="uid://bqqg6b66pcccq"]
+
+[ext_resource type="Script" uid="uid://dtap8te6jisaq" path="res://Armors/ArmorResource.gd" id="1_nc4us"]
 
 [resource]
+script = ExtResource("1_nc4us")
 armor_name = "Steel Boots"
-armor_value = 8
-armor_type = "boots"
-description = "Heavy steel boots."
-rarity = "rare"
-weight = 2.0
-max_durability = 80
-current_durability = 80
+armor_type = 4 # Boots
+armor_material = 1 # Steel
+armor_value = 12
+damage_reduction_bonus = 0.06
+durability = 90
+weight = 1.2
+magic_resistance = 0.02
+fire_resistance = 0.03
+poison_resistance = 0.0
+visual_scene_path = ""
+description = "Heavy steel boots. Offer decent protection and a bit of fire resistance."
+rarity = 2
+value = 70
+level_requirement = 3
+metadata/_custom_type_script = "uid://dtap8te6jisaq"

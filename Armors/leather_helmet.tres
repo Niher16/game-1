@@ -1,13 +1,22 @@
-[gd_resource type="ArmorResource" format=3 uid="uid://bujh37mlxhhf2"]
+[gd_resource type="Resource" script_class="ArmorResource" load_steps=2 format=3 uid="uid://b7qcbqsfv0ki1"]
+
+[ext_resource type="Script" uid="uid://dtap8te6jisaq" path="res://Armors/ArmorResource.gd" id="1_sijjc"]
 
 [resource]
-resource_local_to_scene = false
-resource_name = ""
+script = ExtResource("1_sijjc")
 armor_name = "Leather Helmet"
-armor_value = 5
-armor_type = "helmet"
-description = "A basic leather helmet."
-rarity = "common"
-weight = 1.0
-max_durability = 50
-current_durability = 50
+armor_type = 0 # Helmet
+armor_material = 0 # Leather
+armor_value = 7
+damage_reduction_bonus = 0.03
+durability = 60
+weight = 0.7
+magic_resistance = 0.0
+fire_resistance = 0.0
+poison_resistance = 0.05
+visual_scene_path = ""
+description = "A lightweight leather helmet. Offers basic protection and some poison resistance."
+rarity = 1
+value = 35
+level_requirement = 1
+metadata/_custom_type_script = "uid://dtap8te6jisaq"

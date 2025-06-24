@@ -1,11 +1,22 @@
-[gd_resource type="ArmorResource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ArmorResource" load_steps=2 format=3 uid="uid://bb3kq3c7371y3"]
+
+[ext_resource type="Script" uid="uid://dtap8te6jisaq" path="res://Armors/ArmorResource.gd" id="1_hmu7q"]
 
 [resource]
+script = ExtResource("1_hmu7q")
 armor_name = "Mithril Shield"
-armor_value = 20
-armor_type = "shield"
-description = "A rare shield made of mithril."
-rarity = "epic"
-weight = 2.5
-max_durability = 150
-current_durability = 150
+armor_type = 3 # Shield
+armor_material = 3 # Mithril
+armor_value = 22
+damage_reduction_bonus = 0.12
+durability = 150
+weight = 1.5
+magic_resistance = 0.15
+fire_resistance = 0.1
+poison_resistance = 0.1
+visual_scene_path = ""
+description = "A lightweight but strong mithril shield. Good all-around protection and magic resistance."
+rarity = 3
+value = 220
+level_requirement = 10
+metadata/_custom_type_script = "uid://dtap8te6jisaq"
