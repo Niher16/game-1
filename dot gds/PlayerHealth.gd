@@ -114,36 +114,38 @@ func _handle_death():
 func _show_heal_effect(amount: int):
 	"""Shows visual feedback for healing"""
 	print("✨ Heal effect: +", amount, " HP")
-	
 	# Try to show floating text if system exists
 	if player and player.has_method("show_floating_text"):
 		player.show_floating_text("+" + str(amount), Color.GREEN)
-	
-	# Flash green if possible
+	# Flash green for heal feedback with auto-reset
 	if player and player.has_node("MeshInstance3D"):
 		var mesh = player.get_node("MeshInstance3D")
 		if mesh.material_override:
-			var tween = create_tween()
 			var original_color = mesh.material_override.albedo_color
-			tween.tween_property(mesh.material_override, "albedo_color", Color.GREEN, 0.1)
-			tween.tween_property(mesh.material_override, "albedo_color", original_color, 0.2)
+			mesh.material_override.albedo_color = Color(0.3, 1.0, 0.3)
+			# Reset color after 0.2 seconds
+			get_tree().create_timer(0.2).timeout.connect(func():
+				if mesh and mesh.material_override:
+					mesh.material_override.albedo_color = original_color
+			)
 
 func _show_damage_effect(amount: int):
 	"""Shows visual feedback for damage"""
 	print("💥 Damage effect: -", amount, " HP")
-	
 	# Try to show floating text if system exists
 	if player and player.has_method("show_floating_text"):
 		player.show_floating_text("-" + str(amount), Color.RED)
-	
-	# Flash red if possible
+	# Flash red for damage feedback with auto-reset
 	if player and player.has_node("MeshInstance3D"):
 		var mesh = player.get_node("MeshInstance3D")
 		if mesh.material_override:
-			var tween = create_tween()
 			var original_color = mesh.material_override.albedo_color
-			tween.tween_property(mesh.material_override, "albedo_color", Color.RED, 0.1)
-			tween.tween_property(mesh.material_override, "albedo_color", original_color, 0.3)
+			mesh.material_override.albedo_color = Color(1.0, 0.2, 0.2)
+			# Reset color after 0.3 seconds
+			get_tree().create_timer(0.3).timeout.connect(func():
+				if mesh and mesh.material_override:
+					mesh.material_override.albedo_color = original_color
+			)
 
 func is_invulnerable() -> bool:
 	"""Returns true if player is currently invulnerable"""
