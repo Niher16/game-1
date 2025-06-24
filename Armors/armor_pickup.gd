@@ -16,7 +16,7 @@ enum ArmorType {
 }
 
 # Preload the armor pickup scene for instancing
-@export var armor_scene: PackedScene = preload("res://Scenes/armor_pickup.tscn")
+@export var armor_scene: PackedScene = preload("res://Armors/armor_pickup.tscn")
 
 static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -> bool:
 	if not mesh_target:

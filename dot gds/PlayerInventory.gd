@@ -34,9 +34,11 @@ func _ready():
 		push_warning("PlayerInventory: No weapon_attach_point set or found.")
 	else:
 		print("[PlayerInventory] WeaponAttachPoint found: ", weapon_attach_point.get_path())
-	# Ensure player_ref.weapon_attach_point is set
-	if player_ref and player_ref.weapon_attach_point != weapon_attach_point:
-		player_ref.weapon_attach_point = weapon_attach_point
+	# Ensure weapon_attach_point is set safely
+	if player_ref and player_ref.get_node_or_null("WeaponAttachPoint") != weapon_attach_point:
+		# Don't assign to player_ref.weapon_attach_point - that property doesn't exist
+		# weapon_attach_point is already set correctly on line 33
+		pass
 
 func add_item(item) -> bool:
 	if item == null:
