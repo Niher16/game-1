@@ -1,93 +1,33 @@
-# demolition_king_boss.gd - The Demolition King Boss Fight
-# Fixed following Godot 4.1 best practices for unused parameters
+# demolition_king_boss.gd - SAFE VERSION with debug info
 extends CharacterBody3D
 
+# === SIGNALS ===
 signal boss_died
-signal phase_changed(new_phase: int)
 signal wall_destroyed(position: Vector3)
 
 # === BOSS STATS ===
-@export var max_health = 200
-@export var health = 200
-@export var speed = 4.0
-@export var charge_speed = 12.0
-@export var jump_force = 8.0
-@export var attack_damage = 15
-
-# === PHASE MANAGEMENT ===
-enum BossPhase { ENTRANCE, PHASE_1, PHASE_2, DEATH }
-var current_phase = BossPhase.ENTRANCE
-var phase_1_threshold = 0.5  # 50% health
+@export var max_health: int = 200
+@export var speed: float = 4.0
+@export var charge_speed: float = 8.0  # Slower for testing
 
 # === BOSS STATES ===
 enum BossState { 
-	ENTRANCE_JUMPING, 
-	IDLE, 
-	TELEGRAPH_CHARGE, 
-	CHARGING, 
-	TELEGRAPH_JUMP, 
-	JUMPING, 
-	SPAWNING_SLIMES,
-	THROWING_CHUNKS,
-	STUNNED,
+	SPAWNING,        # Safe spawn state
+	POSITIONING,     # Move to safe position
+	IDLE,           # Normal behavior
+	CHARGING,       # Attack state
 	DYING
 }
-var current_state = BossState.ENTRANCE_JUMPING
+var current_state: BossState = BossState.SPAWNING
 
-# === ATTACK SYSTEMS ===
-var telegraph_timer = 0.0
-var attack_cooldown_timer = 0.0
-var state_timer = 0.0
-
-# Telegraph durations
-const CHARGE_TELEGRAPH_TIME = 1.5
-const JUMP_TELEGRAPH_TIME = 1.2
-const SPAWN_TELEGRAPH_TIME = 2.0
-
-# Attack cooldowns
-const CHARGE_COOLDOWN = 3.0
-const JUMP_COOLDOWN = 4.0
-const SPAWN_COOLDOWN = 6.0
-const THROW_COOLDOWN = 2.0
-
-# === ENTRANCE SEQUENCE ===
-var entrance_jumps_completed = 0
-var entrance_jump_targets = []
-var entrance_jump_timer = 0.0
-var entrance_complete = false
+# === CORE PROPERTIES ===
+var health: int
+var state_timer: float = 0.0
 
 # === CHARGE ATTACK ===
-var charge_start_pos = Vector3.ZERO
-var charge_target_pos = Vector3.ZERO
-var charge_direction = Vector3.ZERO
-var is_charging = false
-var charge_distance = 0.0
-
-# === JUMP ATTACK ===
-var jump_start_pos = Vector3.ZERO
-var jump_target_pos = Vector3.ZERO
-var jump_timer = 0.0
-var jump_duration = 1.0
-var is_jumping = false
-
-# === WALL BREAKING ===
-var walls_to_break = []
-var wall_break_radius = 3.0
-var charge_wall_break_width = 4.0
-
-# === SLIME SPAWNING (Phase 2) ===
-var slime_spawn_positions = []
-var slimes_spawned_this_wave = 0
-var max_slimes_per_wave = 3
-var active_slimes = []
-
-# === PROJECTILE SYSTEM (Phase 2) ===
-var wall_chunks = []
-var chunk_throw_force = 15.0
-
-# === EXPORT VARIABLES (These create the Inspector fields) ===
-@export var slime_scene: PackedScene
-@export var wall_chunk_scene: PackedScene
+var charge_direction: Vector3
+var is_charging: bool = false
+var charge_timer: float = 0.0
 
 # === SCENE REFERENCES ===
 var player: CharacterBody3D
@@ -97,20 +37,34 @@ var original_scale: Vector3
 
 # === VISUAL EFFECTS ===
 var boss_material: StandardMaterial3D
-var flash_timer = 0.0
-var telegraph_intensity = 0.0
 
-# === PHYSICS ===
-var knockback_velocity = Vector3.ZERO
-var is_on_ground = true
+# === PHYSICS & SAFETY ===
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+var spawn_position: Vector3
+var safe_ground_level: float
+var last_safe_position: Vector3
 
-func _ready():
-	print("👑 DEMOLITION KING: Awakening...")
+func _ready() -> void:
+	print("👑 DEMOLITION KING: SAFE SPAWN VERSION!")
+	health = max_health
 	_setup_boss()
-	_setup_entrance_sequence()
-	call_deferred("_start_boss_fight")
+	call_deferred("_find_safe_spawn")
 
-func _setup_boss():
+func _physics_process(delta: float) -> void:
+	state_timer += delta
+	_debug_boss_status()
+	_handle_boss_state(delta)
+	_apply_safe_physics(delta)
+	
+	# Store last position before moving
+	if is_on_floor():
+		last_safe_position = global_position
+	
+	move_and_slide()
+	_check_wall_collisions()
+	_safety_checks()
+
+func _setup_boss() -> void:
 	# Get scene components
 	mesh_instance = get_node("MeshInstance3D")
 	collision_shape = get_node("CollisionShape3D")
@@ -118,514 +72,425 @@ func _setup_boss():
 	if mesh_instance:
 		original_scale = mesh_instance.scale
 		_setup_boss_material()
+		print("✅ Boss visuals setup complete")
 	
 	# Find player
 	player = get_tree().get_first_node_in_group("player")
+	if not player:
+		push_error("❌ No player found!")
+		return
 	
-	# Physics setup
+	print("✅ Found player at: ", player.global_position)
+	
+	# Setup groups and collision
 	add_to_group("bosses")
 	add_to_group("enemies")
 	collision_layer = 4  # Boss layer
-	collision_mask = 1 | 8  # World + walls
+	collision_mask = 1   # Collide with world
+	
+	print("✅ Boss collision setup: layer=", collision_layer, " mask=", collision_mask)
 
-func _setup_boss_material():
+func _setup_boss_material() -> void:
 	boss_material = StandardMaterial3D.new()
-	boss_material.albedo_color = Color(0.8, 0.2, 0.1, 1.0)  # Menacing red
-	boss_material.metallic = 0.2
+	boss_material.albedo_color = Color(0.8, 0.2, 0.1, 1.0)
+	boss_material.metallic = 0.3
 	boss_material.roughness = 0.4
 	boss_material.emission_enabled = true
-	boss_material.emission = Color(0.3, 0.1, 0.0)
+	boss_material.emission = Color(0.3, 0.1, 0.0)  # More visible
 	mesh_instance.material_override = boss_material
 
-func _setup_entrance_sequence():
-	# Calculate dramatic entrance jump positions
-	if player:
-		var arena_center = player.global_position
-		
-		# Create 3 jump positions leading to center
-		entrance_jump_targets = [
-			arena_center + Vector3(12, 0, 8),   # Back-right
-			arena_center + Vector3(-8, 0, 6),   # Back-left  
-			arena_center + Vector3(4, 0, -10),  # Front-right
-			arena_center                        # Final landing
-		]
-		
-		# Start at first position, elevated
-		global_position = entrance_jump_targets[0] + Vector3(0, 15, 0)
-
-func _start_boss_fight():
-	print("🎬 DEMOLITION KING: ENTRANCE BEGINS!")
-	current_state = BossState.ENTRANCE_JUMPING
-	_begin_entrance_jump()
-
-func _physics_process(delta):
-	_update_timers(delta)
-	_handle_boss_state(delta)
-	_update_visual_effects()  # FIXED: Removed delta parameter
-	_apply_physics(delta)
+func _find_safe_spawn() -> void:
+	if not player:
+		return
 	
-	move_and_slide()
-
-func _update_timers(delta):
-	if telegraph_timer > 0:
-		telegraph_timer -= delta
-	if attack_cooldown_timer > 0:
-		attack_cooldown_timer -= delta
-	if flash_timer > 0:
-		flash_timer -= delta
+	print("🔍 Finding safe spawn position near player...")
 	
-	state_timer += delta
+	# Find ground level near player
+	safe_ground_level = _find_ground_level(player.global_position)
+	print("🌍 Ground level detected at Y: ", safe_ground_level)
+	
+	# Position boss on safe ground, a bit away from player
+	var safe_offset = Vector3(8, 0, 8)  # 8 units away
+	spawn_position = Vector3(
+		player.global_position.x + safe_offset.x,
+		safe_ground_level + 2.0,  # 2 units above ground
+		player.global_position.z + safe_offset.z
+	)
+	
+	# Set position and mark as safe
+	global_position = spawn_position
+	last_safe_position = spawn_position
+	
+	print("🎯 Boss spawned at SAFE position: ", global_position)
+	print("🦶 Is on floor: ", is_on_floor())
+	
+	current_state = BossState.POSITIONING
 
-func _handle_boss_state(delta):
+func _find_ground_level(reference_pos: Vector3) -> float:
+	"""Find the ground level near a reference position"""
+	var space_state = get_world_3d().direct_space_state
+	
+	# Cast ray downward from high above reference position
+	var ray_start = reference_pos + Vector3(0, 20, 0)
+	var ray_end = reference_pos + Vector3(0, -20, 0)
+	
+	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+	query.collision_mask = 1  # World collision
+	
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		print("🎯 Ground raycast hit: ", result.collider.name, " at Y: ", result.position.y)
+		return result.position.y
+	else:
+		print("⚠️ No ground found, using player Y level")
+		return reference_pos.y
+
+# === STATE MANAGEMENT ===
+func _handle_boss_state(delta: float) -> void:
 	match current_state:
-		BossState.ENTRANCE_JUMPING:
-			_handle_entrance_sequence(delta)
+		BossState.SPAWNING:
+			_handle_spawning()
+		BossState.POSITIONING:
+			_handle_positioning()
 		BossState.IDLE:
-			_handle_idle_state()  # FIXED: Removed unused delta parameter
-		BossState.TELEGRAPH_CHARGE:
-			_handle_charge_telegraph()  # FIXED: Removed unused delta parameter
+			_handle_idle_state()
 		BossState.CHARGING:
-			_handle_charge_attack()  # FIXED: Removed unused delta parameter
-		BossState.TELEGRAPH_JUMP:
-			_handle_jump_telegraph()  # FIXED: Removed unused delta parameter
-		BossState.JUMPING:
-			_handle_jump_attack(delta)
-		BossState.SPAWNING_SLIMES:
-			_handle_slime_spawning()  # FIXED: Removed unused delta parameter
-		BossState.THROWING_CHUNKS:
-			_handle_chunk_throwing()  # FIXED: Removed unused delta parameter
-		BossState.STUNNED:
-			_handle_stunned_state()  # FIXED: Removed unused delta parameter
+			_handle_charging(delta)
 		BossState.DYING:
 			_handle_death_sequence(delta)
 
-# === ENTRANCE SEQUENCE ===
-func _handle_entrance_sequence(delta):
-	entrance_jump_timer += delta
-	
-	# Dramatic falling jump with wall breaking
-	if entrance_jump_timer >= 1.0:  # Each jump takes 1 second
-		_complete_entrance_jump()
-		entrance_jumps_completed += 1
-		entrance_jump_timer = 0.0
-		
-		if entrance_jumps_completed < entrance_jump_targets.size():
-			_begin_entrance_jump()
-		else:
-			_complete_entrance_sequence()
+func _handle_spawning() -> void:
+	# Just wait a moment to ensure everything is loaded
+	if state_timer >= 0.5:
+		print("✅ Spawn complete, moving to positioning")
+		current_state = BossState.POSITIONING
+		state_timer = 0.0
 
-func _begin_entrance_jump():
-	var target_pos = entrance_jump_targets[entrance_jumps_completed]
+func _handle_positioning() -> void:
+	# Only break walls once at the start, then let him settle
+	if state_timer >= 0.5 and state_timer < 1.0:
+		print("🔨 Initial wall break to clear immediate area...")
+		_force_break_nearby_walls()
 	
-	# Set jump trajectory
-	jump_start_pos = global_position
-	jump_target_pos = target_pos
-	jump_timer = 0.0
-	is_jumping = true
-	
-	print("💥 Entrance jump ", entrance_jumps_completed + 1)
+	# Wait for boss to settle, then start normal behavior
+	if state_timer >= 2.0:
+		print("👑 DEMOLITION KING: READY FOR BATTLE!")
+		current_state = BossState.IDLE
+		state_timer = 0.0
 
-func _complete_entrance_jump():
-	is_jumping = false
-	global_position = jump_target_pos
-	
-	# Break walls at landing site
-	_break_walls_at_position(global_position, wall_break_radius)
-	_create_landing_impact()
-	
-	print("🔥 WALL SMASH at: ", global_position)
+func _break_walls_around_spawn() -> void:
+	"""Break walls around boss spawn to create some arena space"""
+	print("🔨 Creating spawn arena...")
+	_force_break_nearby_walls()
 
-func _complete_entrance_sequence():
-	print("👑 DEMOLITION KING: I HAVE ARRIVED!")
-	entrance_complete = true
-	current_phase = BossPhase.PHASE_1
-	current_state = BossState.IDLE
-	phase_changed.emit(1)
-
-# === PHASE 1: CHARGE & JUMP ATTACKS ===
-func _handle_idle_state():  # FIXED: Removed unused delta parameter
+func _handle_idle_state() -> void:
 	if not player:
 		return
 	
-	# Phase transition check
-	if health <= max_health * phase_1_threshold and current_phase == BossPhase.PHASE_1:
-		_transition_to_phase_2()
+	# Don't try to move if boss is falling or unstable
+	if not is_on_floor() or velocity.y < -2.0:
+		print("⏸️ Boss not stable - waiting to land")
 		return
 	
-	# Attack decision making
-	if attack_cooldown_timer <= 0:
-		_choose_next_attack()
+	# Check if boss is stuck (not moving for a while on stable ground)
+	if state_timer >= 3.0 and velocity.length() < 0.1 and is_on_floor():
+		print("🚫 BOSS APPEARS STUCK! Breaking nearby walls")
+		_force_break_nearby_walls()
+	
+	# Try to move toward player only when stable
+	_move_toward_player()
+	
+	# Charge attack every 5 seconds
+	if state_timer >= 5.0:
+		_start_charge_attack()
 
-func _choose_next_attack():
-	if not player:
+func _move_toward_player() -> void:
+	"""Make boss carefully move toward player"""
+	if not player or not is_on_floor():
 		return
 	
+	var direction_to_player = (player.global_position - global_position).normalized()
 	var distance_to_player = global_position.distance_to(player.global_position)
 	
-	if current_phase == BossPhase.PHASE_1:
-		# Phase 1: Charge and Jump attacks
-		if distance_to_player > 8.0 and randf() < 0.7:
-			_start_charge_attack()
-		else:
-			_start_jump_attack()
+	print("🎯 Moving toward player: distance=", distance_to_player, " direction=", direction_to_player)
 	
-	elif current_phase == BossPhase.PHASE_2:
-		# Phase 2: Spawning and throwing
-		if len(active_slimes) < max_slimes_per_wave and randf() < 0.6:
-			_start_slime_spawning()
-		else:
-			_start_chunk_throwing()
+	# Move toward player at conservative speed
+	var move_speed = speed * 0.5  # Half speed for safety
+	velocity.x = direction_to_player.x * move_speed
+	velocity.z = direction_to_player.z * move_speed
+	
+	# If very close, stop moving
+	if distance_to_player < 4.0:
+		velocity.x = 0
+		velocity.z = 0
+		print("✋ Close enough to player, stopping movement")
 
-# === CHARGE ATTACK ===
-func _start_charge_attack():
-	print("⚡ Boss charging up CHARGE ATTACK!")
-	current_state = BossState.TELEGRAPH_CHARGE
-	telegraph_timer = CHARGE_TELEGRAPH_TIME
-	
-	# Calculate charge path
-	charge_start_pos = global_position
-	charge_target_pos = player.global_position
-	charge_direction = (charge_target_pos - charge_start_pos).normalized()
-	
-	# Extend charge to hit walls
-	charge_target_pos = charge_start_pos + charge_direction * 20.0
-	
-	_face_direction(charge_direction)
-
-func _handle_charge_telegraph():  # FIXED: Removed unused delta parameter
-	# Visual telegraph - grow larger and glow red
-	telegraph_intensity = sin((CHARGE_TELEGRAPH_TIME - telegraph_timer) * 8.0) * 0.3 + 0.7
-	
-	if mesh_instance:
-		var scale_mult = 1.0 + telegraph_intensity * 0.4
-		mesh_instance.scale = original_scale * scale_mult
-	
-	if boss_material:
-		boss_material.emission = Color(0.8, 0.1, 0.0) * telegraph_intensity
-	
-	if telegraph_timer <= 0:
-		_execute_charge_attack()
-
-func _execute_charge_attack():
-	print("💨 CHARGE ATTACK EXECUTING!")
-	current_state = BossState.CHARGING
-	is_charging = true
-	velocity = charge_direction * charge_speed
-	
-	# Reset visual
-	if mesh_instance:
-		mesh_instance.scale = original_scale
-	if boss_material:
-		boss_material.emission = Color(0.3, 0.1, 0.0)
-
-func _handle_charge_attack():  # FIXED: Removed unused delta parameter
-	if not is_charging:
+func _start_charge_attack() -> void:
+	if not player:
 		return
+		
+	print("⚡ DEMOLITION KING: STARTING CHARGE!")
+	current_state = BossState.CHARGING
 	
-	# Check for wall collisions during charge
+	# Calculate direction to player
+	charge_direction = (player.global_position - global_position).normalized()
+	is_charging = true
+	charge_timer = 0.0
+	state_timer = 0.0
+	
+	print("🎯 Charging toward: ", player.global_position)
+
+func _handle_charging(delta: float) -> void:
+	charge_timer += delta
+	
+	# Actually charge forward at full speed
+	velocity.x = charge_direction.x * charge_speed
+	velocity.z = charge_direction.z * charge_speed
+	
+	print("🏃 Boss charging: velocity=(", velocity.x, ", ", velocity.z, ") toward player")
+	
+	# Break walls continuously while charging
+	if int(charge_timer * 10) % 3 == 0:  # Every 0.3 seconds
+		_force_break_nearby_walls()
+	
+	# Stop charging after 3 seconds or if we've moved far enough
+	var distance_traveled = global_position.distance_to(player.global_position)
+	if charge_timer >= 3.0 or distance_traveled < 2.0:
+		_end_charge()
+
+func _end_charge() -> void:
+	print("🛑 Charge ended")
+	is_charging = false
+	velocity.x = 0
+	velocity.z = 0
+	current_state = BossState.IDLE
+	state_timer = 0.0
+	charge_timer = 0.0
+
+# === WALL BREAKING ===
+func _check_wall_collisions() -> void:
+	# Only check collisions when moving
+	if velocity.length() < 0.1:
+		return
+		
 	for index in range(get_slide_collision_count()):
 		var collision = get_slide_collision(index)
 		var collider = collision.get_collider()
 		
-		# Hit wall - break it!
-		if collider and collider.is_in_group("walls"):
-			_break_walls_along_charge_path()
-			_end_charge_attack()
-			return
-		
-		# Hit player
-		elif collider and collider.is_in_group("player"):
-			_damage_player()
-			_end_charge_attack()
-			return
-	
-	# Check if charge distance completed
-	var distance_traveled = global_position.distance_to(charge_start_pos)
-	if distance_traveled >= 20.0:
-		_end_charge_attack()
+		if collider and _is_wall(collider):
+			print("💥 Boss charged through wall: ", collider.name)
+			_break_wall(collider)
 
-func _break_walls_along_charge_path():
-	# Break walls in a line along the charge
-	var steps = int(charge_distance / 2.0)
-	for i in range(steps):
-		var pos = charge_start_pos.lerp(global_position, float(i) / steps)
-		_break_walls_at_position(pos, charge_wall_break_width)
-
-func _end_charge_attack():
-	print("🛑 Charge attack ended")
-	is_charging = false
-	velocity = Vector3.ZERO
-	current_state = BossState.STUNNED
-	state_timer = 0.0
-	attack_cooldown_timer = CHARGE_COOLDOWN
-
-# === JUMP ATTACK ===
-func _start_jump_attack():
-	print("🦘 Boss preparing JUMP ATTACK!")
-	current_state = BossState.TELEGRAPH_JUMP
-	telegraph_timer = JUMP_TELEGRAPH_TIME
+func _force_break_nearby_walls() -> void:
+	"""Break walls in radius around boss"""
+	print("💪 Force breaking walls around: ", global_position)
 	
-	jump_target_pos = player.global_position
-	_face_direction((jump_target_pos - global_position).normalized())
-
-func _handle_jump_telegraph():  # FIXED: Removed unused delta parameter
-	# Crouch and glow for jump
-	telegraph_intensity = sin((JUMP_TELEGRAPH_TIME - telegraph_timer) * 6.0) * 0.5 + 0.5
-	
-	if mesh_instance:
-		var crouch_scale = original_scale
-		crouch_scale.y *= 0.7 + telegraph_intensity * 0.3
-		crouch_scale.x *= 1.2 - telegraph_intensity * 0.2
-		crouch_scale.z *= 1.2 - telegraph_intensity * 0.2
-		mesh_instance.scale = crouch_scale
-	
-	if telegraph_timer <= 0:
-		_execute_jump_attack()
-
-func _execute_jump_attack():
-	print("🚀 JUMP ATTACK EXECUTING!")
-	current_state = BossState.JUMPING
-	is_jumping = true
-	jump_timer = 0.0
-	jump_start_pos = global_position
-	
-	# Reset visual
-	if mesh_instance:
-		mesh_instance.scale = original_scale
-
-func _handle_jump_attack(delta):
-	jump_timer += delta
-	var progress = jump_timer / jump_duration
-	
-	if progress >= 1.0:
-		_complete_jump_attack()
-		return
-	
-	# Arc trajectory
-	var horizontal = jump_start_pos.lerp(jump_target_pos, progress)
-	var height = jump_start_pos.y + (8.0 * sin(progress * PI))
-	global_position = Vector3(horizontal.x, height, horizontal.z)
-
-func _complete_jump_attack():
-	is_jumping = false
-	global_position = Vector3(jump_target_pos.x, jump_start_pos.y, jump_target_pos.z)
-	
-	# Massive ground impact!
-	_break_walls_at_position(global_position, wall_break_radius * 1.5)
-	_create_ground_crack_effect()
-	_damage_nearby_targets()
-	
-	current_state = BossState.STUNNED
-	state_timer = 0.0
-	attack_cooldown_timer = JUMP_COOLDOWN
-	
-	print("💥 MASSIVE GROUND IMPACT!")
-
-# === PHASE 2: SPAWNING & THROWING ===
-func _transition_to_phase_2():
-	print("👑 DEMOLITION KING: PHASE 2 - I'M GETTING ANGRY!")
-	current_phase = BossPhase.PHASE_2
-	current_state = BossState.IDLE
-	phase_changed.emit(2)
-	
-	# Visual change - make boss look more damaged/angry
-	if boss_material:
-		boss_material.albedo_color = Color(0.9, 0.1, 0.1)  # Angrier red
-		boss_material.emission = Color(0.5, 0.0, 0.0)
-
-func _start_slime_spawning():
-	print("🟢 Boss spawning slimes!")
-	current_state = BossState.SPAWNING_SLIMES
-	telegraph_timer = SPAWN_TELEGRAPH_TIME
-	_calculate_spawn_positions()
-
-func _calculate_spawn_positions():
-	slime_spawn_positions.clear()
-	
-	# Spawn slimes around the arena
-	for i in range(max_slimes_per_wave):
-		var angle = (PI * 2.0 / max_slimes_per_wave) * i
-		var spawn_pos = global_position + Vector3(
-			cos(angle) * 8.0,
-			0,
-			sin(angle) * 8.0
-		)
-		slime_spawn_positions.append(spawn_pos)
-
-func _handle_slime_spawning():  # FIXED: Removed unused delta parameter
-	# Telegraph where slimes will spawn
-	telegraph_intensity = sin((SPAWN_TELEGRAPH_TIME - telegraph_timer) * 4.0) * 0.5 + 0.5
-	
-	if telegraph_timer <= 0:
-		_execute_slime_spawning()
-
-func _execute_slime_spawning():
-	print("🌟 Spawning slimes now!")
-	
-	for pos in slime_spawn_positions:
-		if slime_scene:
-			var new_slime = slime_scene.instantiate()
-			get_tree().current_scene.add_child(new_slime)
-			new_slime.global_position = pos
-			active_slimes.append(new_slime)
-			
-			# Connect death signal to track active slimes
-			if new_slime.has_signal("enemy_died"):
-				new_slime.enemy_died.connect(_on_slime_died.bind(new_slime))
-	
-	current_state = BossState.IDLE
-	attack_cooldown_timer = SPAWN_COOLDOWN
-
-func _on_slime_died(slime):
-	if slime in active_slimes:
-		active_slimes.erase(slime)
-
-func _start_chunk_throwing():
-	print("🪨 Boss throwing wall chunks!")
-	current_state = BossState.THROWING_CHUNKS
-	_throw_wall_chunk()
-
-func _handle_chunk_throwing():  # FIXED: Removed unused delta parameter
-	# Simple state - just wait for animation to complete
-	if state_timer >= 1.0:
-		current_state = BossState.IDLE
-		attack_cooldown_timer = THROW_COOLDOWN
-
-func _throw_wall_chunk():
-	if not player or not wall_chunk_scene:
-		return
-	
-	var chunk = wall_chunk_scene.instantiate()
-	get_tree().current_scene.add_child(chunk)
-	chunk.global_position = global_position + Vector3(0, 2, 0)
-	
-	# Calculate trajectory to player
-	var direction = (player.global_position - chunk.global_position).normalized()
-	if chunk.has_method("throw"):
-		chunk.throw(direction * chunk_throw_force)
-	elif chunk is RigidBody3D:
-		chunk.linear_velocity = direction * chunk_throw_force
-
-# === WALL BREAKING SYSTEM ===
-func _break_walls_at_position(pos: Vector3, radius: float):
 	var space_state = get_world_3d().direct_space_state
 	var shape = SphereShape3D.new()
-	shape.radius = radius
+	shape.radius = 4.0  # Smaller radius for testing
 	
 	var query = PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
-	query.transform.origin = pos
-	query.collision_mask = 8  # Wall layer
+	query.transform.origin = global_position
+	query.collision_mask = 1
 	
 	var results = space_state.intersect_shape(query)
+	print("🔍 Found ", results.size(), " objects in break radius")
 	
+	var walls_broken = 0
 	for result in results:
-		var wall = result.collider
-		if wall and wall.is_in_group("walls"):
-			_destroy_wall(wall)
+		var obj = result.collider
+		if _is_wall(obj):
+			_break_wall(obj)
+			walls_broken += 1
+	
+	print("🧱 Broke ", walls_broken, " walls")
 
-func _destroy_wall(wall: Node):
-	print("💥 WALL DESTROYED!")
+func _is_wall(obj: Node) -> bool:
+	"""MUCH SMARTER wall detection - never break floors or important objects"""
+	if not obj:
+		return false
+	
+	var name_lower = obj.name.to_lower()
+	var parent_name_lower = obj.get_parent().name.to_lower() if obj.get_parent() else ""
+	
+	# ABSOLUTELY NEVER BREAK THESE
+	var never_break = (
+		# Floor/Ground objects
+		name_lower.contains("floor") or
+		name_lower.contains("ground") or
+		name_lower.contains("terrain") or
+		name_lower.contains("platform") or
+		# Important game objects
+		name_lower.contains("player") or
+		name_lower.contains("boss") or
+		name_lower.contains("enemy") or
+		name_lower.contains("coin") or
+		name_lower.contains("pickup") or
+		name_lower.contains("orb") or
+		name_lower.contains("potion") or
+		# Groups to preserve
+		obj.is_in_group("player") or
+		obj.is_in_group("bosses") or
+		obj.is_in_group("enemies") or
+		obj.is_in_group("floor") or
+		obj.is_in_group("ground") or
+		obj.is_in_group("terrain")
+	)
+	
+	if never_break:
+		print("🛡️ PROTECTED OBJECT (never break): ", obj.name)
+		return false
+	
+	# ONLY break objects that are clearly walls
+	var is_definitely_wall = (
+		name_lower.contains("wall") or
+		parent_name_lower.contains("wall") or
+		obj.is_in_group("walls") or
+		obj.is_in_group("wall")
+	)
+	
+	if is_definitely_wall:
+		print("💥 CONFIRMED WALL: ", obj.name, " - safe to break")
+		return true
+	
+	# For anything else (like random StaticBody3D), be more careful
+	# Only break if it's clearly blocking and above ground level
+	if obj is StaticBody3D and obj.collision_layer == 1:
+		var obj_y = obj.global_position.y
+		var boss_y = global_position.y
+		
+		# Only break if object is at similar height to boss (not floor below)
+		if abs(obj_y - boss_y) < 1.0 and obj_y > boss_y - 2.0:
+			print("💥 OBSTACLE: ", obj.name, " at similar height - breaking")
+			return true
+		else:
+			print("🛡️ GROUND LEVEL: ", obj.name, " below boss - preserving")
+			return false
+	
+	print("❌ UNKNOWN OBJECT: ", obj.name, " - not breaking")
+	return false
+
+func _break_wall(wall: Node) -> void:
+	"""Break a wall safely"""
+	if not wall or not is_instance_valid(wall):
+		return
+	
+	print("💥 BREAKING WALL: ", wall.name, " at ", wall.global_position)
 	wall_destroyed.emit(wall.global_position)
 	
-	# Simple wall destruction - just hide it
+	# Try different breaking methods
 	if wall.has_method("break_wall"):
 		wall.break_wall()
+	elif wall.has_method("destroy"):
+		wall.destroy()
 	else:
+		# Simple removal
+		if wall.has_method("set_visible"):
+			wall.set_visible(false)
+		if wall.has_method("set_collision_layer"):
+			wall.set_collision_layer(0)
 		wall.queue_free()
 
-# === VISUAL EFFECTS ===
-func _create_landing_impact():
-	# Create screen shake or particle effect here
-	# For now, just a simple print
-	print("💥 GROUND IMPACT EFFECT!")
+# === SAFETY SYSTEMS ===
+func _safety_checks() -> void:
+	"""Prevent boss from dying or falling off world"""
+	
+	# Check if boss fell below world
+	if global_position.y < safe_ground_level - 10.0:
+		print("🚨 BOSS FALLING! Teleporting to safety")
+		global_position = last_safe_position
+		velocity = Vector3.ZERO
+	
+	# Check if boss is taking damage from unknown source
+	if health < max_health and current_state != BossState.DYING:
+		print("🩸 Boss is taking damage! Health: ", health, "/", max_health)
+		# For debugging - let's see what might be hurting him
+		_debug_damage_sources()
 
-func _create_ground_crack_effect():
-	# Create floor crack visual effect
-	print("🌍 GROUND CRACKS APPEAR!")
+func _debug_damage_sources() -> void:
+	"""Debug what might be damaging the boss"""
+	print("🔍 Checking for damage sources around boss...")
+	
+	var space_state = get_world_3d().direct_space_state
+	var shape = SphereShape3D.new()
+	shape.radius = 3.0
+	
+	var query = PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.transform.origin = global_position
+	query.collision_mask = 0xFFFFFFFF  # Check all layers
+	
+	var results = space_state.intersect_shape(query)
+	print("🔍 Objects near boss that might cause damage:")
+	
+	for result in results:
+		var obj = result.collider
+		print("  - ", obj.name, " (", obj.get_class(), ") Layer: ", obj.collision_layer if obj.has_method("get") else "N/A")
 
-# === DAMAGE & HEALTH ===
-func take_damage(amount: int, _source = null):  # FIXED: Prefixed unused parameter with underscore
+func _apply_safe_physics(delta: float) -> void:
+	"""Apply physics safely - prevent falling through world"""
+	
+	# Apply gravity only when appropriate
+	if not is_on_floor() and current_state != BossState.SPAWNING:
+		velocity.y -= gravity * delta
+		
+		# Cap falling speed to prevent clipping through ground
+		velocity.y = max(velocity.y, -15.0)
+
+func _debug_boss_status() -> void:
+	"""Print debug info every few seconds"""
+	if int(state_timer) % 3 == 0 and state_timer - int(state_timer) < 0.1:  # Every 3 seconds
+		print("📊 BOSS STATUS:")
+		print("  Position: ", global_position)
+		print("  State: ", BossState.keys()[current_state])
+		print("  Health: ", health, "/", max_health)
+		print("  On Floor: ", is_on_floor())
+		print("  Velocity: ", velocity)
+
+# === DAMAGE SYSTEM ===
+func take_damage(amount: int, source = null) -> void:
 	if current_state == BossState.DYING:
 		return
 	
+	print("👑 Boss took ", amount, " damage from ", source if source else "unknown")
+	print("  Health before: ", health, "/", max_health)
+	
 	health -= amount
-	flash_timer = 0.5
 	
-	print("👑 Boss took ", amount, " damage! Health: ", health)
-	
-	# Flash red when damaged
-	if boss_material:
-		boss_material.albedo_color = Color.WHITE
-		await get_tree().create_timer(0.1).timeout
-		if boss_material:
-			boss_material.albedo_color = Color(0.8, 0.2, 0.1)
+	print("  Health after: ", health, "/", max_health)
 	
 	if health <= 0:
 		_start_death_sequence()
 
-func _damage_player():
-	if player and player.has_method("take_damage"):
-		player.take_damage(attack_damage, self)
-
-func _damage_nearby_targets():
-	var nearby = _get_nearby_targets(4.0)
-	for target in nearby:
-		if target.has_method("take_damage"):
-			target.take_damage(attack_damage, self)
-
-func _get_nearby_targets(radius: float) -> Array:
-	var targets = []
-	
-	# Simple implementation - just check for player
-	if player and global_position.distance_to(player.global_position) <= radius:
-		targets.append(player)
-	
-	return targets
-
-# === DEATH SEQUENCE ===
-func _start_death_sequence():
-	print("💀 DEMOLITION KING: NOOOOO!")
+func _start_death_sequence() -> void:
+	print("💀 DEMOLITION KING: PROPERLY DEFEATED!")
 	current_state = BossState.DYING
-	
-	# Final explosion of wall breaking
-	_break_walls_at_position(global_position, wall_break_radius * 2.0)
-	
 	boss_died.emit()
 
-func _handle_death_sequence(delta):
-	# Simple death animation
+func _handle_death_sequence(delta: float) -> void:
+	# Slow death animation
 	if mesh_instance:
-		mesh_instance.scale = mesh_instance.scale.lerp(Vector3.ZERO, 2.0 * delta)
+		mesh_instance.scale = mesh_instance.scale.lerp(Vector3.ZERO, 1.0 * delta)
 	
-	if state_timer >= 3.0:
+	if state_timer >= 4.0:
+		print("👑 Boss death sequence complete")
 		queue_free()
 
-# === UTILITY FUNCTIONS ===
-func _handle_stunned_state():  # FIXED: Removed unused delta parameter
-	# Brief recovery period after attacks
-	if state_timer >= 1.0:
-		current_state = BossState.IDLE
-		state_timer = 0.0
+# === DEBUG FUNCTIONS ===
+func debug_status() -> void:
+	"""Print comprehensive debug info"""
+	print("=== BOSS DEBUG STATUS ===")
+	print("Position: ", global_position)
+	print("Health: ", health, "/", max_health)
+	print("State: ", BossState.keys()[current_state])
+	print("On Floor: ", is_on_floor())
+	print("Velocity: ", velocity)
+	print("Last Safe Position: ", last_safe_position)
+	print("Ground Level: ", safe_ground_level)
 
-func _update_visual_effects():  # FIXED: Removed unused delta parameter
-	# Handle damage flash
-	if flash_timer > 0 and boss_material:
-		var flash_intensity = sin(flash_timer * 20.0) * 0.5 + 0.5
-		boss_material.emission = Color(1.0, 0.3, 0.3) * flash_intensity
-
-func _face_direction(direction: Vector3):
-	if direction.length() < 0.1:
-		return
-	var target_rotation = atan2(-direction.x, -direction.z)
-	rotation.y = lerp_angle(rotation.y, target_rotation, 0.1)
-
-func _apply_physics(delta):
-	# Apply gravity when not jumping
-	if not is_jumping and not is_on_floor():
-		velocity.y -= ProjectSettings.get_setting("physics/3d/default_gravity") * delta
-	
-	# Apply knockback
-	if knockback_velocity.length() > 0.1:
-		velocity += knockback_velocity
-		knockback_velocity = knockback_velocity.lerp(Vector3.ZERO, 5.0 * delta)
+func force_break_test() -> void:
+	"""Force test wall breaking"""
+	print("🧪 MANUAL WALL BREAK TEST!")
+	_force_break_nearby_walls()
