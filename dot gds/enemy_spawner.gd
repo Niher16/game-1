@@ -167,22 +167,65 @@ func _spawn_boss() -> Node3D:
 		print("⚠️ Could not find boss spawn position")
 		return null
 	
-	# Create boss
-	var boss = boss_scene.instantiate()
+	var boss: Node3D
 	
-	# If boss_scene is same as enemy_scene, attach boss script
-	if boss_scene == enemy_scene:
-		# Add boss script to regular enemy
-		var boss_script = load("res://Bosses/boss_slime.gd")
-		boss.set_script(boss_script)
-		
-		# IMPORTANT: Manually initialize the boss since _ready() won't be called again
-		boss.call_deferred("_initialize_boss")
+	# Check if we have a proper boss scene
+	if boss_scene and boss_scene != enemy_scene:
+		# Use the dedicated boss scene
+		boss = boss_scene.instantiate()
+		print("👹 Using dedicated boss scene")
+	else:
+		# Create boss from scratch since enemy scene won't work
+		print("👹 Creating boss from scratch (CharacterBody3D)")
+		boss = _create_boss_from_scratch()
+	
+	if not boss:
+		print("❌ Failed to create boss!")
+		return null
 	
 	get_parent().add_child(boss)
 	boss.global_position = spawn_position + Vector3(0, 20, 0)  # Start high for dramatic entry
 	
 	print("👹 BOSS SPAWNED: Epic battle begins!")
+	return boss
+
+func _create_boss_from_scratch() -> CharacterBody3D:
+	"""Create a boss node manually with correct structure"""
+	# Create the main CharacterBody3D node
+	var boss = CharacterBody3D.new()
+	boss.name = "DemolitionKingBoss"
+	
+	# Add MeshInstance3D for visuals
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.name = "MeshInstance3D"
+	boss.add_child(mesh_instance)
+	
+	# Create a simple box mesh (you can replace this with your boss model)
+	var box_mesh = BoxMesh.new()
+	box_mesh.size = Vector3(2, 3, 2)  # Make it bigger than regular enemies
+	mesh_instance.mesh = box_mesh
+	
+	# Add collision shape
+	var collision_shape = CollisionShape3D.new()
+	collision_shape.name = "CollisionShape3D"
+	boss.add_child(collision_shape)
+	
+	# Create collision shape to match the mesh
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(2, 3, 2)
+	collision_shape.shape = shape
+	
+	# Attach the boss script
+	var boss_script = load("res://Bosses/DemolitionKingBoss.gd")
+	boss.set_script(boss_script)
+	
+	# Set up groups and physics layers
+	boss.add_to_group("bosses")
+	boss.add_to_group("enemies")
+	boss.collision_layer = 4  # Boss layer
+	boss.collision_mask = 1 | 8  # World + walls
+	
+	print("✅ Boss created from scratch with CharacterBody3D")
 	return boss
 
 func _find_boss_spawn_position() -> Vector3:

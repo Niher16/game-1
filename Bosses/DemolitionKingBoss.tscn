@@ -1,13 +1,13 @@
 [gd_scene load_steps=4 format=3 uid="uid://c08oimrhmimsm"]
 
-[ext_resource type="Script" uid="uid://d1ksw7qd2v5lm" path="res://Bosses/boss_slime.gd" id="1_n3tf8"]
+[ext_resource type="Script" uid="uid://d1ksw7qd2v5lm" path="res://Bosses/DemolitionKingBoss.gd" id="1_nrvqo"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_taryf"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_7h82a"]
 
-[node name="BossSlime" type="CharacterBody3D"]
-script = ExtResource("1_n3tf8")
+[node name="DemolitionKingBoss" type="CharacterBody3D"]
+script = ExtResource("1_nrvqo")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_taryf")

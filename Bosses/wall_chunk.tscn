@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3 uid="uid://bkqebyy37dgwf"]
+
+[ext_resource type="Script" uid="uid://kfcfbnyco6hd" path="res://Bosses/wall_chunk.gd" id="1_m62sn"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qrjbm"]
+albedo_color = Color(0.215902, 0.215902, 0.215902, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_m62sn"]
+material = SubResource("StandardMaterial3D_qrjbm")
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tgpiv"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[node name="WallChunk" type="RigidBody3D"]
+contact_monitor = true
+max_contacts_reported = 10
+script = ExtResource("1_m62sn")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_m62sn")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_tgpiv")
+
+[node name="Timer" type="Timer" parent="."]
+wait_time = 5.0
+one_shot = true
