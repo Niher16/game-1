@@ -75,8 +75,6 @@ var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
 
-var torch_to_wall_map = {}
-
 func _ready():
 	add_to_group("terrain")
 	
@@ -210,10 +208,6 @@ func _setup_weapon_room(room: Rect2):
 	if guaranteed_weapon_spawn:
 		_spawn_weapon_in_room(room)
 	
-	# Add decorative elements
-	_add_weapon_room_decorations(room)
-	_spawn_fireflies_in_room(room)
-	
 	print("✅ Weapon room setup complete!")
 
 func _apply_weapon_room_floor(room: Rect2):
@@ -305,15 +299,6 @@ func _spawn_weapon_in_room(room: Rect2):
 	else:
 		print("❌ Could not spawn weapon - missing scene or resource")
 
-func _add_weapon_room_decorations(room: Rect2):
-	"""Add decorative elements to weapon room"""
-	# Spawn extra torches around the perimeter
-	_spawn_torches_in_room(room, true)  # Pass true for extra torches
-
-# =====================================
-# MODIFIED: Enhanced wave completion handler
-# =====================================
-
 func _on_wave_completed(wave_number: int):
 	"""Enhanced wave completion with weapon room logic"""
 	print("🗡️ Wave ", wave_number, " completed! Checking for weapon room...")
@@ -338,7 +323,6 @@ func _on_wave_completed(wave_number: int):
 				
 				_spawn_treasure_chest_random_in_room(next_wave_room)
 				_spawn_destructible_objects_in_room(next_wave_room)
-				_spawn_torches_in_room(next_wave_room)
 				print("🗡️ Created weapon room + next wave room!")
 			else:
 				print("❌ Failed to create next wave room after weapon room")
@@ -360,8 +344,6 @@ func _create_normal_room_after_wave(wave_number: int):
 			enemy_spawner.set_newest_spawning_room(new_room)
 		_spawn_treasure_chest_random_in_room(new_room)
 		_spawn_destructible_objects_in_room(new_room)
-		_spawn_torches_in_room(new_room)
-		_spawn_fireflies_in_room(new_room)
 		print("✅ Normal room generated and set as spawning area!")
 	else:
 		print("❌ Room generation failed - no valid position found")
@@ -406,8 +388,6 @@ func generate_starting_room():
 	# Spawn starting room content
 	_spawn_treasure_chest_random_in_room(starting_room)
 	_spawn_destructible_objects_in_room(starting_room)
-	_spawn_torches_in_room(starting_room)
-	_spawn_fireflies_in_room(starting_room)
 
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
@@ -439,7 +419,6 @@ func create_connected_room():
 	new_room_generated.emit(new_room)
 
 	_spawn_destructible_objects_in_room(new_room)
-	_spawn_fireflies_in_room(new_room)
 
 	# --- RANDOM RECRUITER NPC SPAWN ---
 	var spawn_chance = min(recruiter_base_chance + (current_room_count * recruiter_chance_increase), recruiter_max_chance)
@@ -474,7 +453,6 @@ func _clear_everything():
 	generated_objects.clear()
 	wall_lookup.clear()
 	boundary_walls.clear()
-	torch_to_wall_map.clear()
 	rooms.clear()
 	room_shapes.clear()
 	room_types.clear()  # NEW: Clear room types
@@ -757,22 +735,6 @@ func _remove_walls_by_grid_lookup():
 				wall.queue_free()
 			wall_lookup.erase(grid_key)
 
-	# Remove torches attached to deleted walls
-	var torches_to_remove = []
-	for torch in torch_to_wall_map.keys():
-		if not is_instance_valid(torch):
-			torches_to_remove.append(torch)
-			continue
-		var wall_key = torch_to_wall_map[torch]
-		if wall_key in to_remove_keys:
-			torch.queue_free()
-			generated_objects.erase(torch)
-			torches_to_remove.append(torch)
-
-	# Clean up the mapping
-	for torch in torches_to_remove:
-		torch_to_wall_map.erase(torch)
-
 func _choose_room_shape() -> RoomShape:
 	"""Choose a random room shape with weighted probabilities"""
 	var shape_weights = {
@@ -815,35 +777,6 @@ func _get_size_for_shape(shape: RoomShape) -> Vector2:
 		RoomShape.SMALL_SQUARE:
 			return Vector2(5, 5)
 	return base_room_size
-
-# Modified torch spawning to support extra torches in weapon rooms
-func _spawn_torches_in_room(room: Rect2, extra_torches: bool = false):
-	"""Spawn torches in room corners and optionally extra ones for weapon rooms"""
-	if not ResourceLoader.exists("res://Scenes/Torch.tscn"):
-		return
-	
-	var torch_scene = load("res://Scenes/Torch.tscn")
-	var base_torch_count = 4  # Normal room torch count
-	var torch_count = base_torch_count
-	if extra_torches:
-		torch_count = 8  # Double torches for weapon rooms
-	
-	for i in range(torch_count):
-		var torch_instance = torch_scene.instantiate()
-		add_child(torch_instance)
-		
-		# Calculate torch positions (spread around room perimeter)
-		var angle = (i * 2.0 * PI) / torch_count
-		var distance = min(room.size.x, room.size.y) * 0.8
-		
-		var torch_pos = Vector3(
-			(room.get_center().x - map_size.x / 2) * 2.0 + cos(angle) * distance,
-			1.0,
-			(room.get_center().y - map_size.y / 2) * 2.0 + sin(angle) * distance
-		)
-		
-		torch_instance.global_position = torch_pos
-		generated_objects.append(torch_instance)
 
 func _spawn_treasure_chest_random_in_room(room: Rect2):
 	if not treasure_chest_scene:
@@ -980,25 +913,3 @@ func get_boundary_info() -> Dictionary:
 		"map_size": map_size,
 		"safe_zone_size": map_size - Vector2((boundary_thickness + safe_zone_margin) * 2, (boundary_thickness + safe_zone_margin) * 2)
 	}
-
-func _spawn_fireflies_in_room(room: Rect2):
-	# Spawns a random number of fireflies in the given room
-	if not ResourceLoader.exists("res://Scenes/firefly.tscn"):
-		return
-	var firefly_scene = load("res://Scenes/firefly.tscn")
-	var firefly_count = randi_range(2, 5) # You can adjust min/max as desired
-	for i in range(firefly_count):
-		var firefly_instance = firefly_scene.instantiate()
-		add_child(firefly_instance)
-		# Random position in room, slightly above ground
-		var random_pos = Vector2(
-			room.position.x + randf() * room.size.x,
-			room.position.y + randf() * room.size.y
-		)
-		var world_pos = Vector3(
-			(random_pos.x - map_size.x / 2) * 2.0,
-			1.2 + randf() * 1.5, # Height above ground
-			(random_pos.y - map_size.y / 2) * 2.0
-		)
-		firefly_instance.global_position = world_pos
-		generated_objects.append(firefly_instance)

@@ -33,7 +33,7 @@ func _ready():
 	environment.ambient_light_energy = 0.13  # Brighter ambient
 	environment.ambient_light_color = Color(0.38, 0.22, 0.10)  # Even warmer
 
-	# Add subtle bloom effect for glowing torches and highlights
+	# Add subtle bloom effect for glowing highlights
 	environment.glow_enabled = true
 	environment.glow_intensity = 0.18
 	environment.glow_strength = 0.7
@@ -41,7 +41,6 @@ func _ready():
 	world_env.environment = environment
 	add_child(world_env)
 
-	# NO directional light - torches only!
 	# Create systems step by step
 	call_deferred("_create_simple_systems")
 
