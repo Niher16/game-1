@@ -1,0 +1,9 @@
+🛠️ VS Code Setup Commands
+
+Start every coding session with:
+
+"You are working with Godot 4.1+ at D:\GAME PROJECT\Game\game. Always use MCP Server to search files first, then apply Godot 4.1+ best practices with beginner-friendly comments."
+
+For any script changes:
+
+"Use MCP to find [script type] in my project, examine the existing code, then enhance it following Godot 4.1+ patterns with proper error handling."

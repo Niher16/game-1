@@ -7,10 +7,10 @@
 [ext_resource type="Script" uid="uid://dmhde8iqvqhla" path="res://dot gds/camera_3d.gd" id="6_cbln3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
-size = Vector3(2000, 0.5, 2000)
+size = Vector3(20000, 0.5, 20000)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_h2yge"]
-size = Vector3(2000, 0.5, 2000)
+size = Vector3(20000, 0.5, 20000)
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_mkato")

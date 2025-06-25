@@ -1,14 +1,14 @@
-[gd_scene load_steps=24 format=3 uid="uid://c0irx50ye3ekq"]
+[gd_scene load_steps=24 format=3 uid="uid://davx6xri0n0vt"]
 
-[ext_resource type="Script" uid="uid://1jyyh2oinhs5" path="res://player/components/player.gd" id="1_f1ek2"]
-[ext_resource type="Script" uid="uid://t6lt4ntyiv2j" path="res://player/components/PlayerHealth.gd" id="4_f1ek2"]
+[ext_resource type="Script" uid="uid://bt47480nh31yn" path="res://dot gds/player.gd" id="1_4flbx"]
+[ext_resource type="Script" uid="uid://cqexju0dcbsij" path="res://dot gds/PlayerMovement.gd" id="2_cvnsp"]
+[ext_resource type="Script" uid="uid://chx8k2542vhd2" path="res://dot gds/PlayerCombat.gd" id="3_6t5aa"]
 [ext_resource type="ArrayMesh" uid="uid://dpkhctk1q0bpg" path="res://3d Models/Sword/broadsword.obj" id="4_fkybt"]
-[ext_resource type="Script" uid="uid://rdfu4mxmdh6g" path="res://player/components/PlayerProgression.gd" id="5_tx1dd"]
 [ext_resource type="ArrayMesh" uid="uid://dagubfxbsoacu" path="res://3d Models/Bow/bow_01.obj" id="5_x3wgy"]
-[ext_resource type="Script" uid="uid://d1bo8ggx0pcdl" path="res://player/components/PlayerCombat.gd" id="6_gymyn"]
-[ext_resource type="Script" uid="uid://kdmn680ddmdk" path="res://player/components/PlayerMovement.gd" id="7_pu2lt"]
-[ext_resource type="Script" uid="uid://bkrq6y8f3n58x" path="res://player/components/PlayerInventory.gd" id="8_ukyrk"]
-[ext_resource type="Script" uid="uid://spinyeelawcc" path="res://player/components/PlayerStats.gd" id="9_7dp3o"]
+[ext_resource type="Script" uid="uid://dq5lkmafnvuay" path="res://dot gds/PlayerHealth.gd" id="7_3smsa"]
+[ext_resource type="Script" uid="uid://bl4cu5bh7eb27" path="res://dot gds/PlayerProgression.gd" id="8_8erm5"]
+[ext_resource type="Script" uid="uid://dbv3aogrn67ce" path="res://dot gds/PlayerInventory.gd" id="8_f1ek2"]
+[ext_resource type="Script" uid="uid://chb3wyyytaqlj" path="res://dot gds/PlayerStats.gd" id="9_tx1dd"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6t5aa"]
 albedo_color = Color(0, 0, 0, 1)
@@ -180,7 +180,7 @@ _data = {
 [sub_resource type="BoxMesh" id="BoxMesh_vgqql"]
 
 [node name="Player" type="CharacterBody3D" groups=["player"]]
-script = ExtResource("1_f1ek2")
+script = ExtResource("1_4flbx")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 material_override = SubResource("StandardMaterial3D_6t5aa")
@@ -243,19 +243,19 @@ transform = Transform3D(0.262829, 0, 0, 0, 2.54365, 0, 0, 0, 0.85632, 0, -1.1338
 mesh = SubResource("BoxMesh_vgqql")
 
 [node name="HealthComponent" type="Node" parent="."]
-script = ExtResource("4_f1ek2")
+script = ExtResource("7_3smsa")
 
 [node name="ProgressionComponent" type="Node" parent="."]
-script = ExtResource("5_tx1dd")
+script = ExtResource("8_8erm5")
 
 [node name="CombatComponent" type="Node" parent="."]
-script = ExtResource("6_gymyn")
+script = ExtResource("3_6t5aa")
 
 [node name="PlayerMovement" type="Node" parent="."]
-script = ExtResource("7_pu2lt")
+script = ExtResource("2_cvnsp")
 
 [node name="PlayerInventory" type="Node" parent="."]
-script = ExtResource("8_ukyrk")
+script = ExtResource("8_f1ek2")
 
 [node name="PlayerStats" type="Node" parent="."]
-script = ExtResource("9_7dp3o")
+script = ExtResource("9_tx1dd")
