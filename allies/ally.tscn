@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://sdrleb6nfb4n"]
 
-[ext_resource type="Script" uid="uid://dhnpo3b877ia2" path="res://allies/ally.gd" id="1_lx0ct"]
+[ext_resource type="Script" uid="uid://dhnpo3b877ia2" path="res://allies/components/ally.gd" id="1_lx0ct"]
 [ext_resource type="Script" uid="uid://bssh4v2qws77k" path="res://allies/components/ally_health.gd" id="2_health"]
 [ext_resource type="Script" uid="uid://dx42bc8spjgeu" path="res://allies/components/ally_movement.gd" id="3_movement"]
 [ext_resource type="Script" uid="uid://c360rc3db21fw" path="res://allies/components/ally_combat.gd" id="4_combat"]

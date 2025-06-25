@@ -1,12 +1,12 @@
 [gd_scene load_steps=24 format=3 uid="uid://c0irx50ye3ekq"]
 
-[ext_resource type="Script" uid="uid://1jyyh2oinhs5" path="res://player/player.gd" id="1_f1ek2"]
+[ext_resource type="Script" uid="uid://1jyyh2oinhs5" path="res://player/components/player.gd" id="1_f1ek2"]
 [ext_resource type="Script" uid="uid://t6lt4ntyiv2j" path="res://player/components/PlayerHealth.gd" id="4_f1ek2"]
 [ext_resource type="ArrayMesh" uid="uid://dpkhctk1q0bpg" path="res://3d Models/Sword/broadsword.obj" id="4_fkybt"]
 [ext_resource type="Script" uid="uid://rdfu4mxmdh6g" path="res://player/components/PlayerProgression.gd" id="5_tx1dd"]
 [ext_resource type="ArrayMesh" uid="uid://dagubfxbsoacu" path="res://3d Models/Bow/bow_01.obj" id="5_x3wgy"]
 [ext_resource type="Script" uid="uid://d1bo8ggx0pcdl" path="res://player/components/PlayerCombat.gd" id="6_gymyn"]
-[ext_resource type="Script" uid="uid://kdmn680ddmdk" path="res://player/PlayerMovement.gd" id="7_pu2lt"]
+[ext_resource type="Script" uid="uid://kdmn680ddmdk" path="res://player/components/PlayerMovement.gd" id="7_pu2lt"]
 [ext_resource type="Script" uid="uid://bkrq6y8f3n58x" path="res://player/components/PlayerInventory.gd" id="8_ukyrk"]
 [ext_resource type="Script" uid="uid://spinyeelawcc" path="res://player/components/PlayerStats.gd" id="9_7dp3o"]
 

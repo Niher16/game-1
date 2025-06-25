@@ -2,7 +2,7 @@ extends Node
 
 class_name loot_manager
 
-@export var weapon_pickup_scene: PackedScene = preload("res://Scenes/weapon_pickup.tscn")
+@export var weapon_pickup_scene: PackedScene = preload("res://Weapons/weapon_pickup.tscn")
 @export var health_potion_scene: PackedScene = preload("res://Scenes/health_potion.tscn")
 @export var coin_scene: PackedScene = preload("res://Scenes/coin.tscn")
 @export var xp_orb_scene: PackedScene = preload("res://Scenes/xp_orb.tscn")
