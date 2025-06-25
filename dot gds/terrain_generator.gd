@@ -16,8 +16,6 @@ func generate_optimized_terrain():
 	clear_existing_rooms()
 	rooms.clear()
 
-	print("🧱 Generating dungeon with varied room shapes...")
-
 	var attempts := 0
 	while rooms.size() < max_rooms and attempts < max_rooms * 5:
 		var size := Vector2(
@@ -38,8 +36,6 @@ func generate_optimized_terrain():
 		rooms.append(new_room)
 		_spawn_room_visual(new_room)
 		attempts += 1
-
-	print("✅ Generated ", rooms.size(), " rooms")
 
 func _create_room_shape(pos: Vector2, size: Vector2) -> Dictionary:
 	var room := {

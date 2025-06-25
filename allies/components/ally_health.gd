@@ -24,15 +24,11 @@ func _process(delta):
 func take_damage(amount: int, attacker: Node = null):
 	if current_health <= 0 or invuln_timer > 0:
 		return
-	
 	invuln_timer = invuln_duration
 	current_health = max(0, current_health - amount)
 	health_changed.emit(current_health, max_health)
-	
-	# Knockback from attacker
 	if attacker and current_health > 0:
 		_apply_knockback(attacker)
-	
 	if current_health <= 0:
 		ally_died.emit()
 		health_depleted.emit()

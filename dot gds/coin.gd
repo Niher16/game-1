@@ -37,8 +37,6 @@ var mesh_instance: MeshInstance3D
 var coin_material: StandardMaterial3D
 
 func _ready():
-	print("💰 Coin: Creating golden coin...")
-	
 	add_to_group("currency")
 	set_meta("coin_value", coin_value)
 	
@@ -78,7 +76,6 @@ func _create_golden_coin():
 	
 	# Safe material assignment with null check
 	if not safe_set_material(mesh_instance, coin_material):
-		print("❌ Failed to set coin material, using default")
 		var fallback_material = StandardMaterial3D.new()
 		fallback_material.albedo_color = Color.GOLD
 		mesh_instance.material_override = fallback_material
@@ -139,7 +136,6 @@ func _check_vacuum_effect(delta):
 	# Start vacuum effect
 	if distance_to_player <= pickup_range and not is_vacuuming:
 		is_vacuuming = true
-		print("💰 Coin: Starting vacuum toward player!")
 	
 	# Move toward player
 	if is_vacuuming:
@@ -164,18 +160,13 @@ func _collect_coin():
 		return
 	
 	is_being_collected = true
-	print("💰 Coin: Collected! Worth ", coin_value, " coins!")
 	
 	_create_collection_effect()
 	
 	# --- DEBUG: Connect Coin to player progression ---
-	print("🔧 Coin: Looking for player...")
 	var player_ref = get_tree().get_first_node_in_group("player")
 	if player_ref and player_ref.progression_component:
-		print("🔧 Coin: Found player, calling add_currency(", coin_value, ")")
 		player_ref.progression_component.add_currency(coin_value)
-	else:
-		print("❌ Coin: Player or progression_component not found!")
 	
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
@@ -197,8 +188,6 @@ func _create_collection_effect():
 
 func _create_pickup_delay_effect(delay_time: float):
 	"""Create visual effect during pickup delay"""
-	print("💰 Coin: Creating pickup delay effect for ", delay_time, " seconds")
-	
 	# FIXED: Visual feedback that item isn't ready
 	if coin_material:
 		# Make the coin pulse slowly and dimly during delay

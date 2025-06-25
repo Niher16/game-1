@@ -34,7 +34,6 @@ func _ready():
 	_setup_ui()
 	_connect_to_terrain()
 	show_loading_screen()
-	print("Loading Screen: Ready and active")
 
 func _setup_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -154,9 +153,7 @@ func _connect_to_terrain():
 	var terrain_gen = get_tree().get_first_node_in_group("terrain")
 	if terrain_gen and terrain_gen.has_signal("terrain_generated"):
 		terrain_gen.terrain_generated.connect(_on_terrain_generated)
-		print("Loading Screen: Connected to terrain generator")
 	else:
-		print("Loading Screen: No terrain generator found, will auto-hide after 3 seconds")
 		get_tree().create_timer(3.0).timeout.connect(hide_loading_screen)
 
 func _process(delta):
@@ -186,7 +183,6 @@ func show_loading_screen():
 	progress_bar.value = 0.0
 	tip_label.text = loading_tips[0]
 	dots_label.text = ""
-	print("Loading Screen: Showing")
 
 func hide_loading_screen():
 	if not is_active:
@@ -203,7 +199,6 @@ func hide_loading_screen():
 	print("Loading Screen: Hidden")
 
 func _on_terrain_generated():
-	print("Loading Screen: Terrain generation complete!")
 	hide_loading_screen()
 
 # Legacy methods for compatibility

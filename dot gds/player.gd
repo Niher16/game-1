@@ -132,12 +132,8 @@ func _ready():
 	if health_component:
 		if health_component.has_signal("health_changed"):
 			_connect_signal_safely(health_component, "health_changed", _on_health_changed)
-			print("✅ Health signal connected successfully")
-		else:
-			print("❌ Health component missing health_changed signal!")
 		_connect_signal_safely(health_component, "player_died", _on_player_died)
 		_connect_signal_safely(health_component, "health_depleted", _on_health_depleted)
-		print("✅ All health signals connected")
 
 	if movement_component:
 		_connect_signal_safely(movement_component, "dash_charges_changed", _on_dash_charges_changed)
@@ -163,7 +159,6 @@ func _ready():
 	_reset_blink_timer()
 	var config = CharacterGenerator.generate_random_character_config()
 	CharacterAppearanceManager.create_player_appearance(self, config)
-	print("🎨 Player skin tone: ", config["skin_tone"])
 	movement_component.reinitialize_feet()
 	Input.joy_connection_changed.connect(_on_controller_connection_changed)
 	_check_initial_controllers()
@@ -188,14 +183,13 @@ func _setup_player():
 		var weapon_anim_player = AnimationPlayer.new()
 		weapon_anim_player.name = "WeaponAnimationPlayer"
 		add_child(weapon_anim_player)
-		print("✅ Created WeaponAnimationPlayer node")
 	else:
 		print("✅ WeaponAnimationPlayer node already exists")
 	_create_arrow_system()
 
 func _configure_collision():
-	collision_layer = 16 # Player
-	collision_mask = 1 | 2 | 4 | 8 | 32 # Collide with floor, enemy, boss, ally, wall
+	collision_layer = 1 << 2  # Layer 3 (Player)
+	collision_mask = (1 << 0) | (1 << 1) | (1 << 3) | (1 << 4)  # Collide with World, Walls, Ally, Boss
 
 func _create_visual():
 	var existing_mesh = get_node_or_null("MeshInstance3D")
@@ -203,10 +197,8 @@ func _create_visual():
 		mesh_instance = MeshInstance3D.new()
 		mesh_instance.name = "MeshInstance3D"
 		add_child(mesh_instance)
-		print("🎨 Created MeshInstance3D node for player")
 	else:
 		mesh_instance = existing_mesh
-		print("🎨 Using existing MeshInstance3D node")
 	# Ensure material_override is set and unique so dash and effects never share it
 	if not mesh_instance.material_override:
 		var mat = StandardMaterial3D.new()
@@ -227,7 +219,7 @@ func _setup_attack_system():
 	attack_collision.shape = sphere_shape
 	attack_area.add_child(attack_collision)
 	attack_area.collision_layer = 0
-	attack_area.collision_mask = 4
+	attack_area.collision_mask = 1 << 4  # Only hit Boss
 	if not attack_area.is_connected("area_entered", _on_area_pickup_entered):
 		attack_area.area_entered.connect(_on_area_pickup_entered)
 
@@ -238,9 +230,6 @@ func _setup_hand_references():
 	if left_foot:
 		left_foot_original_pos = left_foot.position
 		left_foot_planted_pos = left_foot.position
-		print("✅ Found LeftFoot at: ", left_foot.get_path())
-	else:
-		print("❌ LeftFoot not found!")
 	if right_foot:
 		right_foot_original_pos = right_foot.position
 		right_foot_planted_pos = right_foot.position
@@ -290,24 +279,17 @@ func can_heal() -> bool:
 	return health_component.get_health() < health_component.get_max_health()
 
 func _pickup_health_potion(area: Area3D):
-	print("🧪 Attempting to pickup health potion - Current health: ", health_component.get_health(), "/", health_component.get_max_health())
 	if not can_heal():
-		print("🧪 Already at full health - skipping heal")
 		return
 	var heal_amount = health_component.heal_amount_from_potion
-	print("🧪 Healing for: ", heal_amount, " HP")
 	health_component.heal(heal_amount)
-	print("🧪 Health after heal: ", health_component.get_health(), "/", health_component.get_max_health())
 	if is_instance_valid(area):
 		area.queue_free()
 
 func _pickup_xp_orb(area: Area3D):
 	var xp_value = area.get_meta("xp_value") if area.has_meta("xp_value") else 10
-	print("🔧 Player: _pickup_xp_orb called with value: ", xp_value)
-	print("🔧 progression_component exists: ", progression_component != null)
 	
 	if progression_component:
-		print("🔧 Calling progression_component.add_xp(", xp_value, ")")
 		progression_component.add_xp(xp_value)
 	else:
 		print("❌ ERROR: progression_component is null!")
@@ -317,8 +299,6 @@ func _pickup_xp_orb(area: Area3D):
 
 # --- Health System Component Handlers ---
 func _on_health_changed(current_health: int, max_health: int):
-	print('🔧 Health changed - Current: ', current_health, ' Max: ', max_health)
-	print("🔧 Calling UI group with health update")  # ← Add this line
 	get_tree().call_group("UI", "_on_player_health_changed", current_health, max_health)  # Direct connection now
 
 func _on_health_depleted():
@@ -327,25 +307,19 @@ func _on_health_depleted():
 
 # Update max health through health component and heal player
 func _on_level_up_stats(health_increase: int, _damage_increase: int):
-	print("🔧 Player: _on_level_up_stats called with health_increase: ", health_increase)
 	# Get current values
 	var current_max = health_component.get_max_health()
 	var new_max_health = current_max + health_increase
 	
-	print("🔧 Current max health: ", current_max, " -> New max health: ", new_max_health)
 	# Set new max health
 	health_component.set_max_health(new_max_health)
 	# Heal player by the health increase amount
 	health_component.heal(health_increase)
-	print("✅ Max health increased by ", health_increase, " to: ", new_max_health)
-	print("✅ Current health after heal: ", health_component.get_health())
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
-	print("🔧 Player: XP signal received - ", xp, "/", xp_to_next, " Level: ", level)
 	get_tree().call_group("UI", "_on_player_xp_changed", xp, xp_to_next, level)
 
 func _on_coin_collected(total_currency: int):
-	print("🔧 Player: Coin signal received - Total: ", total_currency)
 	get_tree().call_group("UI", "_on_player_coin_collected", total_currency)
 
 # Animation signal handlers for movement component
@@ -673,7 +647,6 @@ func test_skin_tones():
 		print("Test ", i, " skin tone: ", config["skin_tone"])
 
 func take_damage(amount: int, from: Node3D = null):
-	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
 	if health_component and health_component.has_method("take_damage"):
 		health_component.take_damage(amount, from)
 		# Apply knockback if movement_component exists

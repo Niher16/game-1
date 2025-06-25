@@ -160,28 +160,6 @@ static func generate_character_by_type(character_type: String) -> Dictionary:
 	
 	return config
 
-# NEW: Quick test function
-static func test_generation():
-	"""Test function to verify generation works"""
-	print("=== TESTING CHARACTER GENERATION ===")
-	
-	# Test random generation
-	var random_char = generate_random_character_config()
-	print("Random character skin tone: ", random_char["skin_tone"])
-	print("Random character hair style: ", random_char["hair"]["style"])
-	
-	# Test seeded generation (should be same every time)
-	var seeded_char1 = generate_character_with_seed(12345)
-	var seeded_char2 = generate_character_with_seed(12345)
-	print("Seeded character consistency test: ", 
-		seeded_char1["hair"]["style"] == seeded_char2["hair"]["style"])
-	
-	# Test archetype generation
-	var warrior = generate_character_by_type("warrior")
-	print("Warrior body height: ", warrior["body_height"])
-	
-	print("=== TEST COMPLETE ===")
-
 # Apply a skin tone to an ally using CharacterAppearanceManager
 static func apply_skin_tone_to_ally(character: CharacterBody3D, skin_tone: Color):
 	var config = generate_random_character_config()

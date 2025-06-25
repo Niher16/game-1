@@ -22,7 +22,6 @@ var weapons_found_this_run: Array[String] = []
 var avoid_duplicates = true
 
 func _ready():
-	print("🗡️ WeaponPool: Initializing weapon database...")
 	_load_all_weapons()
 
 func _load_all_weapons():
@@ -40,11 +39,6 @@ func _load_all_weapons():
 	
 	# Add legendary weapons as you create them:
 	# _add_weapon_to_pool("res://Weapons/excalibur.tres", "legendary")
-	
-	print("✅ WeaponPool: Loaded weapons - Common: ", weapon_pools["common"].size(),
-		  ", Uncommon: ", weapon_pools["uncommon"].size(),
-		  ", Rare: ", weapon_pools["rare"].size(), 
-		  ", Legendary: ", weapon_pools["legendary"].size())
 
 func _add_weapon_to_pool(weapon_path: String, rarity: String):
 	"""Add a weapon resource to the specified pool"""
@@ -52,7 +46,6 @@ func _add_weapon_to_pool(weapon_path: String, rarity: String):
 		var weapon = load(weapon_path) as WeaponResource
 		if weapon:
 			weapon_pools[rarity].append(weapon)
-			print("📦 Added ", weapon.weapon_name, " to ", rarity, " pool")
 	else:
 		print("⚠️ Weapon not found: ", weapon_path)
 
@@ -96,7 +89,6 @@ func get_random_weapon(avoid_recent: bool = true) -> WeaponResource:
 		if chosen_weapon.weapon_name not in weapons_found_this_run:
 			weapons_found_this_run.append(chosen_weapon.weapon_name)
 		
-		print("🎲 WeaponPool: Selected ", chosen_weapon.weapon_name, " from ", chosen_pool, " pool")
 		return chosen_weapon
 	
 	# Fallback - return any weapon if pools are empty
@@ -108,7 +100,6 @@ func _get_any_weapon() -> WeaponResource:
 		if pool.size() > 0:
 			return pool[0]
 	
-	print("⚠️ WeaponPool: No weapons available!")
 	return null
 
 func get_weapon_by_name(weapon_name: String) -> WeaponResource:
@@ -126,7 +117,6 @@ func get_weapons_by_rarity(rarity: String) -> Array:
 func reset_found_weapons():
 	"""Reset the list of found weapons (call when starting new run)"""
 	weapons_found_this_run.clear()
-	print("🔄 WeaponPool: Reset found weapons list")
 
 func get_spawn_chance_for_room(room_number: int) -> float:
 	"""Calculate spawn chance based on room progression"""
@@ -139,20 +129,3 @@ func should_spawn_weapon_in_room(room_number: int) -> bool:
 	"""Determine if a weapon should spawn in this room"""
 	var spawn_chance = get_spawn_chance_for_room(room_number)
 	return randf() < spawn_chance
-
-# Debug methods
-func print_weapon_stats():
-	"""Print current weapon pool statistics"""
-	print("=== WEAPON POOL STATS ===")
-	for pool_name in weapon_pools.keys():
-		print(pool_name.capitalize(), ": ", weapon_pools[pool_name].size(), " weapons")
-		for weapon in weapon_pools[pool_name]:
-			print("  - ", weapon.weapon_name, " (", weapon.attack_damage, " dmg)")
-	print("Found this run: ", weapons_found_this_run)
-	print("==========================")
-
-
-# ...existing code...
-# Disabled staff in weapon pool for now
-# _add_weapon_to_pool("res://Weapons/mage_staff.tres", "uncommon")
-# ...existing code...

@@ -20,17 +20,11 @@ func _ready():
 	# Find player and camera references
 	call_deferred("_find_references")
 	_create_command_marker()
-	print("🎮 Ally Command Manager ready! Press '1' to command allies to mouse position")
 
 func _find_references():
 	"""Find player and camera references"""
 	player_ref = get_tree().get_first_node_in_group("player")
 	camera_ref = get_tree().get_first_node_in_group("camera")
-	
-	if not player_ref:
-		print("⚠️ AllyCommandManager: Player not found!")
-	if not camera_ref:
-		print("⚠️ AllyCommandManager: Camera not found!")
 
 func _input(event):
 	if not player_ref or not camera_ref:
@@ -46,39 +40,30 @@ func _issue_move_command():
 	var mouse_world_pos = _get_mouse_world_position()
 	
 	if mouse_world_pos == Vector3.ZERO:
-		print("⚠️ Could not get valid mouse position for command")
 		return
 	
 	# Check if position is within command range
 	var distance_to_player = mouse_world_pos.distance_to(player_ref.global_position)
 	if distance_to_player > command_range:
-		print("⚠️ Command position too far from player (", distance_to_player, "m) - Max range: ", command_range, "m")
 		return
 	
 	# Command all allies to move to position
 	var allies = get_tree().get_nodes_in_group("allies")
-	print("[DEBUG] Found ", allies.size(), " nodes in 'allies' group.")
 	var commanded_count = 0
 	for ally in allies:
 		if not _is_valid_ally(ally):
-			print("[DEBUG] Skipping invalid ally: ", ally)
 			continue
 		var ai_component = ally.get_node_or_null("AIComponent")
 		if not ai_component:
-			print("[DEBUG] Ally '", ally.name, "' missing AIComponent node.")
 			continue
 		if not ai_component.has_method("command_move_to_position"):
-			print("[DEBUG] AIComponent on '", ally.name, "' missing 'command_move_to_position' method.")
 			continue
 		ai_component.command_move_to_position(mouse_world_pos)
 		commanded_count += 1
 	
 	if commanded_count > 0:
-		print("🎯 Commanded ", commanded_count, " allies to search at ", mouse_world_pos)
 		_show_command_feedback(mouse_world_pos)
 		command_issued.emit("move_to_position", mouse_world_pos)
-	else:
-		print("⚠️ No allies available to command")
 
 func _get_mouse_world_position() -> Vector3:
 	# Raycast from camera to mouse position onto the XZ plane (y=0)

@@ -8,13 +8,11 @@ var current_state := State.FOLLOWING
 var player_target
 var enemy_target
 var state_update_timer := 0.0
-var state_update_interval := 0.1  # Update AI state 10 times per second
+var state_update_interval := 0.1
 var attack_delay_timer := 0.0
 var attack_delay := 0.0
 var retreat_timer := 0.0
 
-# --- Extended Ally Name Generation ---
-# 1000+ fantasy-style first and last names (sampled, you can expand further)
 var first_names = [
 	"Aiden", "Luna", "Kai", "Mira", "Rowan", "Zara", "Finn", "Nova", "Ezra", "Lyra",
 	"Orin", "Sage", "Rhea", "Jax", "Vera", "Theo", "Ivy", "Dax", "Nia", "Kian",
@@ -40,7 +38,6 @@ var last_names = [
 ]
 
 func _ready():
-	# Expand first_names and last_names to 1000+ entries each at runtime
 	while first_names.size() < 1000:
 		first_names.append("Name%d" % first_names.size())
 	while last_names.size() < 1000:
@@ -53,13 +50,10 @@ func generate_random_name() -> String:
 
 func setup(ally):
 	ally_ref = ally
-	# Assign a random name if not already set
 	if not ally_ref.has_meta("display_name"):
 		var random_name = generate_random_name()
 		ally_ref.set_meta("display_name", random_name)
 		ally_ref.name = random_name
-		var health = ally_ref.health_component.current_health if ally_ref and ally_ref.health_component else -1
-		print("🆕 Ally assigned name: ", random_name, " | Health: ", health)
 
 func set_player_target(player):
 	player_target = player
@@ -74,15 +68,12 @@ func _process(delta):
 func _update_ai_state():
 	if not player_target:
 		return
-	# Find nearest enemy
 	enemy_target = ally_ref.combat_component.find_nearest_enemy()
-	var previous_state = current_state
-	# Retreat if low health
+	var _previous_state = current_state
 	if ally_ref.health_component.current_health < ally_ref.max_health * 0.25 and enemy_target:
 		current_state = State.RETREATING
 		retreat_timer = 1.0 + randf() * 1.5
 		return
-	# State logic
 	if enemy_target:
 		var distance_to_enemy = ally_ref.global_position.distance_to(enemy_target.global_position)
 		if distance_to_enemy <= ally_ref.combat_component.attack_range:
@@ -93,8 +84,6 @@ func _update_ai_state():
 			current_state = State.FOLLOWING
 	else:
 		current_state = State.FOLLOWING
-	if previous_state != current_state:
-		print("🤖 Ally AI: ", State.keys()[previous_state], " → ", State.keys()[current_state])
 
 func _execute_current_state(delta: float):
 	match current_state:
@@ -121,7 +110,6 @@ func _handle_moving_to_target(delta: float):
 	if not enemy_target:
 		current_state = State.FOLLOWING
 		return
-	# Strafe/circle around enemy
 	ally_ref.movement_component.strafe_around_target(enemy_target, delta)
 	ally_ref.movement_component.apply_separation(delta)
 
@@ -129,7 +117,6 @@ func _handle_attacking(delta: float):
 	if not enemy_target:
 		current_state = State.FOLLOWING
 		return
-	# Add random attack delay for realism
 	if attack_delay_timer > 0:
 		attack_delay_timer -= delta
 		return
@@ -144,16 +131,10 @@ func _handle_attacking(delta: float):
 func _handle_retreating(delta: float):
 	if retreat_timer > 0:
 		retreat_timer -= delta
-		# Move away from enemy
 		if enemy_target:
 			ally_ref.movement_component.move_away_from_target(enemy_target.global_position, delta)
 		return
 	current_state = State.FOLLOWING
 
-# --- Ally Command System ---
 func command_move_to_position(position: Vector3):
-	# Move to a commanded position (for AllyCommandManager)
-	var health = ally_ref.health_component.current_health if ally_ref and ally_ref.health_component else -1
-	print("🎯 Ally '", ally_ref.name, "' received move command to ", position, " | Health: ", health)
-	# You can implement more advanced state logic here if desired
-	ally_ref.movement_component.move_towards_target(position, 0.1) # Move a little each call
+	ally_ref.movement_component.move_towards_target(position, 0.1)

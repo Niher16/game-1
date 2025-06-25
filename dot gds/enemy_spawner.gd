@@ -42,7 +42,6 @@ var wave_delay_timer: Timer
 func _ready():
 	name = "EnemySpawner"
 	add_to_group("spawner")
-	print("🌊 Enhanced Wave System: Initializing with BOSS FIGHT...")
 	
 	_setup_system()
 
@@ -51,25 +50,20 @@ func _setup_system():
 	# Find player
 	player = get_tree().get_first_node_in_group("player")
 	if not player:
-		print("❌ Player not found!")
 		return
 	
 	# Load enemy scene if not set
 	if not enemy_scene:
 		if ResourceLoader.exists("res://Scenes/enemy.tscn"):
 			enemy_scene = load("res://Scenes/enemy.tscn")
-			print("✅ Loaded enemy scene")
 		else:
-			print("❌ No enemy scene found!")
 			return
 	
 	# Load boss scene if not set
 	if not boss_scene:
 		if ResourceLoader.exists("res://Scenes/boss_slime.tscn"):
 			boss_scene = load("res://Scenes/boss_slime.tscn")
-			print("✅ Loaded boss scene")
 		else:
-			print("⚠️ Boss scene not found! Creating fallback...")
 			# Create boss scene reference from enemy scene with boss script
 			boss_scene = enemy_scene  # Fallback - will be enhanced by boss script
 	
@@ -80,20 +74,17 @@ func _setup_system():
 	wave_delay_timer.timeout.connect(_start_next_wave)
 	add_child(wave_delay_timer)
 	
-	print("✅ Enhanced Wave System ready with Boss Fight!")
 
 # === MAIN WAVE SYSTEM ===
 func start_wave_system():
 	"""PUBLIC: Start the entire wave system"""
 	if current_wave == 0:
-		print("🚀 Starting Enhanced Wave System!")
 		current_wave = 1
 		_start_current_wave()
 
 func set_newest_spawning_room(room_rect: Rect2):
 	"""PUBLIC: Set the room where enemies should spawn"""
 	current_spawning_room = room_rect
-	print("🏠 Wave System: Set spawning room to ", room_rect)
 	
 	# If we haven't started waves yet, start now
 	if current_wave == 0:
@@ -102,10 +93,7 @@ func set_newest_spawning_room(room_rect: Rect2):
 func _start_current_wave():
 	"""Start the current wave (ENHANCED: Boss logic for wave 10)"""
 	if wave_active:
-		print("⚠️ Wave already active!")
 		return
-	
-	print("🌊 === STARTING WAVE ", current_wave, " ===")
 	
 	# Check if this is the boss wave
 	if current_wave == boss_wave:
@@ -119,7 +107,6 @@ func _start_current_wave():
 	
 	# Calculate enemies for this wave
 	var total_enemies = base_enemies_per_wave + (current_wave - 1) * enemy_increase_per_wave
-	print("👹 Spawning ", total_enemies, " enemies for wave ", current_wave)
 	
 	# Spawn all enemies for this wave
 	for i in range(total_enemies):
@@ -129,12 +116,9 @@ func _start_current_wave():
 			enemy_spawned.emit(enemy)
 	
 	spawning_active = false
-	print("✅ Wave ", current_wave, " active with ", enemies_alive.size(), " enemies")
 
 func _start_boss_wave():
 	"""NEW: Start the epic boss wave"""
-	print("👹 === BOSS WAVE 10: PREPARE FOR BATTLE! ===")
-	
 	wave_active = true
 	spawning_active = true
 	enemies_alive.clear()
@@ -158,13 +142,11 @@ func _start_boss_wave():
 			boss.enemy_died.connect(_on_enemy_died.bind(boss))
 	
 	spawning_active = false
-	print("✅ BOSS WAVE active! Prepare for the ultimate challenge!")
 
 func _spawn_boss() -> Node3D:
 	"""NEW: Spawn the boss with special positioning"""
 	var spawn_position = _find_boss_spawn_position()
 	if spawn_position == Vector3.ZERO:
-		print("⚠️ Could not find boss spawn position")
 		return null
 	
 	var boss: Node3D
@@ -173,20 +155,16 @@ func _spawn_boss() -> Node3D:
 	if boss_scene and boss_scene != enemy_scene:
 		# Use the dedicated boss scene
 		boss = boss_scene.instantiate()
-		print("👹 Using dedicated boss scene")
 	else:
 		# Create boss from scratch since enemy scene won't work
-		print("👹 Creating boss from scratch (CharacterBody3D)")
 		boss = _create_boss_from_scratch()
 	
 	if not boss:
-		print("❌ Failed to create boss!")
 		return null
 	
 	get_parent().add_child(boss)
 	boss.global_position = spawn_position + Vector3(0, 20, 0)  # Start high for dramatic entry
 	
-	print("👹 BOSS SPAWNED: Epic battle begins!")
 	return boss
 
 func _create_boss_from_scratch() -> CharacterBody3D:
@@ -224,8 +202,7 @@ func _create_boss_from_scratch() -> CharacterBody3D:
 	boss.add_to_group("enemies")
 	boss.collision_layer = 4  # Boss layer
 	boss.collision_mask = 1 | 8  # World + walls
-	
-	print("✅ Boss created from scratch with CharacterBody3D")
+
 	return boss
 
 func _find_boss_spawn_position() -> Vector3:
@@ -250,14 +227,12 @@ func _find_boss_spawn_position() -> Vector3:
 		if _is_valid_spawn_position(test_position):
 			return test_position
 	
-	print("⚠️ Using fallback boss spawn position")
 	return spawn_center + Vector3(randf_range(-8, 8), 0.0, randf_range(-8, 8))
 
 func _spawn_single_enemy() -> Node3D:
 	"""Spawn one regular enemy in the current room"""
 	var spawn_position = _find_spawn_position()
 	if spawn_position == Vector3.ZERO:
-		print("⚠️ Could not find spawn position")
 		return null
 	
 	# Create enemy
@@ -272,7 +247,6 @@ func _spawn_single_enemy() -> Node3D:
 	if enemy.has_signal("enemy_died"):
 		enemy.enemy_died.connect(_on_enemy_died.bind(enemy))
 	
-	print("✅ Spawned enemy at ", spawn_position)
 	return enemy
 
 func _find_spawn_position() -> Vector3:
@@ -293,7 +267,6 @@ func _find_spawn_position() -> Vector3:
 		if _is_valid_spawn_position(test_position):
 			return test_position
 	
-	print("⚠️ Using fallback spawn position")
 	return spawn_center + Vector3(randf_range(-3, 3), 2.0, randf_range(-3, 3))
 
 func _get_spawn_center() -> Vector3:
@@ -355,7 +328,6 @@ func _scale_enemy_for_wave(enemy: Node3D):
 func _on_enemy_died(enemy: Node3D):
 	"""Called when an enemy dies"""
 	enemies_alive.erase(enemy)
-	print("💀 Enemy died! Remaining: ", enemies_alive.size())
 	
 	# Check if wave is complete
 	if enemies_alive.size() == 0 and wave_active:
@@ -363,7 +335,6 @@ func _on_enemy_died(enemy: Node3D):
 
 func _on_boss_defeated():
 	"""NEW: Called when boss is defeated"""
-	print("👹 BOSS DEFEATED! Epic victory!")
 	
 	# Remove boss from enemies list
 	if boss_instance and boss_instance in enemies_alive:
@@ -380,7 +351,7 @@ func _complete_wave():
 	wave_active = false
 	
 	if current_wave == boss_wave:
-		print("🏆 === BOSS WAVE COMPLETED! GAME VICTORY! ===")
+		pass
 	else:
 		print("🎉 WAVE ", current_wave, " COMPLETED!")
 	
@@ -389,13 +360,11 @@ func _complete_wave():
 	
 	# Check if all waves are done
 	if current_wave >= max_waves:
-		print("🏆 ALL WAVES COMPLETED!")
 		all_waves_completed.emit()
 		return
 	
 	# Start delay for next wave (unless it's boss wave - that's the end)
 	if current_wave < max_waves:
-		print("⏳ Next wave starts in ", wave_delay, " seconds...")
 		wave_delay_timer.start()
 
 func _start_next_wave():
@@ -432,72 +401,3 @@ func _get_boss_health() -> float:
 		if "health" in boss_instance and "max_health" in boss_instance:
 			return float(boss_instance.health) / float(boss_instance.max_health)
 	return 0.0
-
-# === DEBUG FUNCTIONS ===
-func force_next_wave():
-	"""Debug: Skip to next wave"""
-	for enemy in enemies_alive:
-		if is_instance_valid(enemy):
-			enemy.queue_free()
-	enemies_alive.clear()
-	if wave_active:
-		_complete_wave()
-
-func force_boss_wave():
-	"""NEW: Debug: Force start boss wave"""
-	current_wave = boss_wave
-	_start_current_wave()
-
-func force_start_waves():
-	"""Debug: Force start wave system"""
-	if current_wave == 0:
-		start_wave_system()
-
-# === DEBUG: Kill all enemies one by one ===
-var debug_kill_timer: Timer
-var debug_kill_active: bool = false
-
-func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F10:
-		if not debug_kill_active:
-			print("[DEBUG] F10 pressed: Starting kill-all-enemies sequence.")
-			debug_kill_active = true
-			if not debug_kill_timer:
-				debug_kill_timer = Timer.new()
-				debug_kill_timer.wait_time = 0.5
-				debug_kill_timer.one_shot = false
-				debug_kill_timer.timeout.connect(_on_debug_kill_timer_timeout)
-				add_child(debug_kill_timer)
-			debug_kill_timer.start()
-		else:
-			print("[DEBUG] F10 pressed: Already running.")
-			
-			# NEW: F11 Boss Fight Activation
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:
-		force_boss_wave()
-		print("🔥 F11: BOSS FIGHT ACTIVATED!")
-
-func _on_debug_kill_timer_timeout():
-	if enemies_alive.size() > 0:
-		var enemy = enemies_alive[0]
-		if is_instance_valid(enemy):
-			if enemy.has_method("die"):
-				enemy.die()
-			elif enemy.has_signal("enemy_died"):
-				enemy.enemy_died.emit()
-			else:
-				enemy.queue_free()
-		else:
-			enemies_alive.remove_at(0)
-	else:
-		print("[DEBUG] All enemies killed by debug tool.")
-		debug_kill_timer.stop()
-		debug_kill_active = false
-
-# === NEW: Debug function to force boss wave ===
-func _ready_debug_commands():
-	"""Setup debug commands for testing"""
-	print("🐛 Debug Commands Available:")
-	print("   F10: Kill all enemies")
-	print("   F11: Force boss wave (call force_boss_wave())")
-	print("   F12: Force next wave")

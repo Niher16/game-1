@@ -18,7 +18,6 @@ var speed_label: Label
 
 func _ready():
 	add_to_group("UI")
-	print("✅ UI node added to group 'UI'")
 	_setup_ui()
 	_find_references()
 	_find_spawner_with_retry()
@@ -34,9 +33,6 @@ func _setup_ui():
 	_create_xp_ui()
 	_create_unit_ui()
 	_create_speed_ui()
-	
-	# Debug: Verify UI elements were created
-	print("🔍 UI Elements created - xp_bar: ", xp_bar != null, " xp_label: ", xp_label != null)
 
 func _create_health_ui():
 	var panel = _create_panel(Vector2(20, 20), Vector2(180, 50), Color.RED)
@@ -85,8 +81,6 @@ func _create_xp_ui():
 	xp_label.add_theme_font_size_override("font_size", 14)
 	xp_label.add_theme_color_override("font_color", Color.WHITE)
 	panel.add_child(xp_label)
-	
-	print("✅ XP UI created - Bar: ", xp_bar != null, " Label: ", xp_label != null)
 
 func _create_unit_ui():
 	var panel = _create_panel(Vector2(20, 270), Vector2(200, 50), Color.GREEN)
@@ -131,19 +125,15 @@ func _create_label(text: String, parent: Panel) -> Label:
 	return label
 
 func _find_references():
-	print("UI: Finding references...")
 	player = get_tree().get_first_node_in_group("player")
 	if player:
-		print("UI: Found player!")
 		# Connect ally signals for all existing allies
 		var allies = get_tree().get_nodes_in_group("allies")
 		for ally in allies:
 			_connect_ally_signals(ally)
-		print("UI: Connected ally signals")
 		# Listen for new allies being added to the scene tree (fixed connect signature)
 		get_tree().connect("node_added", Callable(self, "_on_node_added"), CONNECT_DEFERRED)
 	else:
-		print("UI: Player not found!")
 		await get_tree().create_timer(1.0).timeout
 		_find_references()
 
@@ -185,26 +175,17 @@ func _find_spawner_with_retry():
 
 # ===== SIGNAL HANDLERS (Called via call_group from player) =====
 func _on_player_xp_changed(xp: int, xp_to_next: int, level: int):
-	print("🎯 UI XP Update: ", xp, "/", xp_to_next, " Level: ", level)
 	if xp_bar:
 		xp_bar.max_value = xp_to_next
 		xp_bar.value = xp
-		print("✅ XP bar updated: ", xp, "/", xp_to_next)
-	else:
-		print("🟥 xp_bar is null!")
 	
 	if xp_label:
 		xp_label.text = "XP: %d/%d (Lv.%d)" % [xp, xp_to_next, level]
-		print("✅ XP label updated: ", xp_label.text)
-	else:
-		print("🟥 xp_label is null!")
 
-func _on_player_coin_collected(amount: int):
-	print("🎯 UI Coin Update: ", amount)
+func _on_player_coin_collected(_amount: int):
 	_update_coins()
 
 func _on_player_health_changed(current: int, max_health: int):
-	print("🎯 UI Health Update: ", current, "/", max_health)
 	if health_label:
 		health_label.text = "❤️ Health: " + str(current) + "/" + str(max_health)
 		# Change color based on health percentage
@@ -215,7 +196,6 @@ func _on_player_health_changed(current: int, max_health: int):
 			health_label.add_theme_color_override("font_color", Color.ORANGE)
 		else:
 			health_label.add_theme_color_override("font_color", Color.WHITE)
-		print("✅ Health label updated: ", health_label.text)
 
 # ===== FRAME-BASED UPDATES (Only for non-signal data) =====
 func _process(_delta):
@@ -283,18 +263,14 @@ func _update_speed():
 
 # ===== ALLY SIGNAL HANDLERS =====
 func _on_ally_added():
-	print("✅ Received ally_added signal.")
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _on_ally_removed():
-	print("✅ Received ally_removed signal.")
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _on_ally_died():
-	print("✅ Received ally_died signal.")
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _update_units(current_units: int):
 	if unit_label:
 		unit_label.text = "🤝 Units: %d/%d" % [current_units, max_units]
-		print("✅ Unit counter updated: ", current_units, " / ", max_units)

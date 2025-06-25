@@ -20,7 +20,7 @@ const INVULNERABLE_DURATION: float = 0.5
 var player: CharacterBody3D
 
 func _ready():
-	print("💖 PlayerHealth system ready")
+	pass
 
 func setup(player_ref: CharacterBody3D, starting_health: int = 100):
 	"""Initialize the health system"""
@@ -29,7 +29,6 @@ func setup(player_ref: CharacterBody3D, starting_health: int = 100):
 	current_health = starting_health
 	invulnerable_time = 0.0
 	
-	print("💖 Health system setup - Max: ", max_health, " Current: ", current_health)
 	health_changed.emit(current_health, max_health)
 
 func _process(delta):
@@ -52,7 +51,6 @@ func set_max_health(new_max: int):
 	if current_health > max_health:
 		current_health = max_health
 	health_changed.emit(current_health, max_health)
-	print("💖 Max health set to: ", max_health)
 
 func can_heal() -> bool:
 	"""Returns true if player can be healed"""
@@ -68,14 +66,11 @@ func _update_health_ui(current: int, health_max: int):
 func heal(amount: int):
 	"""Heals the player by specified amount"""
 	if current_health <= 0:
-		print("💀 Cannot heal - player is dead")
 		return
 	if current_health >= max_health:
-		print("💚 Already at full health")
 		return
-	var old_health = current_health
+	var _old_health = current_health
 	current_health = min(current_health + amount, max_health)
-	print("💖 Healed for ", amount, " HP (", old_health, " -> ", current_health, ")")
 	health_changed.emit(current_health, max_health)
 	_update_health_ui(current_health, max_health)
 	# Visual feedback
@@ -85,15 +80,12 @@ func take_damage(amount: int, _from_source: Node = null):
 	"""Damages the player by specified amount"""
 	# Check invulnerability
 	if invulnerable_time > 0:
-		print("🛡️ Damage blocked - still invulnerable")
 		return
 	if current_health <= 0:
-		print("💀 Already dead - no more damage")
 		return
-	var old_health = current_health
+	var _old_health = current_health
 	current_health = max(current_health - amount, 0)
 	invulnerable_time = INVULNERABLE_DURATION
-	print("💔 Took ", amount, " damage (", old_health, " -> ", current_health, ")")
 	health_changed.emit(current_health, max_health)
 	_update_health_ui(current_health, max_health)
 	# Check for death
@@ -104,7 +96,6 @@ func take_damage(amount: int, _from_source: Node = null):
 
 func _handle_death():
 	"""Handles player death"""
-	print("💀 Player died!")
 	player_died.emit()
 	
 	# Add death effects here
@@ -113,7 +104,6 @@ func _handle_death():
 
 func _show_heal_effect(amount: int):
 	"""Shows visual feedback for healing"""
-	print("✨ Heal effect: +", amount, " HP")
 	# Try to show floating text if system exists
 	if player and player.has_method("show_floating_text"):
 		player.show_floating_text("+" + str(amount), Color.GREEN)
@@ -131,7 +121,6 @@ func _show_heal_effect(amount: int):
 
 func _show_damage_effect(amount: int):
 	"""Shows visual feedback for damage"""
-	print("💥 Damage effect: -", amount, " HP")
 	# Try to show floating text if system exists
 	if player and player.has_method("show_floating_text"):
 		player.show_floating_text("-" + str(amount), Color.RED)

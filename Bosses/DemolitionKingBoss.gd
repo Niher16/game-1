@@ -1,9 +1,8 @@
-# demolition_king_boss.gd - SAFE VERSION with debug info
+# demolition_king_boss.gd - SAFE VERSION
 extends CharacterBody3D
 
 # === SIGNALS ===
 signal boss_died
-signal wall_destroyed(position: Vector3)
 
 # === BOSS STATS ===
 @export var max_health: int = 200
@@ -45,14 +44,12 @@ var safe_ground_level: float
 var last_safe_position: Vector3
 
 func _ready() -> void:
-	print("👑 DEMOLITION KING: SAFE SPAWN VERSION!")
 	health = max_health
 	_setup_boss()
 	call_deferred("_find_safe_spawn")
 
 func _physics_process(delta: float) -> void:
 	state_timer += delta
-	_debug_boss_status()
 	_handle_boss_state(delta)
 	_apply_safe_physics(delta)
 	
@@ -72,7 +69,6 @@ func _setup_boss() -> void:
 	if mesh_instance:
 		original_scale = mesh_instance.scale
 		_setup_boss_material()
-		print("✅ Boss visuals setup complete")
 	
 	# Find player
 	player = get_tree().get_first_node_in_group("player")
@@ -80,15 +76,17 @@ func _setup_boss() -> void:
 		push_error("❌ No player found!")
 		return
 	
-	print("✅ Found player at: ", player.global_position)
-	
 	# Setup groups and collision
 	add_to_group("bosses")
 	add_to_group("enemies")
-	collision_layer = 4  # Boss layer
-	collision_mask = 1 | 2 | 8 | 16 | 32   # Collide with floor, enemy, ally, player, wall
-	
-	print("✅ Boss collision setup: layer=", collision_layer, " mask=", collision_mask)
+	# --- STANDARDIZED COLLISION LAYERS ---
+	# Layer 1: World (floor/terrain)
+	# Layer 2: Walls
+	# Layer 3: Player
+	# Layer 4: Ally
+	# Layer 5: Boss
+	collision_layer = 1 << 4  # Layer 5 (Boss)
+	collision_mask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)  # Collide with World, Walls, Player, Ally
 
 func _setup_boss_material() -> void:
 	boss_material = StandardMaterial3D.new()
@@ -103,11 +101,8 @@ func _find_safe_spawn() -> void:
 	if not player:
 		return
 	
-	print("🔍 Finding safe spawn position near player...")
-	
 	# Find ground level near player
 	safe_ground_level = _find_ground_level(player.global_position)
-	print("🌍 Ground level detected at Y: ", safe_ground_level)
 	
 	# Position boss on safe ground, a bit away from player
 	var safe_offset = Vector3(8, 0, 8)  # 8 units away
@@ -120,10 +115,7 @@ func _find_safe_spawn() -> void:
 	# Set position and mark as safe
 	global_position = spawn_position
 	last_safe_position = spawn_position
-	
-	print("🎯 Boss spawned at SAFE position: ", global_position)
-	print("🦶 Is on floor: ", is_on_floor())
-	
+
 	current_state = BossState.POSITIONING
 
 func _find_ground_level(reference_pos: Vector3) -> float:
@@ -140,10 +132,8 @@ func _find_ground_level(reference_pos: Vector3) -> float:
 	var result = space_state.intersect_ray(query)
 	
 	if result:
-		print("🎯 Ground raycast hit: ", result.collider.name, " at Y: ", result.position.y)
 		return result.position.y
 	else:
-		print("⚠️ No ground found, using player Y level")
 		return reference_pos.y
 
 # === STATE MANAGEMENT ===
@@ -163,25 +153,21 @@ func _handle_boss_state(delta: float) -> void:
 func _handle_spawning() -> void:
 	# Just wait a moment to ensure everything is loaded
 	if state_timer >= 0.5:
-		print("✅ Spawn complete, moving to positioning")
 		current_state = BossState.POSITIONING
 		state_timer = 0.0
 
 func _handle_positioning() -> void:
 	# Only break walls once at the start, then let him settle
 	if state_timer >= 0.5 and state_timer < 1.0:
-		print("🔨 Initial wall break to clear immediate area...")
 		_force_break_nearby_walls()
 	
 	# Wait for boss to settle, then start normal behavior
 	if state_timer >= 2.0:
-		print("👑 DEMOLITION KING: READY FOR BATTLE!")
 		current_state = BossState.IDLE
 		state_timer = 0.0
 
 func _break_walls_around_spawn() -> void:
 	"""Break walls around boss spawn to create some arena space"""
-	print("🔨 Creating spawn arena...")
 	_force_break_nearby_walls()
 
 func _handle_idle_state() -> void:
@@ -190,12 +176,10 @@ func _handle_idle_state() -> void:
 	
 	# Don't try to move if boss is falling or unstable
 	if not is_on_floor() or velocity.y < -2.0:
-		print("⏸️ Boss not stable - waiting to land")
 		return
 	
 	# Check if boss is stuck (not moving for a while on stable ground)
 	if state_timer >= 3.0 and velocity.length() < 0.1 and is_on_floor():
-		print("🚫 BOSS APPEARS STUCK! Breaking nearby walls")
 		_force_break_nearby_walls()
 	
 	# Try to move toward player only when stable
@@ -213,8 +197,6 @@ func _move_toward_player() -> void:
 	var direction_to_player = (player.global_position - global_position).normalized()
 	var distance_to_player = global_position.distance_to(player.global_position)
 	
-	print("🎯 Moving toward player: distance=", distance_to_player, " direction=", direction_to_player)
-	
 	# Move toward player at conservative speed
 	var move_speed = speed * 0.5  # Half speed for safety
 	velocity.x = direction_to_player.x * move_speed
@@ -224,13 +206,11 @@ func _move_toward_player() -> void:
 	if distance_to_player < 4.0:
 		velocity.x = 0
 		velocity.z = 0
-		print("✋ Close enough to player, stopping movement")
 
 func _start_charge_attack() -> void:
 	if not player:
 		return
 		
-	print("⚡ DEMOLITION KING: STARTING CHARGE!")
 	current_state = BossState.CHARGING
 	
 	# Calculate direction to player
@@ -238,8 +218,6 @@ func _start_charge_attack() -> void:
 	is_charging = true
 	charge_timer = 0.0
 	state_timer = 0.0
-	
-	print("🎯 Charging toward: ", player.global_position)
 
 func _handle_charging(delta: float) -> void:
 	charge_timer += delta
@@ -247,8 +225,6 @@ func _handle_charging(delta: float) -> void:
 	# Actually charge forward at full speed
 	velocity.x = charge_direction.x * charge_speed
 	velocity.z = charge_direction.z * charge_speed
-	
-	print("🏃 Boss charging: velocity=(", velocity.x, ", ", velocity.z, ") toward player")
 	
 	# Break walls continuously while charging
 	if int(charge_timer * 10) % 3 == 0:  # Every 0.3 seconds
@@ -260,7 +236,6 @@ func _handle_charging(delta: float) -> void:
 		_end_charge()
 
 func _end_charge() -> void:
-	print("🛑 Charge ended")
 	is_charging = false
 	velocity.x = 0
 	velocity.z = 0
@@ -279,12 +254,10 @@ func _check_wall_collisions() -> void:
 		var collider = collision.get_collider()
 		
 		if collider and _is_wall(collider):
-			print("💥 Boss charged through wall: ", collider.name)
 			_break_wall(collider)
 
 func _force_break_nearby_walls() -> void:
 	"""Break walls in radius around boss"""
-	print("💪 Force breaking walls around: ", global_position)
 	
 	var space_state = get_world_3d().direct_space_state
 	var shape = SphereShape3D.new()
@@ -296,17 +269,14 @@ func _force_break_nearby_walls() -> void:
 	query.collision_mask = 1
 	
 	var results = space_state.intersect_shape(query)
-	print("🔍 Found ", results.size(), " objects in break radius")
 	
-	var walls_broken = 0
+	var _walls_broken = 0
 	for result in results:
 		var obj = result.collider
 		if _is_wall(obj):
 			_break_wall(obj)
-			walls_broken += 1
+			_walls_broken += 1
 	
-	print("🧱 Broke ", walls_broken, " walls")
-
 func _is_wall(obj: Node) -> bool:
 	"""MUCH SMARTER wall detection - never break floors or important objects"""
 	if not obj:
@@ -340,7 +310,6 @@ func _is_wall(obj: Node) -> bool:
 	)
 	
 	if never_break:
-		print("🛡️ PROTECTED OBJECT (never break): ", obj.name)
 		return false
 	
 	# ONLY break objects that are clearly walls
@@ -352,7 +321,6 @@ func _is_wall(obj: Node) -> bool:
 	)
 	
 	if is_definitely_wall:
-		print("💥 CONFIRMED WALL: ", obj.name, " - safe to break")
 		return true
 	
 	# For anything else (like random StaticBody3D), be more careful
@@ -363,22 +331,16 @@ func _is_wall(obj: Node) -> bool:
 		
 		# Only break if object is at similar height to boss (not floor below)
 		if abs(obj_y - boss_y) < 1.0 and obj_y > boss_y - 2.0:
-			print("💥 OBSTACLE: ", obj.name, " at similar height - breaking")
 			return true
 		else:
-			print("🛡️ GROUND LEVEL: ", obj.name, " below boss - preserving")
 			return false
 	
-	print("❌ UNKNOWN OBJECT: ", obj.name, " - not breaking")
 	return false
 
 func _break_wall(wall: Node) -> void:
 	"""Break a wall safely"""
 	if not wall or not is_instance_valid(wall):
 		return
-	
-	print("💥 BREAKING WALL: ", wall.name, " at ", wall.global_position)
-	wall_destroyed.emit(wall.global_position)
 	
 	# Try different breaking methods
 	if wall.has_method("break_wall"):
@@ -399,19 +361,16 @@ func _safety_checks() -> void:
 	
 	# Check if boss fell below world
 	if global_position.y < safe_ground_level - 10.0:
-		print("🚨 BOSS FALLING! Teleporting to safety")
 		global_position = last_safe_position
 		velocity = Vector3.ZERO
 	
 	# Check if boss is taking damage from unknown source
 	if health < max_health and current_state != BossState.DYING:
-		print("🩸 Boss is taking damage! Health: ", health, "/", max_health)
 		# For debugging - let's see what might be hurting him
 		_debug_damage_sources()
 
 func _debug_damage_sources() -> void:
 	"""Debug what might be damaging the boss"""
-	print("🔍 Checking for damage sources around boss...")
 	
 	var space_state = get_world_3d().direct_space_state
 	var shape = SphereShape3D.new()
@@ -423,7 +382,6 @@ func _debug_damage_sources() -> void:
 	query.collision_mask = 0xFFFFFFFF  # Check all layers
 	
 	var results = space_state.intersect_shape(query)
-	print("🔍 Objects near boss that might cause damage:")
 	
 	for result in results:
 		var obj = result.collider
@@ -439,33 +397,17 @@ func _apply_safe_physics(delta: float) -> void:
 		# Cap falling speed to prevent clipping through ground
 		velocity.y = max(velocity.y, -15.0)
 
-func _debug_boss_status() -> void:
-	"""Print debug info every few seconds"""
-	if int(state_timer) % 3 == 0 and state_timer - int(state_timer) < 0.1:  # Every 3 seconds
-		print("📊 BOSS STATUS:")
-		print("  Position: ", global_position)
-		print("  State: ", BossState.keys()[current_state])
-		print("  Health: ", health, "/", max_health)
-		print("  On Floor: ", is_on_floor())
-		print("  Velocity: ", velocity)
-
 # === DAMAGE SYSTEM ===
-func take_damage(amount: int, source = null) -> void:
+func take_damage(amount: int, _source = null) -> void:
 	if current_state == BossState.DYING:
 		return
 	
-	print("👑 Boss took ", amount, " damage from ", source if source else "unknown")
-	print("  Health before: ", health, "/", max_health)
-	
 	health -= amount
-	
-	print("  Health after: ", health, "/", max_health)
 	
 	if health <= 0:
 		_start_death_sequence()
 
 func _start_death_sequence() -> void:
-	print("💀 DEMOLITION KING: PROPERLY DEFEATED!")
 	current_state = BossState.DYING
 	boss_died.emit()
 
@@ -475,22 +417,4 @@ func _handle_death_sequence(delta: float) -> void:
 		mesh_instance.scale = mesh_instance.scale.lerp(Vector3.ZERO, 1.0 * delta)
 	
 	if state_timer >= 4.0:
-		print("👑 Boss death sequence complete")
 		queue_free()
-
-# === DEBUG FUNCTIONS ===
-func debug_status() -> void:
-	"""Print comprehensive debug info"""
-	print("=== BOSS DEBUG STATUS ===")
-	print("Position: ", global_position)
-	print("Health: ", health, "/", max_health)
-	print("State: ", BossState.keys()[current_state])
-	print("On Floor: ", is_on_floor())
-	print("Velocity: ", velocity)
-	print("Last Safe Position: ", last_safe_position)
-	print("Ground Level: ", safe_ground_level)
-
-func force_break_test() -> void:
-	"""Force test wall breaking"""
-	print("🧪 MANUAL WALL BREAK TEST!")
-	_force_break_nearby_walls()

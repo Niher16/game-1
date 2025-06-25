@@ -54,7 +54,6 @@ var zoom_velocity: float = 0.0  # For smooth zoom momentum
 # --- Built-in Godot Functions ---
 func _ready() -> void:
 	"""Called when camera is added to scene - finds the player and sets up initial position"""
-	print("Camera: Starting up...")
 	
 	# Find the player node safely
 	_find_player()
@@ -73,10 +72,8 @@ func _find_player() -> void:
 	
 	if players.size() > 0:
 		player = players[0] as Node3D
-		print("Camera: Found player at ", player.global_position)
 		_update_camera_position()
 	else:
-		print("Camera: Player not found, retrying in 0.5 seconds...")
 		# Try again after a short delay
 		get_tree().create_timer(0.5).timeout.connect(_find_player)
 
@@ -103,7 +100,6 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed:
 		if event.keycode == KEY_R:
 			_reset_camera_rotation()
-			print("Camera: Rotation reset!")
 
 func _process(delta: float) -> void:
 	"""Called every frame - updates camera with smooth momentum and transitions"""
@@ -219,8 +215,6 @@ func _zoom_camera(zoom_change: float) -> void:
 	# Update target zoom instead of current zoom for smooth transitions
 	target_zoom += zoom_change
 	target_zoom = clamp(target_zoom, min_zoom_distance, max_zoom_distance)
-	
-	print("Camera: Target zoom = ", target_zoom)
 
 func _reset_camera_rotation() -> void:
 	"""Resets camera rotation to default position with smooth transition"""
@@ -237,7 +231,6 @@ func set_follow_target(new_target: Node3D) -> void:
 	
 	if new_target and is_instance_valid(new_target):
 		player = new_target
-		print("Camera: Now following ", player.name)
 	else:
 		print("Camera: Invalid target provided")
 
@@ -245,18 +238,3 @@ func get_follow_target() -> Node3D:
 	"""Returns the current player being followed"""
 	
 	return player
-
-# --- Debug Functions ---
-func _on_debug_requested() -> void:
-	"""Prints debug information about camera state including momentum"""
-	
-	print("=== Camera Debug Info ===")
-	@warning_ignore("incompatible_ternary")
-	print("Player: ", player.name if player != null else "None")
-	print("Position: ", global_position)
-	print("Current Zoom: ", current_zoom, " | Target: ", target_zoom)
-	print("Current Rotation X: ", rad_to_deg(rotation_x), " | Target: ", rad_to_deg(target_rotation_x))
-	print("Current Rotation Y: ", rad_to_deg(rotation_y), " | Target: ", rad_to_deg(target_rotation_y))
-	print("Momentum X: ", rotation_velocity_x, " | Y: ", rotation_velocity_y)
-	print("Is Rotating: ", is_rotating)
-	print("========================")

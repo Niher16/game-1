@@ -25,34 +25,23 @@ func _ready():
 	controller_navigation_enabled = Input.get_connected_joypads().size() > 0
 
 func show_upgrade_choices(options: Array):
-	print("🎯 LevelUpUI: show_upgrade_choices called")
-	print("📋 Received options: ", options)
-	print("📋 Options count: ", options.size())
-	
 	if options.size() < 3:
-		print("❌ ERROR: Not enough options received!")
 		return
 		
 	current_options = options
 	visible = true
-	print("👁️ UI made visible")
 	
 	# Check if buttons exist
 	if not button1:
-		print("❌ ERROR: button1 is null!")
 		return
 	if not button2:
-		print("❌ ERROR: button2 is null!")  
 		return
 	if not button3:
-		print("❌ ERROR: button3 is null!")
 		return
 		
-	print("✅ All buttons found, updating text...")
 	button1.text = options[0].title + "\n" + options[0].description
 	button2.text = options[1].title + "\n" + options[1].description  
 	button3.text = options[2].title + "\n" + options[2].description
-	print("✅ Button texts updated successfully")
 	
 func _on_button_1_pressed():
 	_choose_upgrade(0)
@@ -64,11 +53,8 @@ func _on_button_3_pressed():
 	_choose_upgrade(2)
 
 func _choose_upgrade(index: int):
-	print("🎯 LevelUpUI: Button ", index, " pressed!")
-	print("🎯 Selected upgrade: ", current_options[index])
 	var player = get_tree().get_first_node_in_group("player")
 	if player and player.progression_component:
-		print("🎯 Calling apply_upgrade on progression component...")
 		player.progression_component.apply_upgrade(current_options[index])
 	else:
 		print("❌ ERROR: Player or progression component not found!")

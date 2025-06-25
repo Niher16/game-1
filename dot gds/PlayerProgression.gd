@@ -23,40 +23,25 @@ func setup(player_ref_in: CharacterBody3D):
 	total_coins_collected = 0
 
 func add_currency(amount: int):
-	print("💰 PlayerProgression: add_currency called with: ", amount)
 	currency += amount
 	total_coins_collected += amount
-	print("💰 Total currency now: ", currency, " - Emitting signal...")
 	coin_collected.emit(currency)
 
 func add_xp(amount: int):
-	print("📈 PlayerProgression: add_xp called with: ", amount)
-	print("📈 Current XP: ", xp, " adding: ", amount)
 	xp += amount
-	print("📈 New XP total: ", xp, "/", xp_to_next_level)
-	print("📈 Emitting xp_changed signal...")
 	xp_changed.emit(xp, xp_to_next_level, level)
-	print("📈 XP signal emitted!")
 	
 	if xp >= xp_to_next_level:
 		_level_up()
 
 func _level_up():
 	if xp >= xp_to_next_level:
-		print('🔥 LEVEL UP! XP: ', xp, ' Required: ', xp_to_next_level)
-	xp -= xp_to_next_level
-	level += 1
-	xp_to_next_level = int(xp_to_next_level * xp_growth)
-	print('📈 New level: ', level, ' XP to next: ', xp_to_next_level)
-	print('📊 XP after level up: ', xp)
-	print('📊 Generating upgrade options...')
-	var upgrade_options = _generate_upgrade_options()
-	print('✅ Generated ', upgrade_options.size(), ' options: ', upgrade_options)
-	print('⏸️ Pausing game...')
-	get_tree().paused = true
-	print('📢 Emitting show_level_up_choices signal with options...')
-	show_level_up_choices.emit(upgrade_options)
-	print('✅ Signal emitted successfully')
+		xp -= xp_to_next_level
+		level += 1
+		xp_to_next_level = int(xp_to_next_level * xp_growth)
+		var upgrade_options = _generate_upgrade_options()
+		get_tree().paused = true
+		show_level_up_choices.emit(upgrade_options)
 
 
 func get_currency() -> int:
@@ -79,17 +64,12 @@ func _generate_upgrade_options() -> Array:
 	]
 
 func apply_upgrade(upgrade_data: Dictionary):
-	print("🔧 PlayerProgression: apply_upgrade called with: ", upgrade_data)
 	match upgrade_data.type:
 		"health":
-			print("🔧 Emitting level_up_stats signal with health increase: ", upgrade_data.value)
 			level_up_stats.emit(upgrade_data.value, 0)
 		"damage":
-			print("🔧 Applying damage increase: ", upgrade_data.value)
 			player_ref.attack_damage += upgrade_data.value
 		"speed":
-			print("🔧 Applying speed increase: ", upgrade_data.value)
 			player_ref.speed += upgrade_data.value
-	print("🔧 Unpausing game...")
 	get_tree().paused = false
 	xp_changed.emit(xp, xp_to_next_level, level)

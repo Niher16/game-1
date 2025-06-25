@@ -177,7 +177,6 @@ func take_damage(amount: int):
 	if is_being_destroyed:
 		return
 	
-	print("🗃️ ", name, " took ", amount, " damage!")
 	health -= amount
 	_show_damage_effect()
 	
@@ -210,7 +209,6 @@ func _destroy():
 		return
 
 	is_being_destroyed = true
-	print("💥 Destroying ", name, "!")
 
 	# 🚫 IMMEDIATE COLLISION DISABLE - This fixes your issue!
 	collision_layer = 0  # Remove from all collision layers
@@ -286,11 +284,9 @@ func _create_breaking_effect():
 func _drop_loot():
 	"""Drop appropriate loot based on object type"""
 	if not LootManager:
-		print("❌ LootManager not found!")
 		return
 
 	var type_key = "crate" if object_type == ObjectType.CRATE else "barrel"
-	print("🎁 Dropping loot for ", type_key)
 
 	if LootManager.has_method("drop_destructible_loot"):
 		LootManager.drop_destructible_loot(global_position, type_key)

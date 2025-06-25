@@ -16,7 +16,6 @@ func _ready():
 	_setup_visual()
 	_setup_interaction_area()
 	_update_ally_counter()
-	print("👤 Recruiter NPC ready!")
 
 func _setup_visual():
 	# Create NPC body (taller than ally, different color)
@@ -69,7 +68,6 @@ func _on_player_entered(body):
 	if body.is_in_group("player"):
 		player_in_range = true
 		interaction_text.visible = true
-		print("👤 Player can recruit ally")
 
 func _on_player_exited(body):
 	if body.is_in_group("player"):
@@ -84,7 +82,6 @@ func recruit_ally():
 	# Check if we have too many allies
 	var current_allies = get_tree().get_nodes_in_group("allies")
 	if current_allies.size() >= max_allies:
-		print("👤 Too many allies! Maximum: ", max_allies)
 		return
 	
 	# Spawn ally
@@ -102,7 +99,6 @@ func recruit_ally():
 		# Fix: connect to correct signal
 		new_ally.ally_died.connect(_on_ally_died)
 		_update_ui_units()
-		print("👤 Recruited new ally! Total allies: ", current_allies.size() + 1)
 		# Emit signal and queue_free recruiter
 		ally_recruited.emit()
 		queue_free()
@@ -111,16 +107,13 @@ func recruit_ally():
 
 func _on_ally_died():
 	_update_ui_units()
-	print("👤 An ally has died. Remaining allies: ", get_tree().get_nodes_in_group("allies").size())
 
 func _update_ui_units():
 	var current_allies = get_tree().get_nodes_in_group("allies").size()
-	print("👤 Updating UI with current allies: ", current_allies, " / ", max_allies)
 	var ui = get_tree().get_first_node_in_group("UI")
 	if ui:
 		if ui.has_method("_update_units"):
 			ui._update_units(current_allies)
-			print("✅ UI updated successfully!")
 		else:
 			print("❌ UI does not have method '_update_units'!")
 	else:

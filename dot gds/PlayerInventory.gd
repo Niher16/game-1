@@ -32,8 +32,8 @@ func _ready():
 		weapon_attach_point = player_ref.get_node_or_null("WeaponAttachPoint")
 	if weapon_attach_point == null:
 		push_warning("PlayerInventory: No weapon_attach_point set or found.")
-	else:
-		print("[PlayerInventory] WeaponAttachPoint found: ", weapon_attach_point.get_path())
+# 	else:
+# 		print("[PlayerInventory] WeaponAttachPoint found: ", weapon_attach_point.get_path())
 	# Ensure player_ref.weapon_attach_point is set
 	if player_ref and player_ref.weapon_attach_point != weapon_attach_point:
 		player_ref.weapon_attach_point = weapon_attach_point

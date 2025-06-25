@@ -184,9 +184,6 @@ func initialize_animations():
 	# Store a random personality offset for organic animation
 	personality_offset = randf_range(-0.1, 0.1)
 
-	# Debug: Print all children of player to see what's available
-	print("🔍 Player children: ", player.get_children().map(func(c): return c.name))
-
 	# Get limb node references
 	left_hand_node = player.get_node_or_null("LeftHandAnchor/LeftHand")
 	right_hand_node = player.get_node_or_null("RightHandAnchor/RightHand")
@@ -196,18 +193,13 @@ func initialize_animations():
 	
 	# If feet not found, schedule a re-check after character creation
 	if not left_foot_node or not right_foot_node:
-		print("🦶 Feet not found yet - will re-check after character creation")
 		_schedule_foot_recheck()
 
 	# Try alternative paths if direct ones fail
 	if not left_foot_node:
 		left_foot_node = _find_node_recursive(player, "LeftFoot")
-		if left_foot_node:
-			print("🔍 Found LeftFoot via recursive search: ", left_foot_node.get_path())
 	if not right_foot_node:
 		right_foot_node = _find_node_recursive(player, "RightFoot")
-		if right_foot_node:
-			print("🔍 Found RightFoot via recursive search: ", right_foot_node.get_path())
 
 	# Store original positions and rotations
 	left_hand_origin = left_hand_node.position if left_hand_node else Vector3.ZERO
@@ -225,43 +217,14 @@ func initialize_animations():
 	current_body_sway = Vector3.ZERO
 	target_body_sway = Vector3.ZERO
 
-	# Debug output
-	var missing = []
-	if not left_hand_node: missing.append("LeftHand")
-	if not right_hand_node: missing.append("RightHand")
-	if not left_foot_node: missing.append("LeftFoot")
-	if not right_foot_node: missing.append("RightFoot")
-	if not body_node: missing.append("MeshInstance3D (Body)")
-	
-	if missing.size() == 0:
-		print("✅ All animation nodes found and positioned")
-	else:
-		print("⚠️ Missing animation nodes: ", missing)
-	
-	# 🦶 Extra foot debugging
-	if left_foot_node and right_foot_node:
-		print("🦶 FEET FOUND! Left: ", left_foot_node.get_path(), " Right: ", right_foot_node.get_path())
-		print("🦶 Foot origins - Left: ", left_foot_origin, " Right: ", right_foot_origin)
-	else:
-		print("❌ FEET NOT FOUND! This is why foot animation isn't working!")
-		if not left_foot_node:
-			print("   - Missing LeftFoot node")
-		if not right_foot_node:
-			print("   - Missing RightFoot node")
-	
-	print("📍 Animation origins captured - Body: ", body_origin, ", Hands: [", left_hand_origin, ", ", right_hand_origin, "], Feet: [", left_foot_origin, ", ", right_foot_origin, "]")
-
 func reinitialize_feet():
 	"""Call this after character appearance is created to find the feet"""
-	print("🦶 Reinitializing feet references...")
 	left_foot_node = player.get_node_or_null("LeftFoot")
 	right_foot_node = player.get_node_or_null("RightFoot")
 	
 	if left_foot_node and right_foot_node:
 		left_foot_origin = left_foot_node.position
 		right_foot_origin = right_foot_node.position
-		print("✅ Feet reinitialized! Left: ", left_foot_node.get_path(), " Right: ", right_foot_node.get_path())
-		print("🦶 Foot origins - Left: ", left_foot_origin, " Right: ", right_foot_origin)
 	else:
 		print("❌ Still can't find feet after reinitialization")
 		if not left_foot_node:
@@ -279,15 +242,12 @@ func _recheck_feet():
 	if left_foot_node and right_foot_node:
 		return  # Already found them
 		
-	print("🔍 Re-checking for feet...")
 	left_foot_node = player.get_node_or_null("LeftFoot")
 	right_foot_node = player.get_node_or_null("RightFoot")
 	
 	if left_foot_node and right_foot_node:
 		left_foot_origin = left_foot_node.position
 		right_foot_origin = right_foot_node.position
-		print("🦶 SUCCESS! Found feet after recheck - Left: ", left_foot_node.get_path(), " Right: ", right_foot_node.get_path())
-		print("🦶 Foot origins - Left: ", left_foot_origin, " Right: ", right_foot_origin)
 	else:
 		print("❌ Still no feet found in recheck")
 
@@ -878,11 +838,3 @@ func set_animation_settings(settings: Dictionary) -> void:
 		foot_step_strength = settings["foot_step_strength"]
 	if "side_step_modifier" in settings:
 		side_step_modifier = settings["side_step_modifier"]
-	print("✅ PlayerMovement animation settings applied: ", settings)
-
-func interact_with_nearest():
-	"""Handle interaction with nearby objects - delegates to player"""
-	if player and player.has_method("interact_with_nearest"):
-		player.interact_with_nearest()
-	else:
-		print("⚠️ No interaction method available")

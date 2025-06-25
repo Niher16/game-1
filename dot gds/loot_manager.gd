@@ -105,12 +105,8 @@ func _create_physics_coin(position: Vector3, parent: Node, amount: int):
 	# Set coin value safely
 	if coin_instance.has_method("set_coin_value"):
 		coin_instance.set_coin_value(amount)
-		print("[DEBUG] set_coin_value method used for coin:", amount)
 	else:
 		coin_instance.set_meta("coin_value", amount)
-		print("[DEBUG] set_meta fallback for coin_value:", amount)
-	
-	print("💰 Spawned coin pickup:", amount)
 	
 	# Apply physics launch
 	_launch_with_physics(coin_instance, position)
@@ -134,7 +130,6 @@ func _drop_weapon_with_physics(position: Vector3, parent: Node):
 	weapon_pickup_instance.set_weapon_resource(weapon_resource)
 	weapon_pickup_instance.set_meta("from_physics", true)
 	_launch_with_physics(weapon_pickup_instance, position)
-	print("🗡️ Dropped weapon with physics: ", weapon_resource.weapon_name)
 
 func drop_enemy_loot(position: Vector3, _enemy_node: Node = null):
 	var config = enemy_loot_config
@@ -188,8 +183,6 @@ func _drop_health_potion(position: Vector3, parent: Node):
 	# Set heal amount if method exists
 	if potion_instance.has_method("set_heal_amount"):
 		potion_instance.set_heal_amount(75)  # Default chest heal amount
-	
-	print("🧪 Dropped health potion at ", position)
 	
 	# Apply physics launch
 	_launch_with_physics(potion_instance, position)
@@ -306,7 +299,6 @@ func _convert_to_pickup_item(physics_body: RigidBody3D, data: Dictionary):
 		await get_tree().create_timer(pickup_delay).timeout
 		if is_instance_valid(pickup_item):
 			pickup_item.set_meta("pickup_disabled", false)
-			print("✅ ", item_type, " ready for pickup!")
 
 # Godot 4.1+ compatibility wrapper for safe property/method setting
 func safe_set_property(object: Node, method_name: String, value) -> bool:
@@ -343,7 +335,6 @@ func _create_physics_xp_orb(loot_data: Dictionary, position: Vector3, parent: No
 	else:
 		# Fallback: set as metadata
 		orb.set_meta("xp_value", xp_amount)
-	print("✅ Created XP orb with ", xp_amount, " XP")
 	# Apply physics launch
 	_launch_with_physics(orb, position)
 

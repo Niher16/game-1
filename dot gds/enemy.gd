@@ -90,7 +90,6 @@ var last_valid_position = Vector3.ZERO
 @export var enabled := true
 
 func _ready():
-	print("🟢 Slime: Starting initialization...")
 	_connect_to_scene_nodes()
 	_setup_physics()
 	_setup_slime_material()
@@ -105,16 +104,12 @@ func _connect_to_scene_nodes():
 		base_scale = original_mesh_scale
 		slime_scale = original_mesh_scale
 		mesh_instance.visible = true
-		print("✅ Slime: Connected to MeshInstance3D")
 	else:
-		print("❌ Slime: Could not find MeshInstance3D!")
 		base_scale = Vector3.ONE
 		slime_scale = Vector3.ONE
 	
 	if collision_shape and is_instance_valid(collision_shape):
-		print("✅ Slime: Connected to CollisionShape3D")
-	else:
-		print("❌ Slime: Could not find CollisionShape3D!")
+		pass
 
 func _setup_slime_material():
 	if not mesh_instance or not is_instance_valid(mesh_instance):
@@ -129,8 +124,8 @@ func _setup_slime_material():
 
 func _setup_physics():
 	add_to_group("enemies")
-	collision_layer = 2 # Enemy
-	collision_mask = 1 | 16 | 4 | 8 | 32 # Collide with floor, player, boss, ally, wall
+	collision_layer = 2
+	collision_mask = 1 | 2 | 8  # Enemies detect allies (layer 8)
 	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
 	max_health = health
 	velocity = Vector3.ZERO
@@ -140,7 +135,6 @@ func _delayed_init():
 	_find_player()
 	_correct_spawn_position()
 	_set_home()
-	print("✅ Slime initialization complete")
 
 func _find_player():
 	player = get_tree().get_first_node_in_group("player")
@@ -191,7 +185,6 @@ func _physics_process(delta):
 	if _is_player_valid() and not is_dead and not is_jumping and not is_being_knocked_back and not is_telegraphing:
 		var player_dist = global_position.distance_to(player.global_position)
 		if player_dist <= 1.2:
-			print("💥 Slime touching player - dealing damage: ", attack_damage)
 			if player.has_method("take_damage"):
 				player.take_damage(attack_damage, self)
 
@@ -235,8 +228,7 @@ func start_attack_telegraph(target: Node3D):
 	var audio_player = get_node_or_null("AttackWarningSound")
 	if audio_player:
 		audio_player.play()
-	
-	print("🔴 Slime telegraphing attack!")
+
 	# Face the target
 	_face_target(target)
 
@@ -248,7 +240,6 @@ func _execute_actual_attack():
 	# Now do the actual jump/damage
 	var target = _find_nearest_target()
 	_perform_jump_attack(target)
-	print("💥 Slime attacking NOW!")
 	
 	# Start recovery after attack
 	_start_attack_recovery()
@@ -257,8 +248,6 @@ func _perform_jump_attack(target: Node3D):
 	"""Bridge function - called by _execute_actual_attack"""
 	if not target or is_jumping:
 		return
-	
-	print("🟢 Slime executing jump attack on: ", target.name)
 	
 	is_jumping = true
 	jump_timer = 0.0
@@ -273,7 +262,6 @@ func _start_attack_recovery():
 	await get_tree().create_timer(0.5).timeout
 	current_state = AIState.IDLE
 	current_anim_state = AnimState.IDLE
-	print("🟢 Slime recovery complete!")
 
 func _handle_slime_animation(delta):
 	animation_timer += delta
@@ -371,7 +359,6 @@ func _handle_spawn_animation(delta):
 		current_state = AIState.IDLE
 		if mesh_instance:
 			mesh_instance.scale = base_scale
-		print("🟢 Slime spawn complete!")
 
 func _handle_knockback(delta):
 	if knockback_timer > 0:
@@ -686,7 +673,6 @@ func die():
 	if is_dead:
 		return
 	is_dead = true
-	print("💀 Slime died!")
 
 	# Simple death animation
 	if mesh_instance and is_instance_valid(mesh_instance):

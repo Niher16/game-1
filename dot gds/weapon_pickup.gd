@@ -40,10 +40,8 @@ var time_alive: float = 0.0
 var weapon_parts: Array[MeshInstance3D] = []
 
 func _ready():
-	print("🗡️ Weapon Pickup Ready - weapon_resource: ", weapon_resource)
 	if weapon_resource:
-		print("🗡️ Weapon name: ", weapon_resource.weapon_name)
-		print("🗡️ Weapon type: ", weapon_resource.weapon_type)
+		pass
 	else:
 		print("❌ No weapon_resource assigned!")
 	# Print scene node structure and mesh_instance existence
@@ -77,16 +75,12 @@ func validate_scene_materials():
 			mesh_node.material_override = default_mat
 
 func _deferred_setup_visual():
-	print("🗡️ _deferred_setup_visual called")
 	if weapon_resource:
-		print("🗡️ _deferred_setup_visual: weapon_resource present, calling _setup_enhanced_visual")
 		_setup_enhanced_visual()
 	else:
-		print("🗡️ _deferred_setup_visual: weapon_resource is null, calling _create_default_sword_visual")
 		_create_default_sword_visual()
 
 func _setup_enhanced_visual():
-	print("🗡️ _setup_enhanced_visual called")
 	"""Create enhanced weapon pickup visual"""
 	# FIRST: Clear the original mesh to get rid of the white ball
 	if mesh_instance:
@@ -94,7 +88,6 @@ func _setup_enhanced_visual():
 		mesh_instance.material_override = null
 
 	if not weapon_resource:
-		print("🗡️ _setup_enhanced_visual: weapon_resource is null, calling _create_default_sword_visual")
 		_create_default_sword_visual()
 		return
 
@@ -110,19 +103,15 @@ func _setup_enhanced_visual():
 	# Use integer values for matching
 	match int(weapon_resource.weapon_type):
 		int(WeaponResource.WeaponType.SWORD):
-			print("🗡️ _setup_enhanced_visual: Creating enhanced sword visual")
 			_create_enhanced_sword()
 		int(WeaponResource.WeaponType.BOW):
-			print("🗡️ _setup_enhanced_visual: Using simple bow visual")
 			_create_simple_bow_visual()
 		# int(WeaponResource.WeaponType.STAFF):
 		# 	print("🗡️ _setup_enhanced_visual: Creating enhanced staff visual")
 		# 	_create_enhanced_staff()
 		int(WeaponResource.WeaponType.STAFF):
-			print("🗡️ Staff pickup temporarily disabled!")
 			_create_default_sword_visual()
 		_:
-			print("🗡️ _setup_enhanced_visual: Unknown type, calling _create_default_sword_visual")
 			_create_default_sword_visual()
 
 	# Create collision shape
@@ -341,8 +330,6 @@ func _create_floating_runes(parent: MeshInstance3D):
 		weapon_parts.append(rune)
 
 func _create_default_sword_visual():
-	print("🗡️ _create_default_sword_visual called: Creating default sword visual")
-	"""Create a default sword visual if weapon_resource is null"""
 	_clear_weapon_parts()
 	_create_enhanced_sword()
 

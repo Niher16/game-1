@@ -1,5 +1,3 @@
-# xp_orb.gd - Beautiful glowing XP orb with subtle animations and proper physics support
-# REPLACE THE ENTIRE FILE WITH THIS CONTENT
 extends Area3D
 
 # XP orb settings
@@ -27,8 +25,6 @@ var orb_material: StandardMaterial3D
 var inner_core: MeshInstance3D
 
 func _ready():
-	print("💙 XP Orb: Creating simple glowing sphere...")
-	
 	add_to_group("xp_orb")
 	set_meta("xp_value", xp_value)
 	
@@ -156,7 +152,6 @@ func _check_vacuum_effect(delta):
 	# Start vacuum effect
 	if distance_to_player <= pickup_range and not is_vacuuming:
 		is_vacuuming = true
-		print("💙 XP Orb: Starting vacuum toward player!")
 	
 	# Move toward player
 	if is_vacuuming:
@@ -181,16 +176,11 @@ func _collect_orb():
 		return
 
 	is_being_collected = true
-	print("💙 XP Orb: Collected! Giving ", xp_value, " XP!")
 
 	# --- DEBUG: Connect XP to player progression ---
-	print("🔧 XP Orb: Looking for player...")
 	var player_ref = get_tree().get_first_node_in_group("player")
 	if player_ref and player_ref.progression_component:
-		print("🔧 XP Orb: Found player, calling add_xp(", xp_value, ")")
 		player_ref.progression_component.add_xp(xp_value)
-	else:
-		print("❌ XP Orb: Player or progression_component not found!")
 
 	_create_collection_effect()
 
@@ -221,8 +211,6 @@ func _create_collection_effect():
 
 func _create_pickup_delay_effect(delay_time: float):
 	"""Create visual effect during pickup delay"""
-	print("💙 XP Orb: Creating pickup delay effect for ", delay_time, " seconds")
-	
 	if orb_material:
 		# Very gentle pulse during delay
 		var tween = create_tween()

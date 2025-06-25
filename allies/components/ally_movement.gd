@@ -82,7 +82,6 @@ func _update_ally_body_animation(delta: float, velocity: Vector3):
 		target_body_sway = Vector3(horizontal_sway, vertical_bob, wiggle)
 		current_body_sway = lerp(current_body_sway, target_body_sway, interpolation_speed * delta)
 		body_node.position = body_origin + current_body_sway
-		#print("[AllyBodyAnim] vel:", velocity.length(), "sway:", current_body_sway)
 	else:
 		walk_cycle_time = 0.0
 		current_body_sway = lerp(current_body_sway, Vector3.ZERO, interpolation_speed * delta)
@@ -178,7 +177,6 @@ func _face_direction(direction: Vector3):
 	ally_ref.rotation.y = lerp_angle(ally_ref.rotation.y, target_rotation, 0.1)
 
 
-# ...existing code...
 func strafe_around_target(target: Node3D, delta: float):
 	if not target:
 		return
@@ -196,7 +194,7 @@ func strafe_around_target(target: Node3D, delta: float):
 	_face_direction(to_enemy)
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
-# ...existing code...
+
 func move_away_from_target(target_pos: Vector3, delta: float):
 	var direction = (ally_ref.global_position - target_pos)
 	direction.y = 0

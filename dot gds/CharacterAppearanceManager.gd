@@ -5,10 +5,8 @@ extends Node
 static func safe_set_material(mesh_instance: MeshInstance3D, material: Material) -> bool:
 	"""Safely set material with null check - Godot 4.1 best practice"""
 	if not mesh_instance:
-		push_warning("🚨 Mesh instance is null - cannot set material")
 		return false
 	if not material:
-		push_warning("🚨 Material is null - creating default material")
 		material = StandardMaterial3D.new()
 	mesh_instance.material_override = material
 	return true
@@ -59,7 +57,6 @@ static func _init_materials(skin_tone = null):
 
 static func create_player_appearance(character: CharacterBody3D, config := {}):
 	"""Create Rayman-style character with modular features based on config"""
-	print("🎨 Creating Rayman-style character...")
 
 	# --- Skin material fix: create unique material per character ---
 	var skin_material = SKIN_MATERIAL.duplicate() if SKIN_MATERIAL else StandardMaterial3D.new()
@@ -68,12 +65,6 @@ static func create_player_appearance(character: CharacterBody3D, config := {}):
 	else:
 		skin_material.albedo_color = SKIN_COLOR
 	# (Copy other material properties if needed)
-
-	# Debug print for skin_tone
-	if config.has("skin_tone"):
-		print("[DEBUG] Received skin_tone in config:", config["skin_tone"])
-	else:
-		print("[DEBUG] No skin_tone in config!")
 
 	_init_materials(config.get("skin_tone", null))
 	_clear_existing_appearance(character)
@@ -269,7 +260,6 @@ static func _clear_existing_eyes(character: CharacterBody3D):
 static func _create_eyes(_character: CharacterBody3D, cfg := {}, mesh_instance: MeshInstance3D = null, body_radius: float = BODY_RADIUS):
 	"""Create expressive floating eyes with pupils, using body_radius for Z offset"""
 	if not mesh_instance:
-		print("⚠️ No mesh_instance provided, eyes might not animate properly")
 		return
 
 	# Remove existing eyes before creating new ones

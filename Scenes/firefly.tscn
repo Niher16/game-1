@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://e3h2x2hy5wl5"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_wced7"]
+
+[node name="Firefly" type="StaticBody3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0.625077, 0)
+mesh = SubResource("SphereMesh_wced7")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.415263, 0.0730011)
+light_color = Color(0.976471, 1, 0.184314, 1)
+light_energy = 8.111
+light_indirect_energy = 14.414
+light_volumetric_fog_energy = 1.16
+light_size = 0.131
+light_specular = 5.187
+omni_range = 16.0
+omni_attenuation = 2.0

@@ -199,25 +199,15 @@ func _on_attack_cooldown_finished():
 func _play_attack_animation(combo_idx: int):
 	# Handles hand animation for attacks (punch, sword, etc.)
 	var current_weapon = WeaponManager.get_current_weapon() if WeaponManager.is_weapon_equipped() else null
-	# 🗡️ DEBUG CODE:
-	print("🗡️ DEBUG: Has weapon = ", current_weapon != null)
-	if current_weapon:
-		print("🗡️ DEBUG: Weapon name = ", current_weapon.weapon_name)
-		print("🗡️ DEBUG: weapon_attach_point exists = ", player.weapon_attach_point != null)
-		if player.weapon_attach_point:
-			print("🗡️ DEBUG: weapon_attach_point path = ", player.weapon_attach_point.get_path())
 	if not current_weapon:
 		# Unarmed: play punch animation on hand
-		print("🥊 No weapon - calling _play_punch_animation")
 		if right_hand:
 			_play_punch_animation(combo_idx)
 	else:
 		# Armed: play weapon animation using player reference (NOT weapon_attach_point!)
 		if player.weapon_attach_point and is_instance_valid(player.weapon_attach_point):
-			print("✅ Using player's weapon_attach_point reference: ", player.weapon_attach_point.get_path())
 			WeaponAnimationManager.play_attack_animation(current_weapon, player)
 		else:
-			print("❌ Player weapon_attach_point is null or invalid!")
 			WeaponAnimationManager.play_attack_animation(current_weapon, player)
 	# Combo feedback (debug only, replace with real effects as needed)
 	# --- Combo particle effects ---
@@ -256,13 +246,6 @@ func _play_impact_sound():
 		impact_sound.play()
 
 func _play_punch_animation(combo_idx := 0):
-	print("🥊 COORDINATE DEBUG:")
-	print("  - Player facing direction: ", player.get_facing_direction() if player.has_method("get_facing_direction") else "unknown")
-	print("  - Player transform.basis.z: ", player.transform.basis.z)
-	print("  - Right hand path: ", right_hand.get_path())
-	print("  - Right hand global position: ", right_hand.global_position)
-	print("  - Player global position: ", player.global_position)
-	print("🥊 _play_punch_animation called - right_hand: ", right_hand != null, " original_pos: ", right_hand_original_pos, " is_animating: ", is_punch_animating)
 	if not right_hand or is_punch_animating:
 		return
 	is_punch_animating = true
@@ -525,7 +508,6 @@ func _check_arrow_collisions(arrow: MeshInstance3D, old_pos: Vector3, new_pos: V
 		
 		var distance = new_pos.distance_to(enemy.global_position)
 		if distance <= 1.0:
-			print("\ud83c\udff9 Arrow hit enemy: ", enemy.name)
 			_stick_arrow_to_enemy(arrow, enemy)
 			return
 	
@@ -536,7 +518,6 @@ func _check_arrow_collisions(arrow: MeshInstance3D, old_pos: Vector3, new_pos: V
 	var result = space_state.intersect_ray(query)
 	
 	if result and result.collider:
-		print("\ud83c\udff9 Arrow hit wall: ", result.collider.name)
 		_stick_arrow_to_wall(arrow, result.position, result.collider)
 
 func _stick_arrow_to_enemy(arrow: MeshInstance3D, enemy: Node3D):
@@ -568,8 +549,6 @@ func _stick_arrow_to_enemy(arrow: MeshInstance3D, enemy: Node3D):
 	var update_timer = arrow.get_node_or_null("Timer")
 	if update_timer:
 		update_timer.queue_free()
-	
-	print("\ud83c\udff9 Arrow stuck to enemy and will move with it")
 
 func _stick_arrow_to_wall(arrow: MeshInstance3D, hit_position: Vector3, wall: Node):
 	# Position arrow at hit point (keep current orientation!)
@@ -583,12 +562,9 @@ func _stick_arrow_to_wall(arrow: MeshInstance3D, hit_position: Vector3, wall: No
 	var update_timer = arrow.get_node_or_null("Timer")
 	if update_timer:
 		update_timer.queue_free()
-	
-	print("\ud83c\udff9 Arrow stuck in wall: ", wall.name)
 
 func _on_arrow_despawn(arrow: MeshInstance3D):
 	if is_instance_valid(arrow):
-		print("\ud83c\udff9 Arrow despawning after timeout")
 		arrow.queue_free()
 
 func _ready():

@@ -74,8 +74,8 @@ func _setup_components() -> void:
 	# Make hands visible by default
 	_ensure_hands_visible()
 	# 🔧 FIXED: Configure collision layers properly
-	collision_layer = 8  # Allies are on layer 8
-	collision_mask = 1 | 2 | 4 | 8 | 16 | 32  # Collide with floor, enemy, boss, ally, player, wall
+	collision_layer = 1 << 3  # Layer 4 (Ally)
+	collision_mask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4) | (1 << 3)  # Collide with World, Walls, Player, Boss, Ally
 
 func _create_character_appearance():
 	# Generate random character appearance with varied skin tones
@@ -89,9 +89,6 @@ func _setup_foot_references() -> void:
 	# Wait multiple frames to ensure nodes are fully created
 	await get_tree().process_frame
 	await get_tree().process_frame
-
-	print("🦶 Debugging foot search for ally...")
-	print("🔍 Ally children: ", get_children().map(func(child): return child.name))
 
 	# Look for feet by name (they might have numbers appended like LeftFoot2, RightFoot2)
 	left_foot = get_node_or_null("LeftFoot")
@@ -113,8 +110,6 @@ func _setup_foot_references() -> void:
 	if left_foot and right_foot:
 		left_foot_original_pos = left_foot.position
 		right_foot_original_pos = right_foot.position
-		print("✅ Found ally feet! LeftFoot: ", left_foot.name, " at ", left_foot.position)
-		print("✅ Found ally feet! RightFoot: ", right_foot.name, " at ", right_foot.position)
 	else:
 		print("❌ Could not find both feet")
 		if left_foot:
@@ -127,7 +122,6 @@ func _setup_foot_references() -> void:
 	for child in get_children():
 		if child is MeshInstance3D:
 			mesh_children.append(child)
-	print("🔍 MeshInstance3D children:", mesh_children.map(func(c): return c.name))
 	# Try to find by 'Body', 'Torso', 'Chest'
 	# Use 'body_name' to avoid shadowing base class property
 	for body_name in ["Body", "Torso", "Chest"]:
@@ -135,7 +129,6 @@ func _setup_foot_references() -> void:
 			if body_name in child.name:
 				body_node = child
 				body_original_pos = body_node.position
-				print("✅ Found body node by name '", body_name, "': ", body_node.name, " at ", body_original_pos)
 				break
 		if body_node:
 			break
@@ -144,11 +137,9 @@ func _setup_foot_references() -> void:
 		if mesh_instance:
 			body_node = mesh_instance
 			body_original_pos = body_node.position
-			print("⚠️ Fallback: using mesh_instance as body_node: ", body_node.name, " at ", body_original_pos)
 		elif mesh_children.size() > 0:
 			body_node = mesh_children[0]
 			body_original_pos = body_node.position
-			print("⚠️ Fallback: using first MeshInstance3D as body_node: ", body_node.name, " at ", body_original_pos)
 	if not body_node:
 		print("❌ Could not find body node")
 
@@ -235,7 +226,6 @@ func _physics_process(delta):
 			left_foot = get_node_or_null("LeftFoot")
 			if left_foot and left_foot is MeshInstance3D:
 				left_foot_original_pos = left_foot.position
-				print("🦶 Found LeftFoot late!")
 		if not right_foot:
 			right_foot = get_node_or_null("RightFoot")
 			if right_foot and right_foot is MeshInstance3D:
@@ -284,13 +274,11 @@ func _ensure_hands_visible():
 	
 	if left_hand:
 		left_hand.visible = true
-		print("👋 Made LeftHand visible for ally")
 	else:
 		print("⚠️ LeftHand not found for ally")
 	
 	if right_hand:
 		right_hand.visible = true
-		print("👋 Made RightHand visible for ally")
 	else:
 		print("⚠️ RightHand not found for ally")
 

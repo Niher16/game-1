@@ -79,7 +79,6 @@ var torch_to_wall_map = {}
 
 func _ready():
 	add_to_group("terrain")
-	print("🗡️ Enhanced Room Generator: Starting with WEAPON ROOMS!")
 	
 	# Check if WeaponPool is available
 	if has_node("/root/WeaponPool"):
@@ -511,8 +510,8 @@ func _generate_all_walls_with_boundary_protection():
 
 func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = false) -> StaticBody3D:
 	var wall = StaticBody3D.new()
-	wall.collision_layer = 32 # Wall
-	wall.collision_mask = 1 | 2 | 4 | 8 | 16 | 64 # Collide with floor, enemy, boss, ally, player, projectiles
+	wall.collision_layer = 1 << 1  # Layer 2 (Walls)
+	wall.collision_mask = (1 << 2) | (1 << 3) | (1 << 4)  # Collide with Player, Ally, Boss
 	
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = BoxMesh.new()

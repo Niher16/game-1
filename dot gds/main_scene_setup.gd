@@ -1,4 +1,4 @@
-# main_scene_setup.gd - FIXED: Prevents double spawning issue
+# main_scene_setup.gd
 extends Node3D
 
 # Remove time of day system and use fixed lighting
@@ -6,16 +6,11 @@ var main_light: DirectionalLight3D
 var world_environment: WorldEnvironment
 
 func _ready():
-	print("🎮 Main Scene: Starting (torch-only lighting)...")
-	
 	# Add LevelUpUI to scene
 	var levelup_ui_scene = load("res://Scenes/LevelUpUI.gd.tscn")
 	if levelup_ui_scene:
 		var levelup_ui = levelup_ui_scene.instantiate()
 		get_tree().current_scene.add_child(levelup_ui)
-		print("✅ LevelUpUI instantiated and added to scene")
-	else:
-		print("❌ Could not load LevelUpUI scene!")
 	
 	# Instantiate enemy spawner from scene early
 	var spawner_scene = load("res://Scenes/spawner.tscn")
@@ -24,15 +19,11 @@ func _ready():
 		spawner.name = "EnemySpawner"
 		add_child(spawner)
 		spawner.add_to_group("spawner")
-		print("✅ Enemy spawner instantiated from Scenes/spawner.tscn")
-	else:
-		print("❌ Could not load Scenes/spawner.tscn!")
 
 	# Remove any existing WorldEnvironment nodes first
 	var existing_env = get_tree().get_first_node_in_group("world_environment") 
 	if existing_env:
 		existing_env.queue_free()
-		print("🗑️ Removed conflicting WorldEnvironment")
 
 	# --- DARK ATMOSPHERIC LIGHTING (SINGLE SOURCE) ---
 	var world_env = WorldEnvironment.new()
@@ -51,8 +42,6 @@ func _ready():
 	add_child(world_env)
 
 	# NO directional light - torches only!
-	print("🌙 Dark atmosphere with torch-only lighting active")
-
 	# Create systems step by step
 	call_deferred("_create_simple_systems")
 
@@ -64,7 +53,6 @@ func _create_simple_systems():
 	# Step 2: Create simple room generator
 	var room_generator = _create_simple_room_generator()
 	if not room_generator:
-		print("❌ Failed to create room generator!")
 		return
 	
 	# Step 3: Wait for spawner to initialize (no longer created here)
@@ -74,9 +62,6 @@ func _create_simple_systems():
 	var spawner = get_node_or_null("EnemySpawner")
 	if spawner:
 		_setup_spawner_for_rooms(spawner, room_generator)
-		print("✅ Enemy spawner ready!")
-	else:
-		print("❌ Enemy spawner not found in scene!")
 	
 	await get_tree().create_timer(5.0).timeout
 	_check_system_status()
@@ -91,39 +76,28 @@ func _create_simple_room_generator() -> Node3D:
 	if room_script:
 		room_gen.script = room_script
 		add_child(room_gen)
-		print("✅ Simple room generator created from separate file")
 		return room_gen
 	else:
-		print("❌ Could not load dot gds/simple_room_generator.gd!")
 		return null
 
 func _setup_spawner_for_rooms(spawner: Node3D, room_generator: Node3D):
 	"""Connect spawner to room system"""
 	await get_tree().create_timer(1.0).timeout
 	
-	print("🔗 Connecting wave system to room generator...")
-	
 	# ✅ FIXED: Check if signal is already connected before connecting
 	if spawner.has_signal("wave_completed") and room_generator.has_method("_on_wave_completed"):
 		if not spawner.wave_completed.is_connected(room_generator._on_wave_completed):
 			spawner.wave_completed.connect(room_generator._on_wave_completed)
-			print("✅ Connected wave_completed signal!")
-		else:
-			print("ℹ️ wave_completed signal already connected, skipping...")
 	
 	# Give spawner the starting room
 	if room_generator.has_method("get_rooms"):
 		var rooms = room_generator.get_rooms()
 		if rooms.size() > 0:
 			spawner.set_newest_spawning_room(rooms[0])
-			print("🏠 Set starting room for spawner")
-	
-	print("✅ Wave system integration complete!")
 	
 	# Start the wave system
 	if spawner.has_method("start_wave_system"):
 		spawner.start_wave_system()
-		print("🚀 Started wave progression system!")
 
 func _check_system_status():
 	var room_gen = get_node_or_null("SimpleRoomGenerator")
