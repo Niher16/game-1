@@ -1,7 +1,6 @@
 # simple_room_generator.gd - ENHANCED: Added weapon rooms between waves - COMPLETE VERSION
 extends Node3D
 
-signal terrain_generated
 signal new_room_generated(room_rect: Rect2)
 signal weapon_room_generated(room_rect: Rect2)  # NEW: Signal for weapon rooms
 
