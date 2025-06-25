@@ -212,6 +212,7 @@ func _setup_weapon_room(room: Rect2):
 	
 	# Add decorative elements
 	_add_weapon_room_decorations(room)
+	_spawn_fireflies_in_room(room)
 	
 	print("✅ Weapon room setup complete!")
 
@@ -360,6 +361,7 @@ func _create_normal_room_after_wave(wave_number: int):
 		_spawn_treasure_chest_random_in_room(new_room)
 		_spawn_destructible_objects_in_room(new_room)
 		_spawn_torches_in_room(new_room)
+		_spawn_fireflies_in_room(new_room)
 		print("✅ Normal room generated and set as spawning area!")
 	else:
 		print("❌ Room generation failed - no valid position found")
@@ -405,6 +407,7 @@ func generate_starting_room():
 	_spawn_treasure_chest_random_in_room(starting_room)
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
+	_spawn_fireflies_in_room(starting_room)
 
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
@@ -436,6 +439,7 @@ func create_connected_room():
 	new_room_generated.emit(new_room)
 
 	_spawn_destructible_objects_in_room(new_room)
+	_spawn_fireflies_in_room(new_room)
 
 	# --- RANDOM RECRUITER NPC SPAWN ---
 	var spawn_chance = min(recruiter_base_chance + (current_room_count * recruiter_chance_increase), recruiter_max_chance)
@@ -976,3 +980,25 @@ func get_boundary_info() -> Dictionary:
 		"map_size": map_size,
 		"safe_zone_size": map_size - Vector2((boundary_thickness + safe_zone_margin) * 2, (boundary_thickness + safe_zone_margin) * 2)
 	}
+
+func _spawn_fireflies_in_room(room: Rect2):
+	# Spawns a random number of fireflies in the given room
+	if not ResourceLoader.exists("res://Scenes/firefly.tscn"):
+		return
+	var firefly_scene = load("res://Scenes/firefly.tscn")
+	var firefly_count = randi_range(2, 5) # You can adjust min/max as desired
+	for i in range(firefly_count):
+		var firefly_instance = firefly_scene.instantiate()
+		add_child(firefly_instance)
+		# Random position in room, slightly above ground
+		var random_pos = Vector2(
+			room.position.x + randf() * room.size.x,
+			room.position.y + randf() * room.size.y
+		)
+		var world_pos = Vector3(
+			(random_pos.x - map_size.x / 2) * 2.0,
+			1.2 + randf() * 1.5, # Height above ground
+			(random_pos.y - map_size.y / 2) * 2.0
+		)
+		firefly_instance.global_position = world_pos
+		generated_objects.append(firefly_instance)

@@ -1,11 +1,15 @@
-[gd_scene load_steps=2 format=3 uid="uid://e3h2x2hy5wl5"]
+[gd_scene load_steps=3 format=3 uid="uid://e3h2x2hy5wl5"]
+
+[ext_resource type="Script" uid="uid://u2yx64x5iwpa" path="res://dot gds/firefly.gd" id="1_nw82r"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_wced7"]
 
 [node name="Firefly" type="StaticBody3D"]
+script = ExtResource("1_nw82r")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0.625077, 0)
+visible = false
 mesh = SubResource("SphereMesh_wced7")
 
 [node name="OmniLight3D" type="OmniLight3D" parent="."]
