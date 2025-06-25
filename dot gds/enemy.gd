@@ -129,8 +129,8 @@ func _setup_slime_material():
 
 func _setup_physics():
 	add_to_group("enemies")
-	collision_layer = 2
-	collision_mask = 1 | 2 | 8  # Enemies detect allies (layer 8)
+	collision_layer = 2 # Enemy
+	collision_mask = 1 | 16 | 4 | 8 | 32 # Collide with floor, player, boss, ally, wall
 	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
 	max_health = health
 	velocity = Vector3.ZERO

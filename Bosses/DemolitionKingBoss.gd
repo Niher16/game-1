@@ -86,7 +86,7 @@ func _setup_boss() -> void:
 	add_to_group("bosses")
 	add_to_group("enemies")
 	collision_layer = 4  # Boss layer
-	collision_mask = 1   # Collide with world
+	collision_mask = 1 | 2 | 8 | 16 | 32   # Collide with floor, enemy, ally, player, wall
 	
 	print("✅ Boss collision setup: layer=", collision_layer, " mask=", collision_mask)
 

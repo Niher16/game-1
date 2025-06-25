@@ -511,8 +511,8 @@ func _generate_all_walls_with_boundary_protection():
 
 func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = false) -> StaticBody3D:
 	var wall = StaticBody3D.new()
-	wall.collision_layer = 1
-	wall.collision_mask = 0
+	wall.collision_layer = 32 # Wall
+	wall.collision_mask = 1 | 2 | 4 | 8 | 16 | 64 # Collide with floor, enemy, boss, ally, player, projectiles
 	
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = BoxMesh.new()

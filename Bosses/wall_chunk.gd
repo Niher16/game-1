@@ -7,6 +7,9 @@ extends RigidBody3D
 func _ready():
 	# Enable collision detection
 	body_entered.connect(_on_body_entered)
+	# Set collision layer/mask for wall chunk
+	collision_layer = 64 # Projectiles
+	collision_mask = 16 | 2 | 4 | 8 | 32 # Collide with player, enemy, boss, ally, wall
 	
 	# Auto-cleanup after lifetime expires
 	await get_tree().create_timer(lifetime).timeout

@@ -75,7 +75,7 @@ func _setup_components() -> void:
 	_ensure_hands_visible()
 	# 🔧 FIXED: Configure collision layers properly
 	collision_layer = 8  # Allies are on layer 8
-	collision_mask = 1 | 2 | 8  # Collide with terrain(1), enemies(2), and other allies(8)
+	collision_mask = 1 | 2 | 4 | 8 | 16 | 32  # Collide with floor, enemy, boss, ally, player, wall
 
 func _create_character_appearance():
 	# Generate random character appearance with varied skin tones

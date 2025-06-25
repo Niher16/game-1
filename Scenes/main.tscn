@@ -16,8 +16,8 @@ size = Vector3(20000, 0.5, 20000)
 script = ExtResource("1_mkato")
 
 [node name="Ground" type="StaticBody3D" parent="."]
-collision_layer = 2
-collision_mask = 31
+collision_layer = 1
+collision_mask = 2 | 4 | 8 | 16 | 32 | 64
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
 mesh = SubResource("BoxMesh_0xm2m")
@@ -53,7 +53,6 @@ script = ExtResource("3_dnx86")
 
 [node name="Player" parent="." instance=ExtResource("4_00g5k")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.01096, 0)
-collision_mask = 3
 
 [node name="Camera3D" type="Camera3D" parent="."]
 script = ExtResource("6_cbln3")

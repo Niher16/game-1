@@ -194,8 +194,8 @@ func _setup_player():
 	_create_arrow_system()
 
 func _configure_collision():
-	collision_layer = 1
-	collision_mask = 1
+	collision_layer = 16 # Player
+	collision_mask = 1 | 2 | 4 | 8 | 32 # Collide with floor, enemy, boss, ally, wall
 
 func _create_visual():
 	var existing_mesh = get_node_or_null("MeshInstance3D")
