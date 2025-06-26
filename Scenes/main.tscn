@@ -1,9 +1,10 @@
-[gd_scene load_steps=8 format=3 uid="uid://dioilysjxebvh"]
+[gd_scene load_steps=9 format=3 uid="uid://dioilysjxebvh"]
 
 [ext_resource type="Script" uid="uid://b5i856ttopent" path="res://dot gds/main_scene_setup.gd" id="1_mkato"]
 [ext_resource type="Script" uid="uid://34pvx714vsnb" path="res://dot gds/UI.gd" id="2_b0obt"]
 [ext_resource type="Script" uid="uid://cyproohbywftk" path="res://dot gds/loading_screen.gd" id="3_dnx86"]
 [ext_resource type="PackedScene" uid="uid://davx6xri0n0vt" path="res://Scenes/player.tscn" id="4_00g5k"]
+[ext_resource type="Script" uid="uid://cb7skpumhkcp1" path="res://dot gds/Light.gd" id="6_21xkr"]
 [ext_resource type="Script" uid="uid://dmhde8iqvqhla" path="res://dot gds/camera_3d.gd" id="6_cbln3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
@@ -16,7 +17,7 @@ size = Vector3(20000, 0.5, 20000)
 script = ExtResource("1_mkato")
 
 [node name="Ground" type="StaticBody3D" parent="."]
-collision_layer = 2
+collision_layer = 15
 collision_mask = 31
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
@@ -61,3 +62,5 @@ follow_speed = 32.0
 zoom_speed = 0.5
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+script = ExtResource("6_21xkr")
+player_light_range = 10.0

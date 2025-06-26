@@ -210,6 +210,31 @@ func _setup_weapon_room(room: Rect2):
 	
 	print("✅ Weapon room setup complete!")
 
+func _create_floor_with_collision(room_center_world: Vector3, size: Vector2, material: Material) -> StaticBody3D:
+	# Create a static body for the floor with collision
+	var floor_body = StaticBody3D.new()
+	floor_body.collision_layer = 1 # Layer 1 (Floor)
+	floor_body.collision_mask = 0xFFFFFFFF # Collide with everything by default
+
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.mesh = PlaneMesh.new()
+	mesh_instance.mesh.size = size
+	mesh_instance.material_override = material
+	mesh_instance.position = Vector3.ZERO
+	floor_body.add_child(mesh_instance)
+
+	var collision_shape = CollisionShape3D.new()
+	var plane_shape = BoxShape3D.new()
+	plane_shape.size = Vector3(size.x, 0.1, size.y) # Thin box for floor collision
+	collision_shape.shape = plane_shape
+	collision_shape.position = Vector3(0, -0.05, 0) # Slightly below mesh
+	floor_body.add_child(collision_shape)
+
+	floor_body.position = room_center_world
+	add_child(floor_body)
+	generated_objects.append(floor_body)
+	return floor_body
+
 func _apply_weapon_room_floor(room: Rect2):
 	"""Apply special golden floor material to weapon room"""
 	var room_center_world = Vector3(
@@ -217,15 +242,7 @@ func _apply_weapon_room_floor(room: Rect2):
 		0.0,
 		(room.get_center().y - map_size.y / 2) * 2.0
 	)
-	
-	# Create special floor plane
-	var floor_plane = MeshInstance3D.new()
-	floor_plane.mesh = PlaneMesh.new()
-	floor_plane.mesh.size = Vector2(room.size.x * 2.0, room.size.y * 2.0)
-	floor_plane.material_override = weapon_room_floor_material
-	floor_plane.position = room_center_world
-	add_child(floor_plane)
-	generated_objects.append(floor_plane)
+	_create_floor_with_collision(room_center_world, Vector2(room.size.x * 2.0, room.size.y * 2.0), weapon_room_floor_material)
 
 func _add_weapon_room_lighting(room: Rect2):
 	"""Add special lighting to weapon room"""

@@ -13,6 +13,10 @@ extends Area3D
 @export var bob_height: float = 0.1
 @export var bob_speed: float = 2.0
 
+# Collision settings
+@export var xp_collision_layer: int = 4
+@export var xp_collision_mask: int = 3 # 1 (walls) | 2 (floor)
+
 # Internal variables
 var player: Node3D
 var is_being_collected: bool = false
@@ -28,8 +32,8 @@ func _ready():
 	add_to_group("xp_orb")
 	set_meta("xp_value", xp_value)
 	
-	collision_layer = 4
-	collision_mask = 1
+	collision_layer = xp_collision_layer
+	collision_mask = xp_collision_mask
 	
 	_create_glowing_sphere()
 	call_deferred("_find_player")

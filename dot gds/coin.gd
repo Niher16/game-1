@@ -24,6 +24,10 @@ static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -
 @export var bob_speed: float = 2.5
 @export var spin_speed: float = 180.0
 
+# Collision settings
+@export var coin_collision_layer: int = 4
+@export var coin_collision_mask: int = 3 # 1 (walls) | 2 (floor)
+
 # Internal variables
 var player: Node3D
 var is_being_collected: bool = false
@@ -40,8 +44,8 @@ func _ready():
 	add_to_group("currency")
 	set_meta("coin_value", coin_value)
 	
-	collision_layer = 4
-	collision_mask = 1
+	collision_layer = coin_collision_layer
+	collision_mask = coin_collision_mask
 	
 	_create_golden_coin()
 	call_deferred("_find_player")
