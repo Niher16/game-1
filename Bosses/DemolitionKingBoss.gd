@@ -889,9 +889,9 @@ func _make_slime_red(slime: Node) -> void:
 	if not slime or not is_instance_valid(slime):
 		return
 	
-	var mesh_instance = slime.get_node_or_null("MeshInstance3D")
-	if mesh_instance and mesh_instance.material_override:
-		var material = mesh_instance.material_override
+	var slime_mesh_instance = slime.get_node_or_null("MeshInstance3D")
+	if slime_mesh_instance and slime_mesh_instance.material_override:
+		var material = slime_mesh_instance.material_override
 		if material is StandardMaterial3D:
 			material.albedo_color = Color(0.8, 0.1, 0.1, 0.95)  # Bright red
 
