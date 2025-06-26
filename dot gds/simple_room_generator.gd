@@ -409,8 +409,31 @@ func generate_starting_room():
 			# Also spawn torches in the corridor(s) between starting and first wave room
 			for corridor_rect in corridors:
 				_spawn_torches_in_room(corridor_rect)
+
+			# --- SPAWN JAIL DOOR AT HALLWAY ENTRANCE ---
+			if ResourceLoader.exists("res://Scenes/JailDoor.tscn"):
+				var jail_door_scene = load("res://Scenes/JailDoor.tscn")
+				var jail_door = jail_door_scene.instantiate()
+				# Place the door at the entrance of the corridor between starting_room and first_wave_room
+				var entrance_pos = Vector2((starting_room.position.x + first_wave_room.position.x) / 2, (starting_room.position.y + first_wave_room.position.y) / 2)
+				var world_pos = Vector3((entrance_pos.x - map_size.x / 2) * 2.0, 1.25, (entrance_pos.y - map_size.y / 2) * 2.0)
+				jail_door.global_position = world_pos
+
+				# Calculate direction vector between rooms
+				var dir = (first_wave_room.position - starting_room.position).normalized()
+				# If the corridor is more horizontal, rotate 90 degrees (Y axis)
+				if abs(dir.x) > abs(dir.y):
+					jail_door.rotation.y = deg_to_rad(90)
+				else:
+					jail_door.rotation.y = 0
+
+				# Scale the door to match corridor width (default cube mesh is 2 units wide)
+				jail_door.scale.x = corridor_width / 2.0
+
+				add_child(jail_door)
+				print("\ud83d\udeaa Jail door spawned at:", jail_door.global_position, " rotation:", jail_door.rotation, " scale:", jail_door.scale)
 		else:
-			print("❌ Could not create first wave room!")
+			print("❌ JailDoor.tscn not found!")
 
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 

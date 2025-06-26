@@ -1,0 +1,23 @@
+[gd_scene load_steps=5 format=3 uid="uid://cwlso1g70cwp4"]
+
+[ext_resource type="Script" uid="uid://8gflgfaebifw" path="res://dot gds/jail_door.gd" id="1"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_3rffr"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_opota"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h84cs"]
+
+[node name="JailDoor" type="StaticBody3D"]
+script = ExtResource("1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_3rffr")
+
+[node name="Area3D" type="Area3D" parent="MeshInstance3D"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/Area3D"]
+shape = SubResource("BoxShape3D_opota")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_h84cs")
