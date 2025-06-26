@@ -397,6 +397,21 @@ func generate_starting_room():
 	# Spawn starting room content
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
+
+	# --- CREATE FIRST WAVE ROOM FARTHER AWAY ---
+	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
+		var first_wave_room = create_connected_room()
+		if first_wave_room != null:
+			enemy_spawner.set_newest_spawning_room(first_wave_room)
+			print("✅ First wave room created and set for enemy spawner:", first_wave_room)
+			# Spawn torches in the first wave room
+			_spawn_torches_in_room(first_wave_room)
+			# Also spawn torches in the corridor(s) between starting and first wave room
+			for corridor_rect in corridors:
+				_spawn_torches_in_room(corridor_rect)
+		else:
+			print("❌ Could not create first wave room!")
+
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
 func create_connected_room():

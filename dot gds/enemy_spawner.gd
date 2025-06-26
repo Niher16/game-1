@@ -19,7 +19,7 @@ signal boss_fight_completed
 # === ENEMY SETTINGS ===
 @export var enemy_scene: PackedScene
 @export var boss_scene: PackedScene  # NEW: Boss scene
-@export var spawn_distance_min: float = 4.0
+@export var spawn_distance_min: float = 25.0
 @export var spawn_distance_max: float = 8.0
 @export var spawn_attempts: int = 20
 
