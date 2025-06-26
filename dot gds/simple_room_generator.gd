@@ -844,8 +844,8 @@ func _find_safe_recruiter_position(room: Rect2) -> Vector3:
 func spawn_torch_at_position(pos: Vector3):
 	var torch_scene = preload("res://Scenes/EnhancedTorch.tscn")
 	var torch = torch_scene.instantiate()
-	torch.global_position = pos
 	add_child(torch)
+	torch.global_position = pos
 	# print("\ud83d\udd25 Torch spawned at: ", pos)  # Commented to reduce log spam
 
 func _spawn_torches_in_room(room: Rect2):
@@ -934,3 +934,30 @@ func get_boundary_info() -> Dictionary:
 		"map_size": map_size,
 		"safe_zone_size": map_size - Vector2((boundary_thickness + safe_zone_margin) * 2, (boundary_thickness + safe_zone_margin) * 2)
 	}
+
+# === BOSS SUPPORT METHODS ===
+# Remove wall from tracking system when boss breaks it
+func _remove_wall_from_lookup(grid_x: int, grid_y: int) -> void:
+	var grid_key = str(grid_x) + "," + str(grid_y)
+	if wall_lookup.has(grid_key):
+		wall_lookup.erase(grid_key)
+		# Also update the terrain grid if within bounds
+		if grid_x >= 0 and grid_x < map_size.x and grid_y >= 0 and grid_y < map_size.y:
+			terrain_grid[grid_x][grid_y] = TileType.FLOOR
+		print("🌍 TERRAIN: Removed wall at grid position (", grid_x, ", ", grid_y, ")")
+
+# Check if a wall position is a boundary wall (unbreakable)
+func _is_boundary_wall(grid_x: int, grid_y: int) -> bool:
+	var grid_key = str(grid_x) + "," + str(grid_y)
+	return boundary_walls.has(grid_key)
+
+# Get wall node at specific grid position
+func get_wall_at_position(grid_x: int, grid_y: int) -> StaticBody3D:
+	var grid_key = str(grid_x) + "," + str(grid_y)
+	return wall_lookup.get(grid_key, null)
+
+# Check if grid position is valid (not a wall)
+func _is_valid_pos(grid_x: int, grid_y: int) -> bool:
+	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+		return false
+	return terrain_grid[grid_x][grid_y] != TileType.WALL
