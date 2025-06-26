@@ -1,4 +1,4 @@
-# enhanced_demolition_king_boss.gd - Enhanced version with more attacks and movement
+# enhanced_demolition_king_boss.gd - Fixed version with proper attack behavior
 extends CharacterBody3D
 
 # === SIGNALS ===
@@ -54,6 +54,7 @@ var throw_timer: float = 0.0
 var movement_target: Vector3
 var circle_angle: float = 0.0
 var last_player_position: Vector3
+var min_idle_time: float = 1.5  # Minimum time to stay in IDLE before considering movement
 
 # === SCENE REFERENCES ===
 var player: CharacterBody3D
@@ -184,40 +185,60 @@ func _handle_boss_state(delta: float) -> void:
 		BossState.DYING:
 			_handle_dying()
 
+# === FIXED IDLE STATE LOGIC ===
 func _handle_enhanced_idle_state() -> void:
-	"""Enhanced idle with attack selection"""
+	"""Enhanced idle with attack selection - FIXED VERSION"""
 	if not player:
 		return
 	
 	var distance_to_player = global_position.distance_to(player.global_position)
 	
+	# Stop moving when in idle
+	velocity.x = 0
+	velocity.z = 0
+	
+	if debug_enabled and state_timer < 0.1:  # Only print once when entering state
+		print("🤖 BOSS: ENTERING IDLE STATE - Distance: ", distance_to_player, " Cooldown: ", attack_cooldown, " Timer: ", state_timer)
+	
+	# Must stay in idle for minimum time to prevent rapid state switching
+	if state_timer < min_idle_time:
+		if debug_enabled and int(state_timer * 2) % 2 == 0:  # Print every 0.5 seconds
+			print("🤖 BOSS: Waiting in IDLE... Timer: ", state_timer, "/", min_idle_time)
+		return
+	
 	# Don't attack while falling or unstable
 	if not is_on_floor() or velocity.y < -2.0:
 		if debug_enabled:
 			print("🤖 BOSS: Not stable - on_floor: ", is_on_floor(), " velocity.y: ", velocity.y)
+		_transition_to_movement()
 		return
 	
-	# Break walls if stuck
+	# Break walls if too close and stuck
 	if distance_to_player < 8.0 and velocity.length() < 0.1:
 		_force_break_nearby_walls()
 	
-	# Choose attack based on distance and cooldown
-	if attack_cooldown <= 0 and state_timer >= 1.0:  # Reduced from 2.0 to 1.0
+	# PRIORITY: Attack if conditions are met
+	if attack_cooldown <= 0:
 		if debug_enabled:
-			print("🤖 BOSS: Choosing attack! Distance: ", distance_to_player)
+			print("🤖 BOSS: ATTACK CONDITIONS MET! Distance: ", distance_to_player, " Executing attack...")
 		_choose_attack(distance_to_player)
-	else:
-		# Move strategically while waiting for cooldown
-		if debug_enabled and attack_cooldown > 0:
-			print("🤖 BOSS: Attack on cooldown: ", attack_cooldown)
+		return
+	
+	# If attack is on cooldown but we've been idle long enough, move strategically
+	if attack_cooldown > 0 and state_timer >= min_idle_time + 1.0:
+		if debug_enabled:
+			print("🤖 BOSS: Attack on cooldown (", attack_cooldown, "), transitioning to movement")
 		_transition_to_movement()
 
 func _choose_attack(distance: float) -> void:
-	"""Intelligently choose which attack to use"""
+	"""Intelligently choose which attack to use - FIXED VERSION"""
+	if debug_enabled:
+		print("🤖 BOSS: CHOOSING ATTACK for distance: ", distance)
+	
 	var attack_choice: int
 	
-	if debug_enabled:
-		print("🤖 BOSS: Choosing attack for distance: ", distance)
+	# Set a base attack cooldown to prevent spam
+	attack_cooldown = 3.0
 	
 	if distance > 15.0:
 		# Far away - leap or charge
@@ -227,13 +248,13 @@ func _choose_attack(distance: float) -> void:
 		else:
 			_start_charge_attack()
 	elif distance > 8.0:
-		# Medium range - all attacks available!
+		# Medium range - all attacks available
 		attack_choice = randi() % 4
 		match attack_choice:
 			0: _start_charge_attack()
 			1: _start_leap_attack()
 			2: _start_slam_attack()
-			3: _start_wall_throw_attack()  # Re-enabled!
+			3: _start_wall_throw_attack()
 	else:
 		# Close range - slam or charge
 		attack_choice = randi() % 2
@@ -248,13 +269,19 @@ func _transition_to_movement() -> void:
 	current_state = BossState.MOVING
 	state_timer = 0.0
 	_set_movement_target()
+	
+	if debug_enabled:
+		print("🤖 BOSS: TRANSITIONING TO MOVEMENT")
 
 func _handle_strategic_movement() -> void:
-	"""More intelligent movement patterns"""
+	"""More intelligent movement patterns - FIXED VERSION"""
 	if not player:
 		return
 	
 	var distance_to_player = global_position.distance_to(player.global_position)
+	
+	if debug_enabled and int(state_timer * 2) % 4 == 0:  # Print every 2 seconds
+		print("🤖 BOSS: MOVING - Timer: ", state_timer, " Distance to player: ", distance_to_player)
 	
 	# Update movement target if player moved significantly
 	if last_player_position.distance_to(player.global_position) > 3.0:
@@ -264,8 +291,13 @@ func _handle_strategic_movement() -> void:
 	# Move toward target
 	_move_toward_target()
 	
-	# Return to idle after moving for a bit
-	if state_timer >= 3.0 or global_position.distance_to(movement_target) < 2.0:
+	# Return to idle with clearer conditions
+	var target_reached = global_position.distance_to(movement_target) < 2.0
+	var been_moving_long_enough = state_timer >= 2.0  # Reduced from 3.0
+	
+	if target_reached or been_moving_long_enough:
+		if debug_enabled:
+			print("🤖 BOSS: MOVEMENT COMPLETE - Returning to IDLE. Target reached: ", target_reached, " Time: ", state_timer)
 		current_state = BossState.IDLE
 		state_timer = 0.0
 
@@ -277,21 +309,30 @@ func _set_movement_target() -> void:
 	var player_pos = player.global_position
 	var current_distance = global_position.distance_to(player_pos)
 	
+	if debug_enabled:
+		print("🤖 BOSS: Setting movement target. Current distance: ", current_distance)
+	
 	# Choose movement strategy based on current distance
 	if current_distance < 5.0:
 		# Too close - back away while circling
 		var away_direction = (global_position - player_pos).normalized()
 		movement_target = player_pos + away_direction * 8.0
+		if debug_enabled:
+			print("🤖 BOSS: Too close - backing away")
 	elif current_distance > 15.0:
 		# Too far - get closer
 		var toward_direction = (player_pos - global_position).normalized()
 		movement_target = global_position + toward_direction * 6.0
+		if debug_enabled:
+			print("🤖 BOSS: Too far - moving closer")
 	else:
 		# Good distance - circle around player
 		circle_angle += PI / 4  # 45 degrees
 		var circle_radius = 10.0
 		var circle_offset = Vector3(cos(circle_angle), 0, sin(circle_angle)) * circle_radius
 		movement_target = player_pos + circle_offset
+		if debug_enabled:
+			print("🤖 BOSS: Good distance - circling")
 	
 	# Make sure target is on ground level
 	movement_target.y = global_position.y
@@ -306,48 +347,102 @@ func _move_toward_target() -> void:
 	if velocity.length() > 0.1:
 		_break_walls_in_movement_direction()
 
-# === NEW ATTACK: LEAP ATTACK ===
+# === ATTACK IMPLEMENTATIONS ===
+func _start_charge_attack() -> void:
+	"""Begin charge attack"""
+	if not player:
+		return
+	
+	current_state = BossState.CHARGING
+	state_timer = 0.0
+	is_charging = true
+	charge_timer = 0.0
+	
+	# Set charge direction toward player
+	charge_direction = (player.global_position - global_position).normalized()
+	velocity = Vector3.ZERO
+	
+	_show_attack_tell("charge")
+	boss_attack_started.emit("charge")
+	
+	if debug_enabled:
+		print("⚡ BOSS: Starting CHARGE ATTACK!")
+
+func _handle_charging(delta: float) -> void:
+	"""Handle charge attack"""
+	charge_timer += delta
+	
+	# Wind-up phase
+	if charge_timer < 1.0:
+		velocity = Vector3.ZERO  # Brief pause before charging
+		return
+	
+	# Charge phase
+	velocity.x = charge_direction.x * charge_speed
+	velocity.z = charge_direction.z * charge_speed
+	
+	# Break walls during charge
+	_break_walls_in_movement_direction()
+	
+	# End charge after 3 seconds total
+	if charge_timer >= 3.0:
+		_end_charge()
+
+func _end_charge() -> void:
+	"""End charge attack"""
+	is_charging = false
+	velocity = Vector3.ZERO
+	_clear_attack_tell()
+	
+	# Brief stun after charge
+	current_state = BossState.STUNNED
+	state_timer = 0.0
+	
+	if debug_enabled:
+		print("⚡ BOSS: Charge attack complete!")
+
 func _start_leap_attack() -> void:
-	"""Begin leap attack with wind-up"""
+	"""Begin leap attack"""
+	if not player:
+		return
+	
 	current_state = BossState.LEAP_WIND_UP
 	state_timer = 0.0
-	attack_cooldown = 4.0
+	is_leaping = false
 	
-	# Set leap target behind player
-	if player:
-		var player_forward = -player.get_global_transform().basis.z
-		leap_target = player.global_position + player_forward * 5.0
-		leap_target.y = global_position.y
+	# Set leap target near player
+	leap_target = player.global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))
+	velocity = Vector3.ZERO
 	
 	_show_attack_tell("leap")
 	boss_attack_started.emit("leap")
 	
 	if debug_enabled:
-		print("🦘 BOSS: Starting leap attack wind-up")
+		print("🦘 BOSS: Starting LEAP ATTACK!")
 
 func _handle_leap_wind_up() -> void:
 	"""Wind-up for leap attack"""
-	velocity = Vector3.ZERO  # Stop moving during wind-up
+	velocity = Vector3.ZERO
 	
 	if state_timer >= 1.5:  # 1.5 second wind-up
 		_execute_leap()
 
 func _execute_leap() -> void:
-	"""Execute the leap"""
+	"""Execute leap attack"""
 	current_state = BossState.LEAPING
 	state_timer = 0.0
 	is_leaping = true
 	
-	# Calculate leap velocity
-	var leap_direction = (leap_target - global_position).normalized()
-	velocity.x = leap_direction.x * jump_speed
-	velocity.z = leap_direction.z * jump_speed
-	velocity.y = jump_speed * 0.8  # Upward component
+	# Calculate jump velocity toward target
+	var direction = (leap_target - global_position).normalized()
+	velocity.x = direction.x * speed * 2
+	velocity.z = direction.z * speed * 2
+	velocity.y = jump_speed
 	
 	_clear_attack_tell()
 	
 	if debug_enabled:
-		print("🦘 BOSS: Executing leap!")
+		print("🦘 BOSS: LEAPING!")
 
 func _handle_leaping() -> void:
 	"""Handle boss while in air"""
@@ -374,12 +469,10 @@ func _land_from_leap() -> void:
 	if debug_enabled:
 		print("🦘 BOSS: Landed from leap!")
 
-# === NEW ATTACK: SLAM ATTACK ===
 func _start_slam_attack() -> void:
 	"""Begin slam attack"""
 	current_state = BossState.SLAM_WIND_UP
 	state_timer = 0.0
-	attack_cooldown = 5.0
 	
 	slam_position = global_position
 	velocity = Vector3.ZERO
@@ -388,7 +481,7 @@ func _start_slam_attack() -> void:
 	boss_attack_started.emit("slam")
 	
 	if debug_enabled:
-		print("💥 BOSS: Starting slam attack wind-up")
+		print("💥 BOSS: Starting SLAM ATTACK!")
 
 func _handle_slam_wind_up() -> void:
 	"""Wind-up for slam attack"""
@@ -422,9 +515,10 @@ func _slam_impact() -> void:
 	velocity = Vector3.ZERO
 	
 	# Break walls in larger radius
+	var old_radius = wall_break_radius
 	wall_break_radius *= 1.5
 	_force_break_nearby_walls()
-	wall_break_radius /= 1.5  # Reset radius
+	wall_break_radius = old_radius  # Reset radius
 	
 	# Damage player if close
 	if player and global_position.distance_to(player.global_position) < 6.0:
@@ -440,304 +534,149 @@ func _slam_impact() -> void:
 	if debug_enabled:
 		print("💥 BOSS: SLAM IMPACT!")
 
-# === NEW ATTACK: WALL THROW ===
 func _start_wall_throw_attack() -> void:
 	"""Begin wall throwing attack"""
+	if not wall_chunk_scene:
+		if debug_enabled:
+			print("🪨 BOSS: No wall chunk scene - skipping throw attack")
+		_start_charge_attack()  # Fallback to charge
+		return
+	
 	current_state = BossState.THROW_WIND_UP
 	state_timer = 0.0
-	attack_cooldown = 3.0
-	
-	chunks_to_throw = 3 + randi() % 3  # 3-5 chunks
+	chunks_to_throw = 3
 	throw_timer = 0.0
+	
 	velocity = Vector3.ZERO
 	
 	_show_attack_tell("throw")
 	boss_attack_started.emit("throw")
 	
 	if debug_enabled:
-		print("🪨 BOSS: Starting wall throw wind-up, chunks: ", chunks_to_throw)
+		print("🪨 BOSS: Starting WALL THROW ATTACK!")
 
 func _handle_throw_wind_up() -> void:
-	"""Wind-up for throw attack"""
+	"""Wind-up for throwing attack"""
 	velocity = Vector3.ZERO
 	
 	if state_timer >= 1.0:  # 1 second wind-up
-		current_state = BossState.THROWING
-		state_timer = 0.0
-		_clear_attack_tell()
+		_execute_throw()
+
+func _execute_throw() -> void:
+	"""Execute throwing attack"""
+	current_state = BossState.THROWING
+	state_timer = 0.0
+	throw_timer = 0.0
+	
+	_clear_attack_tell()
 
 func _handle_throwing(delta: float) -> void:
 	"""Handle throwing wall chunks"""
 	throw_timer += delta
 	
-	# Throw chunks every 0.4 seconds
-	if throw_timer >= 0.4 and chunks_to_throw > 0:
+	# Throw chunks every 0.5 seconds
+	if throw_timer >= 0.5 and chunks_to_throw > 0:
 		_throw_wall_chunk()
 		chunks_to_throw -= 1
 		throw_timer = 0.0
 	
-	# Finish throwing
-	if chunks_to_throw <= 0:
+	# End attack when all chunks thrown
+	if chunks_to_throw <= 0 and state_timer >= 2.0:
 		current_state = BossState.STUNNED
 		state_timer = 0.0
+		
+		if debug_enabled:
+			print("🪨 BOSS: Wall throw attack complete!")
 
 func _throw_wall_chunk() -> void:
-	"""Throw a wall chunk at the player"""
-	if not wall_chunk_scene:
-		if debug_enabled:
-			print("🪨 BOSS: No wall chunk scene loaded, skipping throw")
-		return
-	
-	if not player:
+	"""Throw a single wall chunk at player"""
+	if not wall_chunk_scene or not player:
 		return
 	
 	var chunk = wall_chunk_scene.instantiate()
 	get_tree().current_scene.add_child(chunk)
 	
-	# Position chunk above boss
-	chunk.global_position = global_position + Vector3(0, 2, 0)
+	# Position chunk near boss
+	chunk.global_position = global_position + Vector3(0, 1, 0)
 	
 	# Calculate throw direction with some prediction
-	var player_velocity = Vector3.ZERO
-	if player.has_method("get_velocity"):
-		player_velocity = player.get_velocity()
-	
-	var predicted_position = player.global_position + player_velocity * 0.5
-	var throw_direction = (predicted_position - chunk.global_position).normalized()
+	var target_pos = player.global_position + player.velocity * 0.5  # Lead target
+	var throw_direction = (target_pos - chunk.global_position).normalized()
 	var throw_force = throw_direction * chunk_throw_force
 	
-	# Add some upward arc
-	throw_force.y += chunk_throw_force * 0.3
+	# Add some arc to the throw
+	throw_force.y += 5.0
 	
-	chunk.throw(throw_force)
+	if chunk.has_method("throw"):
+		chunk.throw(throw_force)
 	
 	if debug_enabled:
 		print("🪨 BOSS: Threw wall chunk!")
 
-# === VISUAL TELLS ===
-func _show_attack_tell(attack_type: String) -> void:
-	"""Show visual wind-up for attacks"""
-	if not boss_material or is_showing_tell:
-		return
-	
-	is_showing_tell = true
-	
-	# Create tween for visual effects
-	if wind_up_tween:
-		wind_up_tween.kill()
-	wind_up_tween = create_tween()
-	wind_up_tween.set_loops()
-	
-	# Color and scale effects based on attack type
-	match attack_type:
-		"leap":
-			# Blue pulsing for leap
-			wind_up_tween.tween_method(_set_boss_color, original_color, Color.CYAN, 0.3)
-			wind_up_tween.tween_method(_set_boss_color, Color.CYAN, original_color, 0.3)
-		"slam":
-			# Red pulsing for slam
-			wind_up_tween.tween_method(_set_boss_color, original_color, Color.RED, 0.4)
-			wind_up_tween.tween_method(_set_boss_color, Color.RED, original_color, 0.4)
-		"throw":
-			# Yellow pulsing for throw
-			wind_up_tween.tween_method(_set_boss_color, original_color, Color.YELLOW, 0.2)
-			wind_up_tween.tween_method(_set_boss_color, Color.YELLOW, original_color, 0.2)
-		"charge":
-			# Orange pulsing for charge
-			wind_up_tween.tween_method(_set_boss_color, original_color, Color.ORANGE, 0.25)
-			wind_up_tween.tween_method(_set_boss_color, Color.ORANGE, original_color, 0.25)
-
-func _set_boss_color(color: Color) -> void:
-	"""Set boss material color"""
-	if boss_material:
-		boss_material.albedo_color = color
-
-func _clear_attack_tell() -> void:
-	"""Clear visual wind-up effects"""
-	is_showing_tell = false
-	
-	if wind_up_tween:
-		wind_up_tween.kill()
-	
-	if boss_material:
-		boss_material.albedo_color = original_color
-
 func _handle_stunned() -> void:
-	"""Handle brief stun period after attacks"""
+	"""Handle stun state after attacks"""
 	velocity = Vector3.ZERO
 	
 	if state_timer >= 1.0:  # 1 second stun
 		current_state = BossState.IDLE
 		state_timer = 0.0
-
-func _screen_shake(intensity: float) -> void:
-	"""Create screen shake effect"""
-	# This would connect to your camera shake system
-	# For now, just print debug
-	if debug_enabled:
-		print("📳 SCREEN SHAKE: ", intensity)
-
-# === ENHANCED CHARGE ATTACK ===
-func _start_charge_attack() -> void:
-	"""Enhanced charge attack with wind-up"""
-	current_state = BossState.CHARGING
-	attack_cooldown = 4.0
-	
-	if player:
-		charge_direction = (player.global_position - global_position).normalized()
-	
-	is_charging = false  # Start with wind-up
-	charge_timer = 0.0
-	state_timer = 0.0
-	velocity = Vector3.ZERO
-	
-	_show_attack_tell("charge")
-	boss_attack_started.emit("charge")
-	
-	if debug_enabled:
-		print("⚡ BOSS: Starting enhanced charge attack")
-
-func _handle_charging(delta: float) -> void:
-	"""Enhanced charge with wind-up phase"""
-	charge_timer += delta
-	
-	# Wind-up phase (1 second)
-	if charge_timer < 1.0:
-		velocity = Vector3.ZERO
-		return
-	
-	# Start actual charge
-	if not is_charging:
-		is_charging = true
-		_clear_attack_tell()
+		
 		if debug_enabled:
-			print("⚡ BOSS: CHARGE EXECUTION!")
-	
-	# Execute charge
-	velocity.x = charge_direction.x * charge_speed
-	velocity.z = charge_direction.z * charge_speed
-	
-	# Break walls while charging
-	if int(charge_timer * 5) % 2 == 0:
-		_force_break_nearby_walls()
-	
-	# End charge
-	var distance_to_player = 999.0
-	if player:
-		distance_to_player = global_position.distance_to(player.global_position)
-	
-	if charge_timer >= 4.0 or distance_to_player < 2.0:
-		_end_charge()
+			print("🤖 BOSS: Recovering from stun - returning to IDLE")
 
-func _end_charge() -> void:
-	"""End charge attack"""
-	is_charging = false
-	velocity = Vector3.ZERO
-	current_state = BossState.STUNNED
-	state_timer = 0.0
-	charge_timer = 0.0
-	
-	_clear_attack_tell()
-	
-	if debug_enabled:
-		print("⚡ BOSS: Charge attack ended")
-
-# === KEEP ALL ORIGINAL WALL BREAKING CODE ===
+# === SPAWNING AND POSITIONING ===
 func _find_safe_spawn() -> void:
-	"""Find safe spawn position and clear area"""
+	"""Find safe spawn position"""
 	spawn_position = global_position
 	safe_ground_level = global_position.y
 	last_safe_position = global_position
 	
-	# Clear walls around spawn
-	_force_break_nearby_walls()
+	current_state = BossState.POSITIONING
 	
 	if debug_enabled:
-		print("🤖 BOSS: Safe spawn found at: ", spawn_position)
+		print("🤖 BOSS: Safe spawn found at: ", global_position)
 
 func _handle_spawning() -> void:
-	"""Handle safe spawning state"""
+	"""Handle spawning state"""
 	velocity = Vector3.ZERO
+	state_timer += get_physics_process_delta_time()
 	
-	# Break walls every second during spawn
-	if int(state_timer * 2) % 2 == 0:
-		_force_break_nearby_walls()
-	
-	if is_on_floor() and state_timer >= 2.0:
-		if debug_enabled:
-			print("🤖 BOSS: Spawning complete, moving to positioning")
-		current_state = BossState.POSITIONING
-		state_timer = 0.0
-	elif state_timer >= 5.0:
-		if debug_enabled:
-			print("🤖 BOSS: Forcing spawn completion")
+	if state_timer >= 2.0:
 		current_state = BossState.POSITIONING
 		state_timer = 0.0
 
 func _handle_positioning() -> void:
-	"""Position boss and clear area"""
-	if int(state_timer * 4) % 2 == 0:
-		_force_break_nearby_walls()
-	
-	if state_timer >= 3.0:
-		current_state = BossState.IDLE
-		state_timer = 0.0
-		
-		if debug_enabled:
-			print("🤖 BOSS: Positioning complete")
+	"""Handle positioning state"""
+	if not is_on_floor():
+		velocity.y -= gravity * get_physics_process_delta_time()
+	else:
+		velocity = Vector3.ZERO
+		if state_timer >= 1.0:
+			current_state = BossState.IDLE
+			state_timer = 0.0
+			if debug_enabled:
+				print("🤖 BOSS: Positioning complete")
 
+# === PHYSICS AND UTILITIES ===
 func _apply_safe_physics(delta: float) -> void:
-	"""Apply gravity safely"""
+	"""Apply gravity and physics safely"""
 	if not is_on_floor():
 		velocity.y -= gravity * delta
-	else:
-		if velocity.y < 0:
-			velocity.y = 0
-
-func _check_wall_collisions() -> void:
-	"""Check for wall collisions during movement"""
-	if velocity.length() < 0.1:
-		return
-		
-	for index in range(get_slide_collision_count()):
-		var collision = get_slide_collision(index)
-		var collider = collision.get_collider()
-		
-		if collider and _is_wall(collider):
-			_break_wall(collider)
-
-func _force_break_nearby_walls() -> void:
-	"""Break walls in radius around boss"""
-	var space_state = get_world_3d().direct_space_state
-	var shape = SphereShape3D.new()
-	shape.radius = wall_break_radius
-	
-	var query = PhysicsShapeQueryParameters3D.new()
-	query.shape = shape
-	query.transform.origin = global_position
-	query.collision_mask = 1 << 1  # Wall layer only
-	
-	var results = space_state.intersect_shape(query)
-	
-	for result in results:
-		var obj = result.collider
-		if _is_wall(obj):
-			_break_wall(obj)
-			walls_broken_this_frame += 1
 
 func _break_walls_in_movement_direction() -> void:
-	"""Break walls in movement direction"""
-	var movement_direction = Vector3(velocity.x, 0, velocity.z).normalized()
-	var check_position = global_position + movement_direction * 2.0
+	"""Break walls in front of boss movement"""
+	if velocity.length() < 0.1:
+		return
+	
+	var direction = velocity.normalized()
+	var break_position = global_position + direction * 2.0
 	
 	var space_state = get_world_3d().direct_space_state
-	var shape = SphereShape3D.new()
-	shape.radius = 1.5
-	
 	var query = PhysicsShapeQueryParameters3D.new()
-	query.shape = shape
-	query.transform.origin = check_position
-	query.collision_mask = 1 << 1
+	query.collision_mask = collision_mask
+	query.shape = SphereShape3D.new()
+	query.shape.radius = wall_break_radius
+	query.transform.origin = break_position
 	
 	var results = space_state.intersect_shape(query)
 	
@@ -745,6 +684,31 @@ func _break_walls_in_movement_direction() -> void:
 		var obj = result.collider
 		if _is_wall(obj):
 			_break_wall(obj)
+
+func _force_break_nearby_walls() -> void:
+	"""Force break all walls around boss"""
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsShapeQueryParameters3D.new()
+	query.collision_mask = collision_mask
+	query.shape = SphereShape3D.new()
+	query.shape.radius = wall_break_radius
+	query.transform.origin = global_position
+	
+	var results = space_state.intersect_shape(query)
+	
+	for result in results:
+		var obj = result.collider
+		if _is_wall(obj):
+			_break_wall(obj)
+
+func _check_wall_collisions() -> void:
+	"""Check for wall collisions after movement"""
+	for i in get_slide_collision_count():
+		var collision = get_slide_collision(i)
+		var collider = collision.get_collider()
+		
+		if _is_wall(collider):
+			_break_wall(collider)
 
 func _is_wall(obj: Node) -> bool:
 	"""Wall detection logic"""
@@ -802,6 +766,23 @@ func _handle_dying() -> void:
 	velocity = Vector3.ZERO
 	boss_died.emit()
 
+# === VISUAL EFFECTS (PLACEHOLDER IMPLEMENTATIONS) ===
+func _show_attack_tell(attack_type: String) -> void:
+	"""Show visual tell for incoming attack"""
+	is_showing_tell = true
+	if debug_enabled:
+		print("📢 BOSS: Showing attack tell for: ", attack_type)
+
+func _clear_attack_tell() -> void:
+	"""Clear attack tell"""
+	is_showing_tell = false
+
+func _screen_shake(intensity: float) -> void:
+	"""Create screen shake effect"""
+	if debug_enabled:
+		print("📳 BOSS: Screen shake with intensity: ", intensity)
+
+# === DAMAGE AND HEALTH ===
 func take_damage(amount: int, _source: Node = null) -> void:
 	"""Take damage"""
 	health -= amount
@@ -812,6 +793,7 @@ func take_damage(amount: int, _source: Node = null) -> void:
 	if health <= 0:
 		current_state = BossState.DYING
 
+# === DEBUG ===
 func _debug_status() -> void:
 	"""Debug output"""
 	if not debug_enabled:
