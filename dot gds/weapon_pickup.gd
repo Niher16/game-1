@@ -141,63 +141,64 @@ func _create_enhanced_sword():
 	sword_mesh_instance.mesh = SWORD_MESH
 
 	# Default material (bluish, shiny)
-	var sword_material = StandardMaterial3D.new()
-	# Check weapon name for special visuals
-	var sword_name = ""
-	if weapon_resource and "weapon_name" in weapon_resource:
-		sword_name = weapon_resource.weapon_name
-	if sword_name.to_lower().find("enchanted") != -1:
-		# Enchanted sword: magical color, strong emission, floating runes
-		sword_material.albedo_color = Color(0.5, 0.7, 1.0)
-		sword_material.metallic = 0.8
-		sword_material.roughness = 0.1
-		sword_material.emission_enabled = true
-		sword_material.emission = Color(0.3, 0.7, 1.0) * glow_intensity
-		sword_material.rim_enabled = true
-		sword_material.rim = 0.8
-		# Validate material before assignment
-		if sword_material and sword_mesh_instance:
-			safe_set_material(sword_mesh_instance, sword_material)
-		else:
-			print("❌ Sword material or mesh is null, creating fallback")
-			var fallback = StandardMaterial3D.new()
-			fallback.albedo_color = Color.SILVER
-			safe_set_material(sword_mesh_instance, fallback)
-		# Add magical floating runes
-		_create_floating_runes(sword_mesh_instance)
-	elif sword_name.to_lower().find("steel") != -1 or sword_name.to_lower().find("iron") != -1:
-		# Steel/Iron sword: gold/silver, extra shiny
-		sword_material.albedo_color = Color(0.9, 0.9, 0.7) # pale gold
-		sword_material.metallic = 1.0
-		sword_material.roughness = 0.03
-		sword_material.emission_enabled = true
-		sword_material.emission = Color(1.0, 0.95, 0.7) * 0.2
-		sword_material.rim_enabled = true
-		sword_material.rim = 0.9
-		if sword_material and sword_mesh_instance:
-			safe_set_material(sword_mesh_instance, sword_material)
-		else:
-			print("❌ Sword material or mesh is null, creating fallback")
-			var fallback = StandardMaterial3D.new()
-			fallback.albedo_color = Color.SILVER
-			safe_set_material(sword_mesh_instance, fallback)
-	else:
-		# Default sword (bluish, shiny)
-		sword_material.albedo_color = Color(0.85, 0.9, 1.0)
-		sword_material.metallic = 1.0
-		sword_material.roughness = 0.07
-		sword_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-		sword_material.emission_enabled = true
-		sword_material.emission = Color(0.7, 0.85, 1.0) * glow_intensity * 0.25
-		sword_material.rim_enabled = true
-		sword_material.rim = 0.7
-		if sword_material and sword_mesh_instance:
-			safe_set_material(sword_mesh_instance, sword_material)
-		else:
-			print("❌ Sword material or mesh is null, creating fallback")
-			var fallback = StandardMaterial3D.new()
-			fallback.albedo_color = Color.SILVER
-			safe_set_material(sword_mesh_instance, fallback)
+	# Removed unused sword_material and sword_name variables after enchanted sword removal
+	# var sword_material = StandardMaterial3D.new()
+	# var sword_name = ""
+	# if weapon_resource and "weapon_name" in weapon_resource:
+	# 	sword_name = weapon_resource.weapon_name
+	# Removed enchanted sword special visuals
+	# if sword_name.to_lower().find("enchanted") != -1:
+	# 	# Enchanted sword: magical color, strong emission, floating runes
+	# 	sword_material.albedo_color = Color(0.5, 0.7, 1.0)
+	# 	sword_material.metallic = 0.8
+	# 	sword_material.roughness = 0.1
+	# 	sword_material.emission_enabled = true
+	# 	sword_material.emission = Color(0.3, 0.7, 1.0) * glow_intensity
+	# 	sword_material.rim_enabled = true
+	# 	sword_material.rim = 0.8
+	# 	# Validate material before assignment
+	# 	if sword_material and sword_mesh_instance:
+	# 		safe_set_material(sword_mesh_instance, sword_material)
+	# 	else:
+	# 		print("❌ Sword material or mesh is null, creating fallback")
+	# 		var fallback = StandardMaterial3D.new()
+	# 		fallback.albedo_color = Color.SILVER
+	# 		safe_set_material(sword_mesh_instance, fallback)
+	# 	# Add magical floating runes
+	# 	_create_floating_runes(sword_mesh_instance)
+	# elif sword_name.to_lower().find("steel") != -1 or sword_name.to_lower().find("iron") != -1:
+	# 	# Steel/Iron sword: gold/silver, extra shiny
+	# 	sword_material.albedo_color = Color(0.9, 0.9, 0.7) # pale gold
+	# 	sword_material.metallic = 1.0
+	# 	sword_material.roughness = 0.03
+	# 	sword_material.emission_enabled = true
+	# 	sword_material.emission = Color(1.0, 0.95, 0.7) * 0.2
+	# 	sword_material.rim_enabled = true
+	# 	sword_material.rim = 0.9
+	# 	if sword_material and sword_mesh_instance:
+	# 		safe_set_material(sword_mesh_instance, sword_material)
+	# 	else:
+	# 		print("❌ Sword material or mesh is null, creating fallback")
+	# 		var fallback = StandardMaterial3D.new()
+	# 		fallback.albedo_color = Color.SILVER
+	# 		safe_set_material(sword_mesh_instance, fallback)
+	# else:
+	# 	# Default sword (bluish, shiny)
+	# 	sword_material.albedo_color = Color(0.85, 0.9, 1.0)
+	# 	sword_material.metallic = 1.0
+	# 	sword_material.roughness = 0.07
+	# 	sword_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	# 	sword_material.emission_enabled = true
+	# 	sword_material.emission = Color(0.7, 0.85, 1.0) * glow_intensity * 0.25
+	# 	sword_material.rim_enabled = true
+	# 	sword_material.rim = 0.7
+	# 	if sword_material and sword_mesh_instance:
+	# 		safe_set_material(sword_mesh_instance, sword_material)
+	# 	else:
+	# 		print("❌ Sword material or mesh is null, creating fallback")
+	# 		var fallback = StandardMaterial3D.new()
+	# 		fallback.albedo_color = Color.SILVER
+	# 		safe_set_material(sword_mesh_instance, fallback)
 
 	# Position and scale for pickup (tweak as needed for your mesh)
 	sword_mesh_instance.position = Vector3(0, 0.5, 0)

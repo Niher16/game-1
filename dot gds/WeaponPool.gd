@@ -28,14 +28,11 @@ func _load_all_weapons():
 	"""Load all weapon resources from the Weapons folder"""
 	# Common weapons (starting tier)
 	_add_weapon_to_pool("res://Weapons/iron_sword.tres", "common")
-	_add_weapon_to_pool("res://Weapons/wooden_bow.tres", "common")
 	
 	# Uncommon weapons (mid-tier)
-	_add_weapon_to_pool("res://Weapons/steel_sword.tres", "uncommon")
 	_add_weapon_to_pool("res://Weapons/mage_staff.tres", "uncommon")
 	
 	# Rare weapons (high-tier)
-	_add_weapon_to_pool("res://Weapons/enchanted_blade.tres", "rare")
 	
 	# Add legendary weapons as you create them:
 	# _add_weapon_to_pool("res://Weapons/excalibur.tres", "legendary")

@@ -14,8 +14,11 @@ signal boss_attack_started(attack_type: String)
 
 # === ATTACK PROPERTIES ===
 @export var wall_chunk_scene: PackedScene
+@export var red_slime_scene: PackedScene  # Scene for spawning red slimes
 @export var slam_damage: int = 30
+@export var touch_damage: int = 15  # Damage when boss touches player
 @export var chunk_throw_force: float = 15.0
+@export var boss_knockback_force: float = 20.0  # Knockback when boss touches player
 
 # === ENHANCED BOSS STATES ===
 enum BossState { 
@@ -64,9 +67,10 @@ var original_scale: Vector3
 
 # === VISUAL EFFECTS ===
 var boss_material: StandardMaterial3D
-var original_color: Color
+var original_color: Color = Color(0.8, 0.2, 0.2, 1.0)  # Red boss color
 var wind_up_tween: Tween
 var is_showing_tell: bool = false
+var flash_tween: Tween
 
 # === PHYSICS & SAFETY ===
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
@@ -95,6 +99,24 @@ func _ready() -> void:
 		if debug_enabled:
 			print("🪨 BOSS: Wall chunk scene not found at res://Bosses/wall_chunk.tscn")
 	
+	# Load red slime scene (try multiple possible paths)
+	var slime_paths = [
+		"res://Scenes/enemy.tscn",
+		"res://scenes/enemy.tscn", 
+		"res://Enemy/enemy.tscn",
+		"res://Enemies/slime.tscn"
+	]
+	
+	for path in slime_paths:
+		if ResourceLoader.exists(path):
+			red_slime_scene = load(path)
+			if debug_enabled:
+				print("🟥 BOSS: Red slime scene loaded from: ", path)
+			break
+	
+	if not red_slime_scene and debug_enabled:
+		print("🟥 BOSS: Could not find slime scene in any expected location")
+	
 	if debug_enabled:
 		print("🤖 ENHANCED BOSS: Spawning Enhanced Demolition King")
 		print("🤖 ENHANCED BOSS: Health: ", health, "/", max_health)
@@ -116,6 +138,7 @@ func _physics_process(delta: float) -> void:
 	
 	move_and_slide()
 	_check_wall_collisions()
+	_check_player_collision()  # NEW: Check for touch damage
 	_safety_checks()
 	
 	# Debug output
@@ -148,7 +171,10 @@ func _setup_boss_material() -> void:
 		mesh_instance.set_surface_override_material(0, material)
 	
 	boss_material = material
-	original_color = boss_material.albedo_color
+	# Set boss to red color by default
+	boss_material.albedo_color = original_color
+	boss_material.metallic = 0.1
+	boss_material.roughness = 0.7
 
 func _setup_physics_layers() -> void:
 	"""Setup collision layers properly"""
@@ -766,32 +792,129 @@ func _handle_dying() -> void:
 	velocity = Vector3.ZERO
 	boss_died.emit()
 
-# === VISUAL EFFECTS (PLACEHOLDER IMPLEMENTATIONS) ===
+# === VISUAL EFFECTS (ENHANCED IMPLEMENTATIONS) ===
 func _show_attack_tell(attack_type: String) -> void:
-	"""Show visual tell for incoming attack"""
+	"""Show visual tell for incoming attack with color flash"""
 	is_showing_tell = true
+	
+	if not boss_material:
+		if debug_enabled:
+			print("📢 BOSS: Showing attack tell for: ", attack_type, " (no material)")
+		return
+	
+	# Stop any existing flash
+	if flash_tween:
+		flash_tween.kill()
+	
+	# Flash yellow/orange before attack
+	flash_tween = create_tween()
+	flash_tween.set_loops()  # Infinite loop until cleared
+	
+	var warning_color = Color(1.0, 0.7, 0.2, 1.0)  # Bright orange/yellow
+	flash_tween.tween_property(boss_material, "albedo_color", warning_color, 0.3)
+	flash_tween.tween_property(boss_material, "albedo_color", original_color, 0.3)
+	
 	if debug_enabled:
-		print("📢 BOSS: Showing attack tell for: ", attack_type)
+		print("📢 BOSS: Flashing yellow/orange for attack: ", attack_type)
 
 func _clear_attack_tell() -> void:
-	"""Clear attack tell"""
+	"""Clear attack tell and return to normal color"""
 	is_showing_tell = false
+	
+	# Stop flashing
+	if flash_tween:
+		flash_tween.kill()
+		flash_tween = null
+	
+	# Return to normal red color
+	if boss_material:
+		boss_material.albedo_color = original_color
+	
+	if debug_enabled:
+		print("📢 BOSS: Attack tell cleared, returning to red color")
 
 func _screen_shake(intensity: float) -> void:
 	"""Create screen shake effect"""
+	# Try to find camera and shake it
+	var camera = get_viewport().get_camera_3d()
+	if camera and camera.has_method("add_trauma"):
+		camera.add_trauma(intensity)
+	
 	if debug_enabled:
 		print("📳 BOSS: Screen shake with intensity: ", intensity)
 
 # === DAMAGE AND HEALTH ===
 func take_damage(amount: int, _source: Node = null) -> void:
-	"""Take damage"""
+	"""Take damage and spawn red slime"""
 	health -= amount
+	
+	# Spawn red slime when hit
+	_spawn_red_slime()
 	
 	if debug_enabled:
 		print("🤖 BOSS: Took ", amount, " damage. Health: ", health, "/", max_health)
 	
 	if health <= 0:
 		current_state = BossState.DYING
+
+func _spawn_red_slime() -> void:
+	"""Spawn a red slime when boss takes damage"""
+	if not red_slime_scene:
+		if debug_enabled:
+			print("🟥 BOSS: No red slime scene available")
+		return
+	
+	var slime = red_slime_scene.instantiate()
+	get_tree().current_scene.add_child(slime)
+	
+	# Position slime near boss but not on top
+	var spawn_offset = Vector3(
+		randf_range(-3.0, 3.0),
+		1.0,
+		randf_range(-3.0, 3.0)
+	)
+	slime.global_position = global_position + spawn_offset
+	
+	# Make slime red if it has material
+	if slime.has_method("_setup_slime_material"):
+		call_deferred("_make_slime_red", slime)
+	
+	if debug_enabled:
+		print("🟥 BOSS: Spawned red slime at: ", slime.global_position)
+
+func _make_slime_red(slime: Node) -> void:
+	"""Make the spawned slime red colored"""
+	await get_tree().process_frame  # Wait for slime to be ready
+	
+	if not slime or not is_instance_valid(slime):
+		return
+	
+	var mesh_instance = slime.get_node_or_null("MeshInstance3D")
+	if mesh_instance and mesh_instance.material_override:
+		var material = mesh_instance.material_override
+		if material is StandardMaterial3D:
+			material.albedo_color = Color(0.8, 0.1, 0.1, 0.95)  # Bright red
+
+func _check_player_collision() -> void:
+	"""Check if boss is touching player and deal damage"""
+	if not player or current_state == BossState.DYING:
+		return
+	
+	var distance_to_player = global_position.distance_to(player.global_position)
+	
+	# If boss is close enough to touch player
+	if distance_to_player <= 2.0:  # Adjust this range as needed
+		if player.has_method("take_damage"):
+			player.take_damage(touch_damage, self)
+			
+			# Apply knockback to player
+			if player.has_method("apply_knockback_from_enemy") or player.get("movement_component"):
+				var movement_comp = player.get("movement_component")
+				if movement_comp and movement_comp.has_method("apply_knockback_from_enemy"):
+					movement_comp.apply_knockback_from_enemy(self)
+			
+			if debug_enabled:
+				print("🤖 BOSS: Touch damage dealt to player! Distance: ", distance_to_player)
 
 # === DEBUG ===
 func _debug_status() -> void:
