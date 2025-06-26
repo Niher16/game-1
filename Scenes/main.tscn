@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://dioilysjxebvh"]
+[gd_scene load_steps=11 format=3 uid="uid://dioilysjxebvh"]
 
 [ext_resource type="Script" uid="uid://b5i856ttopent" path="res://dot gds/main_scene_setup.gd" id="1_mkato"]
 [ext_resource type="Script" uid="uid://34pvx714vsnb" path="res://dot gds/UI.gd" id="2_b0obt"]
@@ -12,6 +12,15 @@ size = Vector3(20000, 0.5, 20000)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_h2yge"]
 size = Vector3(20000, 0.5, 20000)
+
+[sub_resource type="Sky" id="Sky_21xkr"]
+
+[sub_resource type="Environment" id="Environment_21xkr"]
+background_energy_multiplier = 0.1
+sky = SubResource("Sky_21xkr")
+sky_custom_fov = 72.5
+ambient_light_color = Color(0, 0, 0.866667, 1)
+ambient_light_energy = 0.1
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_mkato")
@@ -62,5 +71,8 @@ follow_speed = 32.0
 zoom_speed = 0.5
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+visible = false
 script = ExtResource("6_21xkr")
-player_light_range = 10.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_21xkr")

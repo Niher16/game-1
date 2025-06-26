@@ -266,6 +266,9 @@ func _on_ally_added():
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _on_ally_removed():
+	# Safety: Only update if the scene tree is valid
+	if not is_inside_tree():
+		return
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 
 func _on_ally_died():

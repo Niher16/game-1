@@ -361,6 +361,7 @@ func _create_normal_room_after_wave(wave_number: int):
 			enemy_spawner.set_newest_spawning_room(new_room)
 		_spawn_treasure_chest_random_in_room(new_room)
 		_spawn_destructible_objects_in_room(new_room)
+		_spawn_torches_in_room(new_room)
 		print("✅ Normal room generated and set as spawning area!")
 	else:
 		print("❌ Room generation failed - no valid position found")
@@ -405,6 +406,7 @@ func generate_starting_room():
 	# Spawn starting room content
 	_spawn_treasure_chest_random_in_room(starting_room)
 	_spawn_destructible_objects_in_room(starting_room)
+	_spawn_torches_in_room(starting_room)
 
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
@@ -880,6 +882,26 @@ func _find_safe_recruiter_position(room: Rect2) -> Vector3:
 			return world_pos
 	
 	return Vector3.ZERO
+
+func _spawn_torches_in_room(room: Rect2):
+	# Spawns two torches at opposite sides of the room
+	var torch_scene = preload("res://dot gds/Torch.gd")
+	var positions = [
+		Vector2(room.position.x + 1, room.position.y + 1),
+		Vector2(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
+	]
+	for pos in positions:
+		# Instance a Node3D as a parent for the torch
+		var torch_parent = Node3D.new()
+		add_child(torch_parent)
+		var torch = torch_scene.new()
+		torch_parent.add_child(torch)
+		torch_parent.global_position = Vector3(
+			(pos.x - map_size.x / 2) * 2.0,
+			0.0,
+			(pos.y - map_size.y / 2) * 2.0
+		)
+		generated_objects.append(torch_parent)
 
 # =====================================
 # NEW: PUBLIC API FOR UI AND DEBUGGING
