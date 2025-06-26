@@ -495,6 +495,9 @@ func _input(_event):
 	# DEBUG: Kill all enemies one by one with F10
 	if Input.is_key_pressed(KEY_F10):
 		_kill_enemies_one_by_one()
+	# DEBUG: F11 - Kill all enemies, go to wave 10, spawn boss
+	if Input.is_key_pressed(KEY_F11):
+		_activate_boss_debug()
 
 # Coroutine to kill all enemies one by one every 0.2 seconds
 func _kill_enemies_one_by_one():
@@ -826,3 +829,19 @@ func _spawn_test_potion():
 func _unhandled_input(_event):
 	# No test actions for space or enter
 	pass
+
+# F11 debug: Kill all enemies, set wave 10, spawn boss
+func _activate_boss_debug():
+	# Kill all enemies
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if enemy and enemy.has_method("die") and not enemy.is_dead:
+			enemy.die()
+	# Find spawner and set wave to 10, spawn boss
+	var spawner = get_tree().get_first_node_in_group("spawner")
+	if spawner:
+		spawner.current_wave = 10
+		spawner._start_boss_wave()
+		show_message("F11: All enemies killed, wave 10, boss spawned!")
+	else:
+		show_message("F11: Spawner not found!")

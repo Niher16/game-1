@@ -163,7 +163,7 @@ func _spawn_boss() -> Node3D:
 		return null
 	
 	get_parent().add_child(boss)
-	boss.global_position = spawn_position + Vector3(0, 20, 0)  # Start high for dramatic entry
+	boss.global_position = spawn_position + Vector3(0, 3, 0)  # Start 3 units up for quick entry
 	
 	return boss
 
@@ -180,7 +180,7 @@ func _create_boss_from_scratch() -> CharacterBody3D:
 	
 	# Create a simple box mesh (you can replace this with your boss model)
 	var box_mesh = BoxMesh.new()
-	box_mesh.size = Vector3(2, 3, 2)  # Make it bigger than regular enemies
+	box_mesh.size = Vector3(2, 2, 2)  # Perfect cube
 	mesh_instance.mesh = box_mesh
 	
 	# Add collision shape
@@ -190,7 +190,7 @@ func _create_boss_from_scratch() -> CharacterBody3D:
 	
 	# Create collision shape to match the mesh
 	var shape = BoxShape3D.new()
-	shape.size = Vector3(2, 3, 2)
+	shape.size = Vector3(2, 2, 2)     # Perfect cube
 	collision_shape.shape = shape
 	
 	# Attach the boss script
