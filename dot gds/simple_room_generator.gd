@@ -70,7 +70,6 @@ var enemy_spawner: Node3D
 var player: Node3D
 
 # PackedScene references
-var treasure_chest_scene: PackedScene
 var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
@@ -88,12 +87,6 @@ func _ready():
 	_find_references()
 	
 	# Load scenes
-	if ResourceLoader.exists("res://Scenes/treasure_chest.tscn"):
-		treasure_chest_scene = load("res://Scenes/treasure_chest.tscn")
-		print("✅ Treasure chest scene loaded")
-	else:
-		print("⚠️ Treasure chest scene not found")
-	
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
 		print("✅ Weapon pickup scene loaded")
@@ -338,7 +331,6 @@ func _on_wave_completed(wave_number: int):
 				if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 					enemy_spawner.set_newest_spawning_room(next_wave_room)
 				
-				_spawn_treasure_chest_random_in_room(next_wave_room)
 				_spawn_destructible_objects_in_room(next_wave_room)
 				print("🗡️ Created weapon room + next wave room!")
 			else:
@@ -359,7 +351,6 @@ func _create_normal_room_after_wave(wave_number: int):
 		# Tell the enemy spawner to use this new room for the next wave
 		if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 			enemy_spawner.set_newest_spawning_room(new_room)
-		_spawn_treasure_chest_random_in_room(new_room)
 		_spawn_destructible_objects_in_room(new_room)
 		_spawn_torches_in_room(new_room)
 		print("✅ Normal room generated and set as spawning area!")
@@ -404,10 +395,8 @@ func generate_starting_room():
 	_move_player_to_room(starting_room)
 	
 	# Spawn starting room content
-	_spawn_treasure_chest_random_in_room(starting_room)
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
-
 	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
 func create_connected_room():
@@ -797,38 +786,6 @@ func _get_size_for_shape(shape: RoomShape) -> Vector2:
 			return Vector2(5, 5)
 	return base_room_size
 
-func _spawn_treasure_chest_random_in_room(room: Rect2):
-	if not treasure_chest_scene:
-		print("⚠️ Treasure chest scene not found, cannot spawn chest.")
-		return
-	
-	var chest_instance = treasure_chest_scene.instantiate()
-	add_child(chest_instance)
-	
-	# Find a position away from room edges
-	var margin = 2
-	var x_range = room.size.x - (margin * 2)
-	var y_range = room.size.y - (margin * 2)
-	
-	if x_range > 0 and y_range > 0:
-		var random_offset = Vector2(
-			randf() * x_range,
-			randf() * y_range
-		)
-		
-		var chest_grid_pos = room.position + Vector2(margin, margin) + random_offset
-		var chest_world_pos = Vector3(
-			(chest_grid_pos.x - map_size.x / 2) * 2.0,
-			1.0,
-			(chest_grid_pos.y - map_size.y / 2) * 2.0
-		)
-		
-		chest_instance.global_position = chest_world_pos
-		generated_objects.append(chest_instance)
-		print("💎 Treasure chest spawned at: ", chest_world_pos)
-	else:
-		chest_instance.queue_free()
-
 func _spawn_destructible_objects_in_room(room: Rect2):
 	"""Spawn crates and barrels in room"""
 	var objects_to_spawn = randi_range(2, 4)
@@ -883,25 +840,50 @@ func _find_safe_recruiter_position(room: Rect2) -> Vector3:
 	
 	return Vector3.ZERO
 
+# Spawns a torch at the given position
+func spawn_torch_at_position(pos: Vector3):
+	var torch_scene = preload("res://Scenes/EnhancedTorch.tscn")
+	var torch = torch_scene.instantiate()
+	torch.global_position = pos
+	add_child(torch)
+	# print("\ud83d\udd25 Torch spawned at: ", pos)  # Commented to reduce log spam
+
 func _spawn_torches_in_room(room: Rect2):
-	# Spawns two torches at opposite sides of the room
-	var torch_scene = preload("res://dot gds/Torch.gd")
-	var positions = [
-		Vector2(room.position.x + 1, room.position.y + 1),
-		Vector2(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
+	# Improved: Place torches near corners, but not inside walls
+	var torch_height = 1.5
+	var offset = 0.7  # Distance from wall/corner
+	var try_offsets = [
+		Vector2(0, 0),
+		Vector2(offset, 0),
+		Vector2(0, offset),
+		Vector2(offset, offset),
+		Vector2(-offset, 0),
+		Vector2(0, -offset),
+		Vector2(-offset, -offset)
 	]
-	for pos in positions:
-		# Instance a Node3D as a parent for the torch
-		var torch_parent = Node3D.new()
-		add_child(torch_parent)
-		var torch = torch_scene.new()
-		torch_parent.add_child(torch)
-		torch_parent.global_position = Vector3(
-			(pos.x - map_size.x / 2) * 2.0,
-			0.0,
-			(pos.y - map_size.y / 2) * 2.0
-		)
-		generated_objects.append(torch_parent)
+	var corners = [
+		Vector2(room.position.x + offset, room.position.y + offset),
+		Vector2(room.position.x + room.size.x - offset, room.position.y + offset),
+		Vector2(room.position.x + offset, room.position.y + room.size.y - offset),
+		Vector2(room.position.x + room.size.x - offset, room.position.y + room.size.y - offset)
+	]
+	for corner in corners:
+		var found = false
+		for local_offset in try_offsets:
+			var grid_x = int(round(corner.x + local_offset.x))
+			var grid_y = int(round(corner.y + local_offset.y))
+			if grid_x >= 0 and grid_x < map_size.x and grid_y >= 0 and grid_y < map_size.y:
+				if terrain_grid[grid_x][grid_y] == TileType.FLOOR or terrain_grid[grid_x][grid_y] == TileType.CORRIDOR:
+					var world_pos = Vector3(
+						(grid_x - map_size.x / 2) * 2.0,
+						torch_height,
+						(grid_y - map_size.y / 2) * 2.0
+					)
+					spawn_torch_at_position(world_pos)
+					found = true
+					break
+		if not found:
+			print("⚠️ Could not find valid floor for torch near corner:", corner)
 
 # =====================================
 # NEW: PUBLIC API FOR UI AND DEBUGGING
