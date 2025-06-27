@@ -688,6 +688,9 @@ func _apply_safe_physics(delta: float) -> void:
 	"""Apply gravity and physics safely"""
 	if not is_on_floor():
 		velocity.y -= gravity * delta
+	# Prevent being pushed into the ground
+	if is_on_floor() and velocity.y < 0:
+		velocity.y = 0
 
 func _break_walls_in_movement_direction() -> void:
 	"""Break walls in front of boss movement"""

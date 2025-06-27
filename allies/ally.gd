@@ -195,6 +195,9 @@ func _physics_process(delta):
 	# Add gravity
 	if not is_on_floor():
 		velocity.y -= ProjectSettings.get_setting("physics/3d/default_gravity") * delta
+	# Prevent being pushed into the ground
+	if is_on_floor() and velocity.y < 0:
+		velocity.y = 0
 	# Apply knockback if active
 	if knockback_timer > 0.0:
 		knockback_timer -= delta

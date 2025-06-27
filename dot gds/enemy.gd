@@ -645,6 +645,9 @@ func _complete_slime_jump_attack():
 func _apply_gravity(delta):
 	if not is_on_floor() and not is_jumping:
 		velocity.y -= ProjectSettings.get_setting("physics/3d/default_gravity") * delta
+	# Prevent being pushed into the ground
+	if is_on_floor() and velocity.y < 0:
+		velocity.y = 0
 
 func take_damage(amount: int):
 	if is_dead:

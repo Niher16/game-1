@@ -1,7 +1,8 @@
-# simple_room_generator.gd - ENHANCED: Fixed torch spawning 
+# simple_room_generator.gd - ENHANCED: Fixed torch spawning in corridors and jail door positioning
 extends Node3D
 
 signal new_room_generated(room_rect: Rect2)
+signal weapon_room_generated(room_rect: Rect2)
 
 @export var map_size = Vector2(60, 60)
 @export var base_room_size = Vector2(6, 6)
@@ -75,6 +76,7 @@ var weapon_room_floor_material: StandardMaterial3D
 # References
 var enemy_spawner: Node3D
 var player: Node3D
+var jail_door_instance: Node3D  # NEW: Reference to spawned jail door
 
 # PackedScene references
 var weapon_pickup_scene: PackedScene
@@ -90,6 +92,7 @@ func _ready():
 		print("❌ WeaponPool autoload is NOT available")
 	
 	_create_materials()
+	_find_references()
 	
 	# Load scenes
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
@@ -99,18 +102,7 @@ func _ready():
 		print("⚠️ Weapon pickup scene not found")
 	
 	if auto_generate_on_start:
-		# Wait a bit longer for all systems to initialize
-		call_deferred("_initialize_with_delay")
-
-func _initialize_with_delay():
-	"""Initialize after other systems are ready"""
-	await get_tree().process_frame
-	await get_tree().process_frame  # Extra wait
-	
-	_find_references()
-	
-	# Generate starting room
-	generate_starting_room()
+		call_deferred("generate_starting_room")
 
 func _create_materials():
 	# Regular wall material
@@ -142,43 +134,17 @@ func _find_references():
 	if not player:
 		print("⚠️ Player not found, will search again later")
 	
-	# Find enemy spawner with multiple attempts
-	_find_enemy_spawner()
-
-func _find_enemy_spawner():
-	"""Find enemy spawner with multiple search methods"""
-	# Method 1: Try relative path
+	# Find enemy spawner
 	enemy_spawner = get_node_or_null("../EnemySpawner")
-	
-	# Method 2: Try by group
 	if not enemy_spawner:
 		var spawners = get_tree().get_nodes_in_group("spawner")
 		if spawners.size() > 0:
 			enemy_spawner = spawners[0]
-			print("✅ Found spawner by group: ", enemy_spawner.name)
 	
-	# Method 3: Try finding any node with "spawner" in name
-	if not enemy_spawner:
-		for node in get_tree().current_scene.get_children():
-			if "spawner" in node.name.to_lower() or "enemy" in node.name.to_lower():
-				if node.has_method("set_newest_spawning_room"):
-					enemy_spawner = node
-					print("✅ Found spawner by name search: ", enemy_spawner.name)
-					break
-	
-	# Connect signal if spawner found
-	if enemy_spawner:
-		if enemy_spawner.has_signal("wave_completed"):
-			if not enemy_spawner.wave_completed.is_connected(_on_wave_completed):
-				enemy_spawner.wave_completed.connect(_on_wave_completed)
-				print("✅ Connected to spawner wave_completed signal")
-		
-		if enemy_spawner.has_method("set_newest_spawning_room"):
-			print("✅ Spawner has set_newest_spawning_room method")
-		else:
-			print("❌ Spawner missing set_newest_spawning_room method")
-	else:
-		print("❌ Enemy spawner not found by any method")
+	if enemy_spawner and enemy_spawner.has_signal("wave_completed"):
+		if not enemy_spawner.wave_completed.is_connected(_on_wave_completed):
+			enemy_spawner.wave_completed.connect(_on_wave_completed)
+			print("✅ Connected to spawner wave_completed signal")
 
 # =====================================
 # IMPROVED CORRIDOR CREATION AND TRACKING
@@ -252,6 +218,7 @@ func _spawn_torches_in_corridor(corridor_connection: Dictionary):
 	"""NEW: Spawn torches along a corridor path with proper spacing"""
 	var start_room = corridor_connection.start_room
 	var end_room = corridor_connection.end_room
+	var corridor_rect = corridor_connection.corridor_rect
 	
 	# Calculate corridor length for torch placement
 	var start_center = start_room.get_center()
@@ -318,14 +285,9 @@ func _try_place_corridor_torch(grid_pos: Vector2) -> bool:
 	return true
 
 func _spawn_torches_in_room(room: Rect2):
-	"""Improved: Place torches near corners, but not inside walls - LIMITED NUMBER"""
+	"""Improved: Place torches near corners, but not inside walls"""
 	var torch_height = torch_height_offset
 	var offset = 0.7  # Distance from wall/corner
-	
-	# Limit to 2 torches per room maximum
-	var max_room_torches = 2
-	var torches_placed = 0
-	
 	var try_offsets = [
 		Vector2(0, 0),
 		Vector2(offset, 0),
@@ -335,17 +297,13 @@ func _spawn_torches_in_room(room: Rect2):
 		Vector2(0, -offset),
 		Vector2(-offset, -offset)
 	]
-	
-	# Try only 2 corners (opposite corners for better lighting)
 	var corners = [
-		Vector2(room.position.x + offset, room.position.y + offset),                      # Top-left
-		Vector2(room.position.x + room.size.x - offset, room.position.y + room.size.y - offset)  # Bottom-right
+		Vector2(room.position.x + offset, room.position.y + offset),
+		Vector2(room.position.x + room.size.x - offset, room.position.y + offset),
+		Vector2(room.position.x + offset, room.position.y + room.size.y - offset),
+		Vector2(room.position.x + room.size.x - offset, room.position.y + room.size.y - offset)
 	]
-	
 	for corner in corners:
-		if torches_placed >= max_room_torches:
-			break
-			
 		var found = false
 		for local_offset in try_offsets:
 			var grid_x = int(round(corner.x + local_offset.x))
@@ -358,13 +316,68 @@ func _spawn_torches_in_room(room: Rect2):
 						(grid_y - map_size.y / 2) * 2.0
 					)
 					spawn_torch_at_position(world_pos)
-					torches_placed += 1
 					found = true
 					break
 		if not found:
 			print("⚠️ Could not find valid floor for torch near corner:", corner)
+
+# =====================================
+# IMPROVED JAIL DOOR SYSTEM
+# =====================================
+
+func _spawn_jail_door_at_corridor_entrance(start_room: Rect2, target_room: Rect2, corridor_connection: Dictionary):
+	"""NEW: Properly position jail door to span the corridor entrance"""
+	if not ResourceLoader.exists("res://Scenes/JailDoor.tscn"):
+		print("❌ JailDoor.tscn not found!")
+		return
 	
-	print("🔥 Placed ", torches_placed, " torches in room")
+	var jail_door_scene = load("res://Scenes/JailDoor.tscn")
+	jail_door_instance = jail_door_scene.instantiate()
+	
+	# Calculate the actual entrance point where the corridor meets the starting room
+	var room_center = start_room.get_center()
+	var target_center = target_room.get_center()
+	var direction = (target_center - room_center).normalized()
+	
+	# Find the edge of the starting room closest to the target room
+	var entrance_pos: Vector2
+	if abs(direction.x) > abs(direction.y):
+		# Horizontal corridor
+		if direction.x > 0:
+			# Corridor goes east
+			entrance_pos = Vector2(start_room.position.x + start_room.size.x, room_center.y)
+		else:
+			# Corridor goes west
+			entrance_pos = Vector2(start_room.position.x, room_center.y)
+		# Rotate door 90 degrees for horizontal corridors
+		jail_door_instance.rotation.y = deg_to_rad(90)
+		# Scale to match corridor width
+		jail_door_instance.scale = Vector3(corridor_width / 2.0, 1.0, 1.0)
+	else:
+		# Vertical corridor
+		if direction.y > 0:
+			# Corridor goes south
+			entrance_pos = Vector2(room_center.x, start_room.position.y + start_room.size.y)
+		else:
+			# Corridor goes north
+			entrance_pos = Vector2(room_center.x, start_room.position.y)
+		# Keep door at 0 rotation for vertical corridors
+		jail_door_instance.rotation.y = 0
+		# Scale to match corridor width
+		jail_door_instance.scale = Vector3(1.0, 1.0, corridor_width / 2.0)
+	
+	# Convert to world position
+	var world_pos = Vector3(
+		(entrance_pos.x - map_size.x / 2) * 2.0,
+		1.25,  # Door height
+		(entrance_pos.y - map_size.y / 2) * 2.0
+	)
+	
+	jail_door_instance.global_position = world_pos
+	add_child(jail_door_instance)
+	generated_objects.append(jail_door_instance)
+	
+	print("🚪 Jail door spawned at corridor entrance: ", world_pos, " rotation: ", jail_door_instance.rotation, " scale: ", jail_door_instance.scale)
 
 # =====================================
 # ENHANCED ROOM GENERATION
@@ -403,53 +416,38 @@ func generate_starting_room():
 	# Move player to room center
 	_move_player_to_room(starting_room)
 	
-	# Spawn starting room content (limited torches)
+	# Spawn starting room content
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
-	# --- CREATE FIRST WAVE ROOM REGARDLESS OF SPAWNER STATUS ---
+	# --- CREATE FIRST WAVE ROOM FARTHER AWAY ---
 	print("🗡️ Creating first wave room connected to starting room...")
-	
-	# Always create the first wave room - we'll set up spawner later if needed
-	call_deferred("_create_first_wave_room_deferred", starting_room)
-
-	print("🗡️ Starting room setup complete!")
-
-func _create_first_wave_room_deferred(starting_room: Rect2):
-	"""Create the first wave room after starting room is fully set up"""
-	print("🗡️ Creating deferred first wave room...")
-	
-	# Try to find spawner again if we don't have it
-	if not enemy_spawner:
-		print("🔄 Retrying spawner detection...")
-		_find_enemy_spawner()
-	
-	# Set starting room as initial spawning area if spawner is available
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
-		print("✅ Setting starting room as initial spawning area")
-		enemy_spawner.set_newest_spawning_room(starting_room)
-	
-	# Create first wave room regardless of spawner status
-	var first_wave_room = create_connected_room()
-	if first_wave_room != null:
-		print("✅ First wave room created:", first_wave_room)
-		
-		# Set this as the wave room for spawner if available
-		if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
-			# For now, keep starting room as spawning area - first wave room will be used later
-			print("✅ First wave room available for future waves")
-		
-		# Spawn torches in the first wave room
-		_spawn_torches_in_room(first_wave_room)
-		
-		# Spawn torches in the connecting corridor (limited)
-		if corridor_connections.size() > 0:
-			var latest_corridor = corridor_connections[corridor_connections.size() - 1]
-			_spawn_torches_in_corridor(latest_corridor)
-		
-		print("🏠 First wave room setup complete!")
+		var first_wave_room = create_connected_room()
+		if first_wave_room != null:
+			enemy_spawner.set_newest_spawning_room(first_wave_room)
+			print("✅ First wave room created and set for enemy spawner:", first_wave_room)
+			
+			# Spawn torches in the first wave room
+			_spawn_torches_in_room(first_wave_room)
+			
+			# FIXED: Spawn torches in the connecting corridor
+			if corridor_connections.size() > 0:
+				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+				_spawn_torches_in_corridor(latest_corridor)
+			
+			# FIXED: Spawn jail door at the proper corridor entrance
+			if corridor_connections.size() > 0:
+				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+				_spawn_jail_door_at_corridor_entrance(starting_room, first_wave_room, latest_corridor)
+			else:
+				print("❌ No corridor connections found for jail door placement")
+		else:
+			print("❌ Failed to create first wave room!")
 	else:
-		print("❌ Failed to create first wave room!")
+		print("❌ Enemy spawner not found or missing method!")
+
+	print("🗡️ Starting room created with PROTECTED BOUNDARIES!")
 
 func create_connected_room():
 	"""Create a new room with boundary protection"""
@@ -481,7 +479,10 @@ func create_connected_room():
 	_spawn_destructible_objects_in_room(new_room)
 	_spawn_torches_in_room(new_room)
 	
-	# NOTE: Corridor torches are only spawned during initial setup, not for every new room
+	# FIXED: Spawn torches in the new corridor
+	if corridor_connections.size() > 0:
+		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		_spawn_torches_in_corridor(latest_corridor)
 
 	# --- RANDOM RECRUITER NPC SPAWN ---
 	var spawn_chance = min(recruiter_base_chance + (current_room_count * recruiter_chance_increase), recruiter_max_chance)
@@ -522,6 +523,7 @@ func _clear_everything():
 	corridors.clear()
 	corridor_connections.clear()  # NEW: Clear corridor connections
 	current_room_count = 0
+	jail_door_instance = null  # NEW: Clear jail door reference
 
 func _fill_with_walls():
 	terrain_grid.clear()

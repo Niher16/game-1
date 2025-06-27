@@ -552,12 +552,19 @@ func _physics_process(delta):
 		movement_component.handle_knockback(delta)
 		movement_component.apply_gravity(delta)
 		move_and_slide()
+		# Prevent being pushed into the ground
+		if is_on_floor() and velocity.y < 0:
+			velocity.y = 0
 		return
 
 	movement_component.handle_movement_and_dash(delta)
 	combat_component.handle_attack_input()
 	movement_component.handle_dash_cooldown(delta)
 	_handle_advanced_blinking(delta)
+
+	# Prevent being pushed into the ground
+	if is_on_floor() and velocity.y < 0:
+		velocity.y = 0
 
 func set_character_appearance(config: Dictionary):
 	if mesh_instance and CharacterAppearanceManager:
