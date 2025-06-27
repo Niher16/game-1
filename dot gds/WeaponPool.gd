@@ -30,7 +30,6 @@ func _load_all_weapons():
 	_add_weapon_to_pool("res://Weapons/iron_sword.tres", "common")
 	
 	# Uncommon weapons (mid-tier)
-	_add_weapon_to_pool("res://Weapons/mage_staff.tres", "uncommon")
 	
 	# Rare weapons (high-tier)
 	

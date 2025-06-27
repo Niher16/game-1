@@ -15,6 +15,7 @@ signal boss_fight_completed
 @export var enemy_increase_per_wave: int = 2
 @export var wave_delay: float = 3.0
 @export var boss_wave: int = 10  # Wave where boss spawns
+@export var initial_spawn_delay: float = 5.0  # Delay before first enemies spawn
 
 # === ENEMY SETTINGS ===
 @export var enemy_scene: PackedScene
@@ -80,12 +81,14 @@ func start_wave_system():
 	"""PUBLIC: Start the entire wave system"""
 	if current_wave == 0:
 		current_wave = 1
+		# Wait before starting the first wave
+		await get_tree().create_timer(initial_spawn_delay).timeout
 		_start_current_wave()
 
 func set_newest_spawning_room(room_rect: Rect2):
-	"""PUBLIC: Set the room where enemies should spawn"""
+	"""Set the newest room for spawning (weapon rooms now allowed)"""
 	current_spawning_room = room_rect
-	
+	print("✅ New spawning room set: ", room_rect)
 	# If we haven't started waves yet, start now
 	if current_wave == 0:
 		start_wave_system()
@@ -284,24 +287,38 @@ func _get_spawn_center() -> Vector3:
 		return player.global_position
 
 func _is_valid_spawn_position(pos: Vector3) -> bool:
-	"""Check if spawn position is valid"""
+	"""Check if spawn position is valid and not on top of walls or too close to player"""
 	# Check distance from player
 	var player_distance = pos.distance_to(player.global_position)
-	if player_distance < 2.0 or player_distance > 15.0:
+	if player_distance < 20.0:
 		return false
-	
+	if player_distance > spawn_distance_min:
+		return false
+
 	# Check for enemy overlap
 	for enemy in enemies_alive:
 		if is_instance_valid(enemy) and pos.distance_to(enemy.global_position) < 2.0:
 			return false
-	
+
 	# Check terrain if available
 	var terrain = get_tree().get_first_node_in_group("terrain")
 	if terrain and terrain.has_method("_is_valid_pos"):
 		var grid_x = int((pos.x / 2.0) + (map_size.x / 2))
 		var grid_y = int((pos.z / 2.0) + (map_size.y / 2))
-		return terrain._is_valid_pos(grid_x, grid_y)
-	
+		if not terrain._is_valid_pos(grid_x, grid_y):
+			return false
+
+	# Check for wall collision using physics
+	var space_state = get_world_3d().direct_space_state
+	var params = PhysicsPointQueryParameters3D.new()
+	params.position = pos
+	params.collide_with_areas = true
+	params.collide_with_bodies = true
+	var result = space_state.intersect_point(params, 32)
+	for hit in result:
+		if hit.collider and hit.collider.is_in_group("walls"):
+			return false
+
 	return true
 
 func _scale_enemy_for_wave(enemy: Node3D):
@@ -373,6 +390,23 @@ func _start_next_wave():
 	_start_current_wave()
 
 # === PUBLIC API FOR UI AND OTHER SYSTEMS ===
+
+func can_spawn_in_room(_room: Rect2) -> bool:
+	"""Enemies can spawn in any room (weapon rooms allowed)"""
+	return true
+
+func get_valid_spawn_rooms() -> Array:
+	"""Get all rooms where enemies can spawn (excludes weapon rooms)"""
+	var room_generator = get_node_or_null("../SimpleRoomGenerator")
+	var valid_rooms = []
+	
+	if room_generator and room_generator.has_method("get_rooms"):
+		var all_rooms = room_generator.get_rooms()
+		for room in all_rooms:
+			if can_spawn_in_room(room):
+				valid_rooms.append(room)
+	return valid_rooms
+
 func get_wave_info() -> Dictionary:
 	"""Get current wave information for UI (ENHANCED: Boss info)"""
 	var total_enemies_for_wave

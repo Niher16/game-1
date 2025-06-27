@@ -424,7 +424,7 @@ func _setup_collision_shape():
 
 # Copilot: Handle E key interaction for weapon pickup
 func _input(event):
-	if event.is_action_pressed("interact") and player_in_range and not get_meta("pickup_disabled", false):
+	if event.is_action_pressed("interaction") and player_in_range and not get_meta("pickup_disabled", false):
 		_interact_with_weapon()
 
 # Copilot: Handle player entering weapon pickup area

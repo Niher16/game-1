@@ -852,3 +852,27 @@ func _activate_boss_debug():
 		show_message("F11: All enemies killed, wave 10, boss spawned!")
 	else:
 		show_message("F11: Spawner not found!")
+
+func ensure_safe_spawn(min_distance: float = 5.0):
+	"""Move player to a safe spot if enemies are too close at spawn."""
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var safe = true
+	for enemy in enemies:
+		if is_instance_valid(enemy) and global_position.distance_to(enemy.global_position) < min_distance:
+			safe = false
+			break
+	if not safe:
+		# Try to find a safe spot nearby
+		for attempt in range(20):
+			var angle = randf() * TAU
+			var distance = randf_range(min_distance, min_distance + 5.0)
+			var test_pos = global_position + Vector3(cos(angle) * distance, 0, sin(angle) * distance)
+			var too_close = false
+			for enemy in enemies:
+				if is_instance_valid(enemy) and test_pos.distance_to(enemy.global_position) < min_distance:
+					too_close = true
+					break
+			if not too_close:
+				global_position = test_pos
+				return
+		# If no safe spot found, just stay in place

@@ -1,4 +1,4 @@
-# simple_room_generator.gd - ENHANCED: Fixed torch spawning in corridors and jail door positioning
+# simple_room_generator.gd - ENHANCED: Fixed torch spawning in corridors
 extends Node3D
 
 signal new_room_generated(room_rect: Rect2)
@@ -75,7 +75,6 @@ var weapon_room_floor_material: StandardMaterial3D
 # References
 var enemy_spawner: Node3D
 var player: Node3D
-var jail_door_instance: Node3D  # NEW: Reference to spawned jail door
 
 # PackedScene references
 var weapon_pickup_scene: PackedScene
@@ -89,26 +88,55 @@ const WALL_COLLISION_MASK: int = (1 << 2) | (1 << 3) | (1 << 4)
 const DEFAULT_OBJECT_HEIGHT: float = 1.0
 const DEFAULT_DOOR_HEIGHT: float = 1.25
 
+var _spawner_retry_count := 0
+const _SPAWNER_MAX_RETRIES := 10
+const _SPAWNER_RETRY_DELAY := 0.5
+var _pending_generate_starting_room := false
+
 func _ready():
 	add_to_group("terrain")
-	
+	# Initialize terrain_grid as a 2D array of WALLs
+	terrain_grid = []
+	for x in range(map_size.x):
+		var col = []
+		for y in range(map_size.y):
+			col.append(TileType.WALL)
+		terrain_grid.append(col)
+
 	if has_node("/root/WeaponPool"):
 		print("✅ WeaponPool autoload is available")
 	else:
 		print("❌ WeaponPool autoload is NOT available")
-	
+
 	_create_materials()
 	_find_references()
-	
+
 	# Load scenes
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
 		print("✅ Weapon pickup scene loaded")
 	else:
 		print("⚠️ Weapon pickup scene not found")
-	
+
 	if auto_generate_on_start:
-		call_deferred("generate_starting_room")
+		_pending_generate_starting_room = true
+		_try_generate_starting_room_when_spawner_ready()
+
+func _try_generate_starting_room_when_spawner_ready():
+	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
+		if _pending_generate_starting_room:
+			_pending_generate_starting_room = false
+			generate_starting_room()
+			_spawner_retry_count = 0
+	else:
+		_spawner_retry_count += 1
+		if _spawner_retry_count <= _SPAWNER_MAX_RETRIES:
+			print("🔄 Enemy spawner not found, retrying (attempt %d/%d)..." % [_spawner_retry_count, _SPAWNER_MAX_RETRIES])
+			_find_references()
+			await get_tree().create_timer(_SPAWNER_RETRY_DELAY).timeout
+			_try_generate_starting_room_when_spawner_ready()
+		else:
+			print("❌ Enemy spawner not found after %d retries. Giving up!" % _SPAWNER_MAX_RETRIES)
 
 func _create_materials():
 	# Regular wall material
@@ -333,66 +361,6 @@ func _spawn_torches_in_room(room: Rect2):
 			print("⚠️ Could not find valid floor for torch near corner:", corner)
 
 # =====================================
-# IMPROVED JAIL DOOR SYSTEM
-# =====================================
-
-func _spawn_jail_door_at_corridor_entrance(start_room: Rect2, target_room: Rect2, _corridor_connection: Dictionary):
-	"""NEW: Properly position jail door to span the corridor entrance"""
-	if not ResourceLoader.exists("res://Scenes/JailDoor.tscn"):
-		print("❌ JailDoor.tscn not found!")
-		return
-	
-	var jail_door_scene = load("res://Scenes/JailDoor.tscn")
-	jail_door_instance = jail_door_scene.instantiate()
-	
-	# Calculate the actual entrance point where the corridor meets the starting room
-	var room_center = start_room.get_center()
-	var target_center = target_room.get_center()
-	var direction = (target_center - room_center).normalized()
-	
-	# Find the edge of the starting room closest to the target room
-	var entrance_pos: Vector2
-	if abs(direction.x) > abs(direction.y):
-		# Horizontal corridor
-		if direction.x > 0:
-			# Corridor goes east
-			entrance_pos = Vector2(start_room.position.x + start_room.size.x, room_center.y)
-		else:
-			# Corridor goes west
-			entrance_pos = Vector2(start_room.position.x, room_center.y)
-		# Rotate door 90 degrees for horizontal corridors
-		jail_door_instance.rotation.y = deg_to_rad(90)
-		# Scale to match corridor width
-		jail_door_instance.scale = Vector3(corridor_width / 2.0, 1.0, 1.0)
-	else:
-		# Vertical corridor
-		if direction.y > 0:
-			# Corridor goes south
-			entrance_pos = Vector2(room_center.x, start_room.position.y + start_room.size.y)
-		else:
-			# Corridor goes north
-			entrance_pos = Vector2(room_center.x, start_room.position.y)
-		# Keep door at 0 rotation for vertical corridors
-		jail_door_instance.rotation.y = 0
-		# Scale to match corridor width
-		jail_door_instance.scale = Vector3(1.0, 1.0, corridor_width / 2.0)
-	
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	# Convert to world position
-	var world_pos = Vector3(
-		(entrance_pos.x - half_map_x) * 2.0,
-		DEFAULT_DOOR_HEIGHT,  # Door height
-		(entrance_pos.y - half_map_y) * 2.0
-	)
-	
-	jail_door_instance.global_position = world_pos
-	add_child(jail_door_instance)
-	generated_objects.append(jail_door_instance)
-	
-	print("🚪 Jail door spawned at corridor entrance: ", world_pos, " rotation: ", jail_door_instance.rotation, " scale: ", jail_door_instance.scale)
-
-# =====================================
 # ENHANCED ROOM GENERATION
 # =====================================
 
@@ -449,14 +417,6 @@ func generate_starting_room():
 				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
 				_spawn_torches_in_corridor(latest_corridor)
 			
-			# FIXED: Spawn jail door at the proper corridor entrance
-			if corridor_connections.size() > 0:
-				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
-				_spawn_jail_door_at_corridor_entrance(starting_room, first_wave_room, latest_corridor)
-			else:
-				print("❌ No corridor connections found for jail door placement")
-		else:
-			print("❌ Failed to create first wave room!")
 	else:
 		print("❌ Enemy spawner not found or missing method!")
 
@@ -536,7 +496,6 @@ func _clear_everything():
 	corridors.clear()
 	corridor_connections.clear()  # NEW: Clear corridor connections
 	current_room_count = 0
-	jail_door_instance = null  # NEW: Clear jail door reference
 
 func _fill_with_walls():
 	terrain_grid.clear()
@@ -610,8 +569,27 @@ func _is_valid_carve_position(x: int, y: int) -> bool:
 	
 	return true
 
-# Continue with remaining methods from original file...
-# (Include all the existing methods like _carve_room_shape, _choose_room_shape, etc.)
+func _is_valid_torch_position(grid_pos: Vector2, room: Rect2) -> bool:
+	"""Check if a grid position is valid for torch placement"""
+	var grid_x = int(grid_pos.x)
+	var grid_y = int(grid_pos.y)
+
+	# Defensive checks for terrain_grid
+	if grid_x < 0 or grid_x >= terrain_grid.size():
+		return false
+	if grid_y < 0 or grid_y >= terrain_grid[grid_x].size():
+		return false
+
+	# Check bounds
+	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+		return false
+
+	# Check if within room bounds
+	if not room.has_point(Vector2(grid_x, grid_y)):
+		return false
+
+	# Check if position is floor (not wall)
+	return terrain_grid[grid_x][grid_y] == TileType.FLOOR
 
 # Add these essential missing methods for completeness:
 
@@ -819,9 +797,18 @@ func _find_safe_recruiter_position(room: Rect2) -> Vector3:
 	return Vector3.ZERO
 
 func _on_wave_completed(wave_number: int):
-	"""Enhanced wave completion handler"""
+	"""Enhanced wave completion handler with 50% chance to create weapon room after each wave"""
 	print("🗡️ Wave ", wave_number, " completed! Creating new room...")
-	_create_normal_room_after_wave(wave_number)
+	if randf() < 0.5:
+		var weapon_room = _create_weapon_room()
+		if weapon_room != Rect2():
+			if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
+				enemy_spawner.set_newest_spawning_room(weapon_room)
+			print("✅ Weapon room generated and set as spawning area!")
+		else:
+			_create_normal_room_after_wave(wave_number)
+	else:
+		_create_normal_room_after_wave(wave_number)
 
 func _create_normal_room_after_wave(wave_number: int):
 	"""Create normal room after wave"""
@@ -896,3 +883,107 @@ func _carve_u_shape(room: Rect2):
 		for y in range(int(room.position.y + half_y), int(room.position.y + room.size.y)):
 			if _is_valid_carve_position(x, y):
 				terrain_grid[x][y] = TileType.FLOOR
+
+func _create_weapon_room() -> Rect2:
+	"""Create a weapon room with special properties"""
+	if rooms.is_empty():
+		print("🏺 No existing rooms for weapon room!")
+		return Rect2()
+
+	var last_room = rooms[rooms.size() - 1]
+	print("🏺 Creating weapon room connected to: ", last_room)
+
+	# Use special weapon room size
+	var new_room = _find_new_room_position(last_room, weapon_room_size)
+	if new_room == Rect2():
+		print("🏺 Could not place weapon room safely within boundaries!")
+		return Rect2()
+
+	print("🏺 Creating weapon room: ", new_room)
+
+	# Carve the room (always use SQUARE shape for weapon rooms)
+	_carve_room_shape(new_room, RoomShape.SQUARE)
+	_create_simple_corridor_protected(last_room, new_room)
+	_remove_walls_by_grid_lookup()
+
+	# Add to arrays with WEAPON type
+	rooms.append(new_room)
+	room_shapes.append(RoomShape.SQUARE)
+	room_types.append(RoomType.WEAPON)
+	current_room_count += 1
+
+	print("🏺 Weapon room created! Total rooms: ", rooms.size())
+	new_room_generated.emit(new_room, RoomType.WEAPON)
+
+	# Spawn weapon room content
+	_spawn_weapon_room_content(new_room)
+
+	# Spawn torches in the connecting corridor
+	if corridor_connections.size() > 0:
+		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		_spawn_torches_in_corridor(latest_corridor)
+
+	return new_room
+
+# --- WEAPON ROOM CONTENT SPAWN STUBS ---
+func _spawn_weapon_room_content(room: Rect2):
+	"""Spawn weapon and torch circle in weapon room (stub)"""
+	var room_center = room.get_center()
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var weapon_world_pos = Vector3(
+		(room_center.x - half_map_x) * 2.0,
+		DEFAULT_OBJECT_HEIGHT,
+		(room_center.y - half_map_y) * 2.0
+	)
+	_spawn_weapon_pickup(weapon_world_pos)
+	_spawn_torch_circle_around_weapon(weapon_world_pos, room)
+	_apply_weapon_room_floor_material(room)
+
+func _spawn_weapon_pickup(spawn_pos: Vector3):
+	"""Spawn a weapon pickup at the specified position (stub)"""
+	if not weapon_pickup_scene:
+		print("❌ No weapon pickup scene available!")
+		return
+	var weapon_pickup = weapon_pickup_scene.instantiate()
+	add_child(weapon_pickup)
+	weapon_pickup.global_position = spawn_pos
+	generated_objects.append(weapon_pickup)
+
+func _spawn_torch_circle_around_weapon(center_pos: Vector3, room: Rect2):
+	"""Spawn torches in a circle around the weapon pickup (stub)"""
+	var torch_count = 6
+	var angle_step = TAU / torch_count
+	for i in range(torch_count):
+		var angle = i * angle_step
+		var torch_offset = Vector3(
+			cos(angle) * 3.0,
+			0,
+			sin(angle) * 3.0
+		)
+		var torch_pos = center_pos + torch_offset
+		torch_pos.y = torch_height_offset
+		var grid_pos = _world_to_grid_position(torch_pos)
+		if _is_valid_torch_position(grid_pos, room):
+			spawn_torch_at_position(torch_pos)
+
+func _apply_weapon_room_floor_material(room: Rect2):
+	"""Apply special golden floor material to weapon room (stub)"""
+	print("✨ Applying special weapon room floor material to room: ", room)
+
+func _world_to_grid_position(world_pos: Vector3) -> Vector2:
+	"""Convert world position back to grid position (stub)"""
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	return Vector2(
+		round(world_pos.x / 2.0 + half_map_x),
+		round(world_pos.z / 2.0 + half_map_y)
+	)
+
+func get_rooms(include_weapon_rooms := true) -> Array:
+	"""Return all rooms. If include_weapon_rooms is false, only normal rooms are returned."""
+	var result = []
+	for i in range(rooms.size()):
+		if include_weapon_rooms or room_types[i] == RoomType.NORMAL:
+			result.append(rooms[i])
+	return result
