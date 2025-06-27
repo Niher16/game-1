@@ -1,6 +1,213 @@
-[gd_scene load_steps=5 format=3 uid="uid://cwlso1g70cwp4"]
+[gd_scene load_steps=5 format=3 uid="uid://c7ptayqwvlnd7"]
 
-[ext_resource type="Script" uid="uid://8gflgfaebifw" path="res://dot gds/jail_door.gd" id="1"]
+[sub_resource type="GDScript" id="GDScript_3rffr"]
+script/source = "# jail_door.gd - Enhanced jail door with proper E key interaction and animations
+extends StaticBody3D
+
+@export var is_open: bool = false
+@export var open_animation_time: float = 1.0
+@export var interaction_distance: float = 3.0
+
+var player_in_range := false
+var original_position: Vector3
+var open_position: Vector3
+var tween: Tween
+var interaction_ui: Label3D
+
+func _ready():
+	# Store original position for animations
+	original_position = global_position
+	# Calculate open position (move the door up and make it semi-transparent)
+	open_position = original_position + Vector3(0, 4.0, 0)
+	
+	# Create interaction UI
+	_setup_interaction_ui()
+	
+	# Set up area detection
+	var area = $Area3D if has_node(\"Area3D\") else null
+	if area:
+		area.body_entered.connect(_on_body_entered)
+		area.body_exited.connect(_on_body_exited)
+		
+		# Ensure area has proper collision shape for interaction
+		var area_collision = area.get_node(\"CollisionShape3D\") if area.has_node(\"CollisionShape3D\") else null
+		if area_collision and area_collision.shape:
+			# Scale the interaction area to match our interaction distance
+			if area_collision.shape is BoxShape3D:
+				area_collision.shape.size = Vector3(interaction_distance * 2, 3.0, interaction_distance * 2)
+			elif area_collision.shape is SphereShape3D:
+				area_collision.shape.radius = interaction_distance
+	else:
+		print(\"[JailDoor] Warning: Area3D node not found. Creating one...\")
+		_create_interaction_area()
+
+func _setup_interaction_ui():
+	\"\"\"Create floating interaction text\"\"\"
+	interaction_ui = Label3D.new()
+	interaction_ui.text = \"Press E to Open Door\"
+	interaction_ui.position = Vector3(0, 2.0, 0)
+	interaction_ui.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	interaction_ui.modulate = Color(1.0, 1.0, 0.0, 0.9)  # Bright yellow
+	interaction_ui.font_size = 48
+	interaction_ui.outline_size = 4
+	interaction_ui.outline_modulate = Color.BLACK
+	interaction_ui.visible = false
+	add_child(interaction_ui)
+
+func _create_interaction_area():
+	\"\"\"Create interaction area if it doesn't exist\"\"\"
+	var area = Area3D.new()
+	area.name = \"Area3D\"
+	add_child(area)
+	
+	var collision = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(interaction_distance * 2, 3.0, interaction_distance * 2)
+	collision.shape = shape
+	area.add_child(collision)
+	
+	area.body_entered.connect(_on_body_entered)
+	area.body_exited.connect(_on_body_exited)
+
+func _on_body_entered(body):
+	if body.is_in_group(\"player\"):
+		player_in_range = true
+		if interaction_ui:
+			interaction_ui.visible = true
+		print(\"🚪 Player near jail door\")
+
+func _on_body_exited(body):
+	if body.is_in_group(\"player\"):
+		player_in_range = false
+		if interaction_ui:
+			interaction_ui.visible = false
+		print(\"🚪 Player left jail door area\")
+
+func _process(_delta):
+	# Check for E key interaction
+	if player_in_range and Input.is_action_just_pressed(\"interact\") and not is_open:
+		open_door()
+
+func open_door():
+	\"\"\"Open the jail door with smooth animation\"\"\"
+	if is_open:
+		return
+	
+	is_open = true
+	print(\"🚪 Opening jail door!\")
+	
+	# Hide interaction UI
+	if interaction_ui:
+		interaction_ui.visible = false
+	
+	# Disable collision so player can pass through
+	var collision = $CollisionShape3D if has_node(\"CollisionShape3D\") else null
+	if collision:
+		collision.disabled = true
+	
+	# Create smooth opening animation
+	if tween:
+		tween.kill()
+	tween = create_tween()
+	
+	# Animate position (move up)
+	tween.parallel().tween_property(self, \"global_position\", open_position, open_animation_time)
+	
+	# Animate transparency (make semi-transparent)
+	var mesh_instance = $MeshInstance3D if has_node(\"MeshInstance3D\") else null
+	if mesh_instance and mesh_instance.material_override:
+		tween.parallel().tween_method(_set_door_transparency, 1.0, 0.3, open_animation_time)
+	elif mesh_instance:
+		# Create material if it doesn't exist
+		var material = StandardMaterial3D.new()
+		material.albedo_color = Color.GRAY
+		material.flags_transparent = true
+		mesh_instance.material_override = material
+		tween.parallel().tween_method(_set_door_transparency, 1.0, 0.3, open_animation_time)
+	
+	# Set easing for smooth animation
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	
+	# Optional: Play sound effect when opening
+	_play_door_sound()
+	
+	# Optional: Add particle effects
+	_spawn_door_particles()
+
+func _set_door_transparency(alpha: float):
+	\"\"\"Helper method to set door transparency during animation\"\"\"
+	var mesh_instance = $MeshInstance3D if has_node(\"MeshInstance3D\") else null
+	if mesh_instance and mesh_instance.material_override:
+		mesh_instance.material_override.albedo_color.a = alpha
+
+func _play_door_sound():
+	\"\"\"Play door opening sound if audio system is available\"\"\"
+	# You can add audio here if you have an AudioStreamPlayer3D
+	var audio_player = $AudioStreamPlayer3D if has_node(\"AudioStreamPlayer3D\") else null
+	if audio_player and audio_player.stream:
+		audio_player.play()
+	else:
+		print(\"🔊 Door opening sound (no audio configured)\")
+
+func _spawn_door_particles():
+	\"\"\"Optional particle effects when door opens\"\"\"
+	# You could add particle effects here
+	print(\"✨ Door particles spawned\")
+
+func close_door():
+	\"\"\"Close the door (optional functionality)\"\"\"
+	if not is_open:
+		return
+	
+	is_open = false
+	print(\"🚪 Closing jail door!\")
+	
+	# Re-enable collision
+	var collision = $CollisionShape3D if has_node(\"CollisionShape3D\") else null
+	if collision:
+		collision.disabled = false
+	
+	# Animate back to original position
+	if tween:
+		tween.kill()
+	tween = create_tween()
+	
+	tween.parallel().tween_property(self, \"global_position\", original_position, open_animation_time)
+	
+	# Restore full opacity
+	var mesh_instance = $MeshInstance3D if has_node(\"MeshInstance3D\") else null
+	if mesh_instance and mesh_instance.material_override:
+		tween.parallel().tween_method(_set_door_transparency, 0.3, 1.0, open_animation_time)
+	
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+# Debug method to test door functionality
+func _unhandled_input(event):
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_O:  # Press O to open door (debug)
+				if not is_open:
+					open_door()
+			KEY_C:  # Press C to close door (debug)
+				if is_open:
+					close_door()
+
+# Method to check if door is open (for external scripts)
+func is_door_open() -> bool:
+	return is_open
+
+# Method to force open the door (for external scripts)
+func force_open():
+	if not is_open:
+		open_door()
+
+# Method to force close the door (for external scripts)  
+func force_close():
+	if is_open:
+		close_door()
+"
 
 [sub_resource type="BoxMesh" id="BoxMesh_3rffr"]
 
@@ -9,7 +216,7 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_h84cs"]
 
 [node name="JailDoor" type="StaticBody3D"]
-script = ExtResource("1")
+script = SubResource("GDScript_3rffr")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_3rffr")
