@@ -2,7 +2,6 @@
 extends Node3D
 
 signal new_room_generated(room_rect: Rect2)
-signal weapon_room_generated(room_rect: Rect2)
 
 @export var map_size = Vector2(60, 60)
 @export var base_room_size = Vector2(6, 6)
@@ -82,6 +81,13 @@ var jail_door_instance: Node3D  # NEW: Reference to spawned jail door
 var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
+
+# --- CONSTANTS FOR MAGIC NUMBERS ---
+const PLAYER_HEIGHT: float = 1.5
+const WALL_LAYER: int = 1 << 1
+const WALL_COLLISION_MASK: int = (1 << 2) | (1 << 3) | (1 << 4)
+const DEFAULT_OBJECT_HEIGHT: float = 1.0
+const DEFAULT_DOOR_HEIGHT: float = 1.25
 
 func _ready():
 	add_to_group("terrain")
@@ -218,7 +224,6 @@ func _spawn_torches_in_corridor(corridor_connection: Dictionary):
 	"""NEW: Spawn torches along a corridor path with proper spacing"""
 	var start_room = corridor_connection.start_room
 	var end_room = corridor_connection.end_room
-	var corridor_rect = corridor_connection.corridor_rect
 	
 	# Calculate corridor length for torch placement
 	var start_center = start_room.get_center()
@@ -236,6 +241,8 @@ func _spawn_torches_in_corridor(corridor_connection: Dictionary):
 	var is_horizontal = abs(direction.x) > abs(direction.y)
 	
 	var placed_torches = 0
+	var _half_map_x = map_size.x / 2
+	var _half_map_y = map_size.y / 2
 	
 	# Place torches evenly spaced along the corridor
 	for i in range(torch_count):
@@ -274,11 +281,13 @@ func _try_place_corridor_torch(grid_pos: Vector2) -> bool:
 	if terrain_grid[grid_x][grid_y] == TileType.WALL:
 		return false
 	
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	# Convert to world position
 	var world_pos = Vector3(
-		(grid_x - map_size.x / 2) * 2.0,
+		(grid_x - half_map_x) * 2.0,
 		torch_height_offset,
-		(grid_y - map_size.y / 2) * 2.0
+		(grid_y - half_map_y) * 2.0
 	)
 	
 	spawn_torch_at_position(world_pos)
@@ -310,10 +319,12 @@ func _spawn_torches_in_room(room: Rect2):
 			var grid_y = int(round(corner.y + local_offset.y))
 			if grid_x >= 0 and grid_x < map_size.x and grid_y >= 0 and grid_y < map_size.y:
 				if terrain_grid[grid_x][grid_y] == TileType.FLOOR or terrain_grid[grid_x][grid_y] == TileType.CORRIDOR:
+					var half_map_x = map_size.x / 2  # Only used here
+					var half_map_y = map_size.y / 2  # Only used here
 					var world_pos = Vector3(
-						(grid_x - map_size.x / 2) * 2.0,
+						(grid_x - half_map_x) * 2.0,
 						torch_height,
-						(grid_y - map_size.y / 2) * 2.0
+						(grid_y - half_map_y) * 2.0
 					)
 					spawn_torch_at_position(world_pos)
 					found = true
@@ -325,7 +336,7 @@ func _spawn_torches_in_room(room: Rect2):
 # IMPROVED JAIL DOOR SYSTEM
 # =====================================
 
-func _spawn_jail_door_at_corridor_entrance(start_room: Rect2, target_room: Rect2, corridor_connection: Dictionary):
+func _spawn_jail_door_at_corridor_entrance(start_room: Rect2, target_room: Rect2, _corridor_connection: Dictionary):
 	"""NEW: Properly position jail door to span the corridor entrance"""
 	if not ResourceLoader.exists("res://Scenes/JailDoor.tscn"):
 		print("❌ JailDoor.tscn not found!")
@@ -366,11 +377,13 @@ func _spawn_jail_door_at_corridor_entrance(start_room: Rect2, target_room: Rect2
 		# Scale to match corridor width
 		jail_door_instance.scale = Vector3(1.0, 1.0, corridor_width / 2.0)
 	
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	# Convert to world position
 	var world_pos = Vector3(
-		(entrance_pos.x - map_size.x / 2) * 2.0,
-		1.25,  # Door height
-		(entrance_pos.y - map_size.y / 2) * 2.0
+		(entrance_pos.x - half_map_x) * 2.0,
+		DEFAULT_DOOR_HEIGHT,  # Door height
+		(entrance_pos.y - half_map_y) * 2.0
 	)
 	
 	jail_door_instance.global_position = world_pos
@@ -558,28 +571,30 @@ func _generate_all_walls_with_boundary_protection():
 
 func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = false) -> StaticBody3D:
 	var wall = StaticBody3D.new()
-	wall.collision_layer = 1 << 1  # Layer 2 (Walls)
-	wall.collision_mask = (1 << 2) | (1 << 3) | (1 << 4)  # Collide with Player, Ally, Boss
-	
+	wall.collision_layer = WALL_LAYER
+	wall.collision_mask = WALL_COLLISION_MASK
+
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = BoxMesh.new()
 	mesh_instance.mesh.size = Vector3(2, wall_height, 2)
 	mesh_instance.material_override = boundary_wall_material if is_boundary else wall_material
-	
+
 	var collision_shape = CollisionShape3D.new()
 	collision_shape.shape = BoxShape3D.new()
 	collision_shape.shape.size = Vector3(2, wall_height, 2)
-	
+
 	wall.add_child(mesh_instance)
 	wall.add_child(collision_shape)
 	add_child(wall)
-	
+
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	wall.position = Vector3(
-		(grid_x - map_size.x / 2) * 2.0,
+		(grid_x - half_map_x) * 2.0,
 		wall_height / 2.0,
-		(grid_y - map_size.y / 2) * 2.0
+		(grid_y - half_map_y) * 2.0
 	)
-	
+
 	generated_objects.append(wall)
 	return wall
 
@@ -713,11 +728,13 @@ func _move_player_to_room(room: Rect2):
 		player = get_tree().get_first_node_in_group("player")
 		if not player:
 			return
-	
+
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	var room_center_world = Vector3(
-		(room.get_center().x - map_size.x / 2) * 2.0,
-		1.5,
-		(room.get_center().y - map_size.y / 2) * 2.0
+		(room.get_center().x - half_map_x) * 2.0,
+		PLAYER_HEIGHT,
+		(room.get_center().y - half_map_y) * 2.0
 	)
 	player.global_position = room_center_world
 	print("🗡️ Moved player to safe room center: ", room_center_world)
@@ -748,53 +765,57 @@ func _remove_walls_by_grid_lookup():
 func _spawn_destructible_objects_in_room(room: Rect2):
 	"""Spawn crates and barrels in room"""
 	var objects_to_spawn = randi_range(2, 4)
-	
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+
 	for i in range(objects_to_spawn):
 		var object_scene = crate_scene if randf() < 0.6 else barrel_scene
 		if not object_scene:
 			continue
-		
+
 		var object_instance = object_scene.instantiate()
 		add_child(object_instance)
-		
+
 		var random_pos = Vector2(
 			room.position.x + randf() * room.size.x,
 			room.position.y + randf() * room.size.y
 		)
-		
+
 		var world_pos = Vector3(
-			(random_pos.x - map_size.x / 2) * 2.0,
-			1.0,
-			(random_pos.y - map_size.y / 2) * 2.0
+			(random_pos.x - half_map_x) * 2.0,
+			DEFAULT_OBJECT_HEIGHT,
+			(random_pos.y - half_map_y) * 2.0
 		)
-		
+
 		object_instance.global_position = world_pos
 		generated_objects.append(object_instance)
 
 func _find_safe_recruiter_position(room: Rect2) -> Vector3:
 	"""Find safe position for recruiter away from other objects"""
 	var attempts = 10
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	for attempt in range(attempts):
 		var random_pos = Vector2(
 			room.position.x + 1 + randf() * (room.size.x - 2),
 			room.position.y + 1 + randf() * (room.size.y - 2)
 		)
-		
+
 		var world_pos = Vector3(
-			(random_pos.x - map_size.x / 2) * 2.0,
-			1.0,
-			(random_pos.y - map_size.y / 2) * 2.0
+			(random_pos.x - half_map_x) * 2.0,
+			DEFAULT_OBJECT_HEIGHT,
+			(random_pos.y - half_map_y) * 2.0
 		)
-		
+
 		var safe = true
 		for obj in generated_objects:
 			if is_instance_valid(obj) and world_pos.distance_to(obj.global_position) < 3.0:
 				safe = false
 				break
-		
+
 		if safe:
 			return world_pos
-	
+
 	return Vector3.ZERO
 
 func _on_wave_completed(wave_number: int):

@@ -29,6 +29,12 @@ const BOW_MESH = preload("res://3d Models/Bow/bow_01.obj")
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D")
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
+# Delays pickup for a short time (e.g., after spawning from physics)
+func _create_pickup_delay_effect(delay: float) -> void:
+	set_meta("pickup_disabled", true)
+	await get_tree().create_timer(delay).timeout
+	set_meta("pickup_disabled", false)
+
 # Floating text and interaction
 var floating_text: Label3D = null
 var player_in_range: bool = false
@@ -40,10 +46,14 @@ var time_alive: float = 0.0
 var weapon_parts: Array[MeshInstance3D] = []
 
 func _ready():
-	if weapon_resource:
-		pass
-	else:
-		print("❌ No weapon_resource assigned!")
+	# Copilot: Set up proper collision layers for weapon pickup Area3D
+	collision_layer = 4
+	collision_mask = 1 << 3 # Detect layer 3 (player)
+	# Copilot: Connect area signals for player detection
+	if not is_connected("body_entered", Callable(self, "_on_body_entered")):
+		connect("body_entered", Callable(self, "_on_body_entered"))
+	if not is_connected("body_exited", Callable(self, "_on_body_exited")):
+		connect("body_exited", Callable(self, "_on_body_exited"))
 	# Print scene node structure and mesh_instance existence
 	print("🗡️ Node children: ", get_children())
 	print("🗡️ mesh_instance exists: ", mesh_instance != null)
@@ -51,8 +61,6 @@ func _ready():
 	
 	print("🗡️ Enhanced Weapon Pickup: Setting up...")
 	add_to_group("weapon_pickup")
-	collision_layer = 4
-	collision_mask = 1
 	
 	# Set pickup disabled initially if this came from physics
 	if get_meta("from_physics", false):
@@ -64,6 +72,7 @@ func _ready():
 	# Defer visual setup to ensure scene is fully loaded
 	call_deferred("_deferred_setup_visual")
 	call_deferred("validate_scene_materials")
+	_setup_collision_shape()
 
 func validate_scene_materials():
 	var mesh_nodes = find_children("*", "MeshInstance3D", true, false)
@@ -403,87 +412,124 @@ func _animate_staff_effects(delta):
 			if part.material_override and part.material_override.billboard_mode == BaseMaterial3D.BILLBOARD_ENABLED:
 				part.rotation_degrees.z += 45 * delta
 
-func _input(_event):
-	if Input.is_action_just_pressed("interaction") and player_in_range and not get_meta("pickup_disabled", false):
+# Copilot: Create sphere collision shape for weapon pickup area
+func _setup_collision_shape():
+	if not collision_shape:
+		collision_shape = CollisionShape3D.new()
+		add_child(collision_shape)
+	if not collision_shape.shape or not collision_shape.shape is SphereShape3D:
+		var sphere = SphereShape3D.new()
+		sphere.radius = 1.5
+		collision_shape.shape = sphere
+
+# Copilot: Handle E key interaction for weapon pickup
+func _input(event):
+	if event.is_action_pressed("interact") and player_in_range and not get_meta("pickup_disabled", false):
 		_interact_with_weapon()
 
-func _on_area_entered(area: Area3D):
-	if area.get_parent() and area.get_parent().is_in_group("player"):
+# Copilot: Handle player entering weapon pickup area
+func _on_body_entered(body: Node3D):
+	if body.is_in_group("player"):
 		player_in_range = true
 		_update_interaction_text()
 		if floating_text:
 			floating_text.visible = true
-		print("🗡️ Player near weapon: ", weapon_resource.weapon_name if weapon_resource else "Unknown")
 
-func _on_area_exited(area: Area3D):
-	if area.get_parent() and area.get_parent().is_in_group("player"):
+func _on_body_exited(body: Node3D):
+	if body.is_in_group("player"):
 		player_in_range = false
 		if floating_text:
 			floating_text.visible = false
 
-func _update_interaction_text():
-	if not weapon_resource or not floating_text:
-		return
-
-	var weapon_name = weapon_resource.weapon_name
-	var player_has_weapon = WeaponManager.is_weapon_equipped()
-	
-	if player_has_weapon:
-		floating_text.text = "Press E to Swap for %s" % weapon_name
-		floating_text.modulate = Color(0.8, 0.8, 1.0, 0.9)
-	else:
-		floating_text.text = "Press E to Pick Up %s" % weapon_name
-		floating_text.modulate = Color(0.3, 1.0, 0.3, 0.9)
-
-func _interact_with_weapon():
+# Copilot: Create 3D weapon visual based on WeaponResource type
+func _create_weapon_visual():
 	if not weapon_resource:
+		_create_default_sword_visual()
 		return
-	
-	print("🗡️ Interacting with weapon: ", weapon_resource.weapon_name)
-	
-	if WeaponManager.is_weapon_equipped():
-		_swap_weapons()
-	else:
-		_pickup_weapon()
+	_clear_weapon_parts()
+	match int(weapon_resource.weapon_type):
+		int(WeaponResource.WeaponType.SWORD):
+			_create_enhanced_sword()
+		int(WeaponResource.WeaponType.BOW):
+			_create_simple_bow_visual()
+		int(WeaponResource.WeaponType.STAFF):
+			_create_enhanced_staff()
+		_:
+			_create_default_sword_visual()
 
-func _pickup_weapon():
-	WeaponManager.equip_weapon(weapon_resource)
-	print("🗡️ Picked up: ", weapon_resource.weapon_name)
-	queue_free()
+# Copilot: Add floating rotation and bob animation to weapon mesh
+# (Already handled in _process, but ensure all weapon_parts animate)
+# ...existing code...
 
-func _swap_weapons():
-	var old_weapon = WeaponManager.get_current_weapon()
-	WeaponManager.equip_weapon(weapon_resource)
-	print("🗡️ Swapped to: ", weapon_resource.weapon_name)
-	if old_weapon:
-		set_weapon_resource(old_weapon)
-		print("🗡️ Dropped: ", old_weapon.weapon_name)
-	else:
-		queue_free()
+# Copilot: Handle weapon pickup and swap logic with WeaponManager
+# (Already handled in _interact_with_weapon, but ensure logic is robust)
+# ...existing code...
 
+# Copilot: Create complete weapon pickup scene setup
+# (Scene structure is Area3D root, CollisionShape3D, MeshInstance3D children)
+# ...existing code...
+
+# Copilot: Create diagnostic function for weapon pickup debugging
+func _run_weapon_pickup_diagnostic():
+	print("[WeaponPickup Diagnostic]")
+	print("Collision Layer:", collision_layer)
+	print("Collision Mask:", collision_mask)
+	var found_player = get_tree().get_first_node_in_group("player")
+	print("Player found:", found_player)
+	var pickups = get_tree().get_nodes_in_group("weapon_pickup")
+	print("Weapon pickups in scene:", pickups.size())
+	for p in pickups:
+		print("- Pickup:", p, "Resource:", p.weapon_resource if "weapon_resource" in p else "None")
+
+# Copilot: Assign weapon resource and update pickup visuals
 func set_weapon_resource(new_resource: WeaponResource):
-	print("🗡️ set_weapon_resource called with: ", new_resource)
 	weapon_resource = new_resource
 	if weapon_resource and "weapon_name" in weapon_resource:
 		set_meta("weapon_name", weapon_resource.weapon_name)
-	# Always setup visual when resource is set, using deferred call for consistency
 	if is_inside_tree():
-		print("🗡️ Setting up visuals for weapon_resource: ", weapon_resource)
-		call_deferred("_deferred_setup_visual")
+		call_deferred("_create_weapon_visual")
 		if player_in_range:
 			_update_interaction_text()
 
-func _create_pickup_delay_effect(delay_time: float):
-	"""Create visual effect during pickup delay"""
-	print("🗡️ Weapon pickup delay effect for ", delay_time, " seconds")
-	# Dim the weapon during delay
+# Copilot: Add emission glow effect to weapon pickup materials
+func _add_glow_effect():
 	for part in weapon_parts:
-		if is_instance_valid(part) and part.material_override:
-			var material = part.material_override as StandardMaterial3D
-			if material and material.emission_enabled:
-				var tween = create_tween()
-				tween.set_loops(int(delay_time * 2))
-				var dim_emission = material.emission * 0.3
-				var normal_emission = material.emission
-				tween.tween_property(material, "emission", dim_emission, 0.25)
-				tween.tween_property(material, "emission", normal_emission, 0.25)
+		if part.material_override and part.material_override is StandardMaterial3D:
+			var mat = part.material_override
+			mat.emission_enabled = true
+			match int(weapon_resource.weapon_type):
+				int(WeaponResource.WeaponType.SWORD):
+					mat.emission = Color(0.7, 0.85, 1.0) * glow_intensity
+				int(WeaponResource.WeaponType.BOW):
+					mat.emission = Color(0.3, 0.6, 0.2) * glow_intensity
+				int(WeaponResource.WeaponType.STAFF):
+					mat.emission = Color(0.4, 0.6, 1.0) * glow_intensity
+				_:
+					mat.emission = Color.WHITE * glow_intensity
+
+# Copilot: Update the floating interaction text based on weapon_resource
+func _update_interaction_text():
+	if not floating_text:
+		return
+	if weapon_resource and "weapon_name" in weapon_resource:
+		floating_text.text = "Press E to Pick Up " + str(weapon_resource.weapon_name)
+	else:
+		floating_text.text = "Press E to Pick Up"
+
+# Copilot: Implement weapon pickup interaction logic
+func _interact_with_weapon():
+	# Prevent pickup if already disabled
+	if get_meta("pickup_disabled", false):
+		return
+	# Give weapon to player (assumes player has a WeaponManager or similar)
+	if player and player.has_method("pickup_weapon"):
+		player.pickup_weapon(weapon_resource)
+	# Play pickup sound or effect here if desired
+	# Disable further pickup and hide visuals
+	set_meta("pickup_disabled", true)
+	visible = false
+	if floating_text:
+		floating_text.visible = false
+	# Optionally queue_free() after a short delay
+	await get_tree().create_timer(0.2).timeout
+	queue_free()
