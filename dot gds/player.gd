@@ -171,6 +171,9 @@ func _ready():
 	add_child(death_timer)
 	death_timer.timeout.connect(_restart_scene)
 
+	# Ensure player is in the correct group and setup
+	_setup_player()
+
 func _setup_player():
 	add_to_group("player")
 	_configure_collision()

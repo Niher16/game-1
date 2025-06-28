@@ -210,7 +210,7 @@ func _create_enhanced_sword():
 	# 		safe_set_material(sword_mesh_instance, fallback)
 
 	# Position and scale for pickup (tweak as needed for your mesh)
-	sword_mesh_instance.position = Vector3(0, 0.5, 0)
+	sword_mesh_instance.position = Vector3(0, -4.5, 0)
 	sword_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
 	add_child(sword_mesh_instance)
 	weapon_parts.append(sword_mesh_instance)
@@ -239,7 +239,7 @@ func _create_simple_bow_visual():
 		fallback.albedo_color = Color(0.7, 0.5, 0.3)
 		safe_set_material(bow_mesh_instance, fallback)
 	# Raise the bow even higher above the ground
-	bow_mesh_instance.position = Vector3(0, 1.0, 0) # was 0.6
+	bow_mesh_instance.position = Vector3(0, -4.0, 0) # was 0.6
 	bow_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
 	add_child(bow_mesh_instance)
 	weapon_parts.append(bow_mesh_instance)
@@ -274,7 +274,7 @@ func _create_enhanced_staff():
 	ornate_mesh.bottom_radius = 0.03
 	ornate_mesh.height = 0.15
 	ornate_top.mesh = ornate_mesh
-	ornate_top.position = Vector3(0, 0.4, 0)
+	ornate_top.position = Vector3(0, -4.6, 0)
 	var ornate_material = StandardMaterial3D.new()
 	ornate_material.albedo_color = Color(0.8, 0.6, 0.2)
 	ornate_material.metallic = 0.9
@@ -296,7 +296,7 @@ func _create_enhanced_staff():
 	orb_mesh.radius = 0.12
 	orb_mesh.height = 0.15
 	orb.mesh = orb_mesh
-	orb.position = Vector3(0, 0.55, 0)
+	orb.position = Vector3(0, -4.45, 0)
 	var orb_material = StandardMaterial3D.new()
 	orb_material.albedo_color = Color(0.3, 0.5, 1.0, 0.8)
 	orb_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
