@@ -401,6 +401,17 @@ func generate_starting_room():
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
+	# Spawn a sword in the starting room
+	var starting_room_center = starting_room.get_center()
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var sword_spawn_pos = Vector3(
+		(starting_room_center.x - half_map_x) * 2.0,
+		DEFAULT_OBJECT_HEIGHT,
+		(starting_room_center.y - half_map_y) * 2.0
+	)
+	_spawn_weapon_pickup(sword_spawn_pos)
+
 	# --- CREATE FIRST WAVE ROOM FARTHER AWAY ---
 	print("🗡️ Creating first wave room connected to starting room...")
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):

@@ -191,8 +191,31 @@ func _setup_player():
 	_create_arrow_system()
 
 func _configure_collision():
-	collision_layer = 1 << 2  # Layer 3 (Player)
+	# FIXED: Set player to Layer 3 (binary 100 = 4) so weapon pickups can detect it
+	collision_layer = 4  # Layer 3 (Player) - binary 100
 	collision_mask = (1 << 0) | (1 << 1) | (1 << 3) | (1 << 4)  # Collide with World, Walls, Ally, Boss
+	
+	print("✅ Player collision configured:")
+	print("  - Player collision layer: ", collision_layer)
+	print("  - Player collision mask: ", collision_mask)
+
+# Add this debug function to test your collision setup
+func debug_collision_layers():
+	print("🔍 [PLAYER COLLISION DEBUG]")
+	print("  - collision_layer: ", collision_layer)
+	print("  - collision_mask: ", collision_mask)
+	print("  - Global position: ", global_position)
+	print("  - Is in player group: ", is_in_group("player"))
+	
+	# Test weapon pickup detection
+	var weapon_pickups = get_tree().get_nodes_in_group("weapon_pickup")
+	print("  - Weapon pickups in scene: ", weapon_pickups.size())
+	
+	for pickup in weapon_pickups:
+		var distance = global_position.distance_to(pickup.global_position)
+		print("    - Pickup at distance: ", distance)
+		if distance < 2.0:
+			print("      ⚠️ Close to pickup but not detecting? Check collision layers!")
 
 func _create_visual():
 	var existing_mesh = get_node_or_null("MeshInstance3D")

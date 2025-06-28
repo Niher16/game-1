@@ -46,33 +46,65 @@ var time_alive: float = 0.0
 var weapon_parts: Array[MeshInstance3D] = []
 
 func _ready():
-	# Copilot: Set up proper collision layers for weapon pickup Area3D
-	collision_layer = 4
-	collision_mask = 1 << 3 # Detect layer 3 (player)
-	# Copilot: Connect area signals for player detection
+	# CRITICAL: Set up proper collision layers for weapon pickup Area3D
+	collision_layer = 8  # Layer 4 (weapon pickups)
+	collision_mask = 4   # Detect layer 3 (player) - binary 100 = 4
+	
+	print("🗡️ Weapon Pickup Setup:")
+	print("  - Collision Layer: ", collision_layer)
+	print("  - Collision Mask: ", collision_mask)
+	
+	# Connect signals properly (these are the correct signal names for Area3D)
 	if not is_connected("body_entered", Callable(self, "_on_body_entered")):
 		connect("body_entered", Callable(self, "_on_body_entered"))
+		print("  ✅ Connected body_entered signal")
+	
 	if not is_connected("body_exited", Callable(self, "_on_body_exited")):
 		connect("body_exited", Callable(self, "_on_body_exited"))
-	# Print scene node structure and mesh_instance existence
-	print("🗡️ Node children: ", get_children())
-	print("🗡️ mesh_instance exists: ", mesh_instance != null)
-	print("🗡️ mesh_instance path: ", str(mesh_instance.get_path()) if mesh_instance else "None")
+		print("  ✅ Connected body_exited signal")
 	
-	print("🗡️ Enhanced Weapon Pickup: Setting up...")
+	# Continue with rest of setup
 	add_to_group("weapon_pickup")
 	
-	# Set pickup disabled initially if this came from physics
 	if get_meta("from_physics", false):
 		set_meta("pickup_disabled", true)
 		_create_pickup_delay_effect(0.2)
 	
 	_find_player()
 	_create_floating_text()
-	# Defer visual setup to ensure scene is fully loaded
 	call_deferred("_deferred_setup_visual")
 	call_deferred("validate_scene_materials")
 	_setup_collision_shape()
+	call_deferred("_auto_assign_weapon_if_missing")
+
+# NEW FUNCTION: Auto-assign weapon if none exists
+func _auto_assign_weapon_if_missing():
+	"""Automatically assign a weapon resource if none exists"""
+	if not weapon_resource:
+		print("⚠️ No weapon resource found, auto-assigning...")
+		if WeaponPool and WeaponPool.has_method("get_random_weapon"):
+			var auto_weapon = WeaponPool.get_random_weapon()
+			if auto_weapon:
+				set_weapon_resource(auto_weapon)
+				print("✅ Auto-assigned weapon: ", auto_weapon.weapon_name)
+			else:
+				print("❌ WeaponPool returned null weapon!")
+		else:
+			# Fallback: create a basic sword
+			print("⚠️ WeaponPool not available, creating fallback weapon...")
+			_create_fallback_weapon()
+
+# NEW FUNCTION: Create a basic weapon as fallback
+func _create_fallback_weapon():
+	"""Create a basic weapon resource as fallback"""
+	var fallback_weapon = WeaponResource.new()
+	fallback_weapon.weapon_name = "Iron Sword"
+	fallback_weapon.weapon_type = WeaponResource.WeaponType.SWORD
+	fallback_weapon.attack_damage = 25
+	fallback_weapon.attack_range = 2.5
+	fallback_weapon.attack_cooldown = 0.8
+	set_weapon_resource(fallback_weapon)
+	print("✅ Created fallback weapon: ", fallback_weapon.weapon_name)
 
 func validate_scene_materials():
 	var mesh_nodes = find_children("*", "MeshInstance3D", true, false)
@@ -510,26 +542,105 @@ func _add_glow_effect():
 # Copilot: Update the floating interaction text based on weapon_resource
 func _update_interaction_text():
 	if not floating_text:
+		print("⚠️ No floating_text found!")
 		return
-	if weapon_resource and "weapon_name" in weapon_resource:
-		floating_text.text = "Press E to Pick Up " + str(weapon_resource.weapon_name)
+	print("🏷️ Updating interaction text...")
+	if weapon_resource and weapon_resource.has("weapon_name"):
+		var weapon_name = weapon_resource.weapon_name
+		print("  - Weapon name found: '", weapon_name, "'")
+		floating_text.text = "Press E to Pick Up " + str(weapon_name)
 	else:
+		print("  - No weapon resource or weapon_name, using default")
 		floating_text.text = "Press E to Pick Up"
+	print("  - Final text: '", floating_text.text, "'")
+
+# Debug function to inspect weapon resource and WeaponPool
+func debug_weapon_resource():
+	print("🔍 WEAPON PICKUP DEBUG:")
+	print("  - weapon_resource exists: ", weapon_resource != null)
+	if weapon_resource:
+		print("  - weapon_name: '", weapon_resource.weapon_name, "'")
+		print("  - weapon_type: ", weapon_resource.weapon_type)
+		print("  - attack_damage: ", weapon_resource.attack_damage)
+	else:
+		print("  - NO WEAPON RESOURCE ASSIGNED!")
+	
+	# Test WeaponPool
+	if WeaponPool:
+		print("  - WeaponPool exists: ✅")
+		var test_weapon = WeaponPool.get_random_weapon()
+		if test_weapon:
+			print("  - WeaponPool test weapon: '", test_weapon.weapon_name, "'")
+		else:
+			print("  - WeaponPool returned null!")
+	else:
+		print("  - WeaponPool missing: ❌")
+
+# Create a test function to manually assign a weapon
+func assign_test_weapon():
+	print("🧪 Assigning test weapon...")
+	if WeaponPool:
+		var test_weapon = WeaponPool.get_random_weapon()
+		if test_weapon:
+			set_weapon_resource(test_weapon)
+			print("✅ Test weapon assigned: ", test_weapon.weapon_name)
+		else:
+			print("❌ WeaponPool returned null weapon!")
+	else:
+		print("❌ WeaponPool not found!")
 
 # Copilot: Implement weapon pickup interaction logic
 func _interact_with_weapon():
+	print("🗡️ WEAPON INTERACTION TRIGGERED")
+	
 	# Prevent pickup if already disabled
 	if get_meta("pickup_disabled", false):
+		print("❌ Pickup disabled, ignoring interaction")
 		return
-	# Give weapon to player (assumes player has a WeaponManager or similar)
-	if player and player.has_method("pickup_weapon"):
+	
+	if not weapon_resource:
+		print("❌ No weapon resource assigned!")
+		return
+	
+	if not player:
+		player = get_tree().get_first_node_in_group("player")
+		if not player:
+			print("❌ No player found!")
+			return
+	
+	print("✅ Attempting weapon pickup: ", weapon_resource.weapon_name)
+	
+	# Check if player has pickup_weapon method
+	if player.has_method("pickup_weapon"):
 		player.pickup_weapon(weapon_resource)
-	# Play pickup sound or effect here if desired
-	# Disable further pickup and hide visuals
+		print("✅ Weapon given to player via pickup_weapon()")
+	else:
+		# Fallback: try to equip directly via WeaponManager
+		if WeaponManager:
+			WeaponManager.equip_weapon(weapon_resource)
+			print("✅ Weapon equipped via WeaponManager fallback")
+		else:
+			print("❌ No pickup method available!")
+			return
+	
+	# Disable pickup and cleanup
 	set_meta("pickup_disabled", true)
 	visible = false
 	if floating_text:
 		floating_text.visible = false
-	# Optionally queue_free() after a short delay
+	
+	# Cleanup after short delay
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
+
+# Call this in your scene to test the pickup system
+func test_pickup_system():
+	print("🧪 TESTING WEAPON PICKUP SYSTEM")
+	_run_weapon_pickup_diagnostic()
+	
+	# Test interaction if player is nearby
+	var test_player = get_tree().get_first_node_in_group("player")
+	if test_player and global_position.distance_to(test_player.global_position) < 3.0:
+		print("🧪 Player nearby, testing interaction...")
+		player_in_range = true
+		_interact_with_weapon()
