@@ -15,6 +15,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import fs from "fs/promises";
 import path from "path";
+import { exec } from "child_process";
 
 class GodotMCPServer {
   constructor() {
@@ -29,6 +30,8 @@ class GodotMCPServer {
         },
       }
     );
+
+    this.projectRoot = process.cwd(); // Default to current working directory
 
     this.setupToolHandlers();
     this.setupErrorHandling();
@@ -155,8 +158,132 @@ class GodotMCPServer {
                 type: "string",
                 description: "Path to the Godot project directory",
               },
+              max_depth: {
+                type: "integer",
+                description: "Maximum directory depth to scan (default 4)",
+                default: 4,
+              },
             },
             required: ["project_path"],
+          },
+        },
+        {
+          name: "read_resource",
+          description: "Read the content and summary of a Godot .tres or .res resource file",
+          inputSchema: {
+            type: "object",
+            properties: {
+              file_path: {
+                type: "string",
+                description: "Path to the resource file to read",
+              },
+            },
+            required: ["file_path"],
+          },
+        },
+        {
+          name: "create_resource",
+          description: "Create a new Godot .tres or .res resource file with specified content",
+          inputSchema: {
+            type: "object",
+            properties: {
+              file_path: {
+                type: "string",
+                description: "Path where the resource file should be created",
+              },
+              content: {
+                type: "string",
+                description: "Resource file content",
+              },
+            },
+            required: ["file_path", "content"],
+          },
+        },
+        {
+          name: "modify_resource",
+          description: "Modify an existing Godot .tres or .res resource file by replacing its content",
+          inputSchema: {
+            type: "object",
+            properties: {
+              file_path: {
+                type: "string",
+                description: "Path to the resource file to modify",
+              },
+              content: {
+                type: "string",
+                description: "New resource file content",
+              },
+            },
+            required: ["file_path", "content"],
+          },
+        },
+        {
+          name: "validate_project",
+          description: "Check for missing scripts, broken scene references, and duplicate class names in the Godot project.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_path: {
+                type: "string",
+                description: "Path to the Godot project directory",
+              },
+            },
+            required: ["project_path"],
+          },
+        },
+        {
+          name: "generate_docs",
+          description: "Generate markdown documentation for all scripts and scenes in the Godot project.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_path: {
+                type: "string",
+                description: "Path to the Godot project directory",
+              },
+            },
+            required: ["project_path"],
+          },
+        },
+        {
+          name: "run_godot_cli",
+          description: "Run a Godot CLI command (e.g., export, run, build) and return the output.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_path: {
+                type: "string",
+                description: "Path to the Godot project directory",
+              },
+              args: {
+                type: "string",
+                description: "Arguments to pass to the Godot executable (e.g., --export-debug Windows)"
+              },
+              godot_executable: {
+                type: "string",
+                description: "Path to the Godot executable (optional, defaults to 'godot')",
+                default: "godot"
+              }
+            },
+            required: ["project_path", "args"],
+          },
+        },
+        {
+          name: "check_godot_version",
+          description: "Parse and report the Godot version from project.godot, warn if it doesn't match the expected version.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_path: {
+                type: "string",
+                description: "Path to the Godot project directory",
+              },
+              expected_version: {
+                type: "string",
+                description: "Expected Godot version (e.g., 4.4)",
+              },
+            },
+            required: ["project_path", "expected_version"],
           },
         },
       ],
@@ -165,7 +292,6 @@ class GodotMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-
       try {
         switch (name) {
           case "read_godot_project":
@@ -193,8 +319,29 @@ class GodotMCPServer {
             );
           
           case "analyze_project_structure":
-            return await this.analyzeProjectStructure(args.project_path);
-
+            return await this.analyzeProjectStructure(args.project_path, args.max_depth || 4);
+          
+          case "read_resource":
+            return await this.readResource(args.file_path);
+          
+          case "create_resource":
+            return await this.createResource(args.file_path, args.content);
+          
+          case "modify_resource":
+            return await this.modifyResource(args.file_path, args.content);
+          
+          case "validate_project":
+            return await this.validateProject(args.project_path);
+          
+          case "generate_docs":
+            return await this.generateDocs(args.project_path);
+          
+          case "run_godot_cli":
+            return await this.runGodotCLI(args.project_path, args.args, args.godot_executable || "godot");
+          
+          case "check_godot_version":
+            return await this.checkGodotVersion(args.project_path, args.expected_version);
+          
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -243,10 +390,19 @@ ${projectContent.substring(0, 500)}...`,
     }
   }
 
+  // Path validation helper
+  validatePath(filePath) {
+    const resolved = path.resolve(this.projectRoot, filePath);
+    if (!resolved.startsWith(this.projectRoot)) {
+      throw new Error(`Invalid file path: ${filePath}`);
+    }
+    return resolved;
+  }
+
   async createGDScript(filePath, content, className) {
     try {
-      // Ensure the directory exists
-      const dir = path.dirname(filePath);
+      const safePath = this.validatePath(filePath);
+      const dir = path.dirname(safePath);
       await fs.mkdir(dir, { recursive: true });
       
       // Add class_name if provided
@@ -260,7 +416,7 @@ ${projectContent.substring(0, 500)}...`,
         scriptContent = `extends Node\n\n${scriptContent}`;
       }
       
-      await fs.writeFile(filePath, scriptContent, "utf-8");
+      await fs.writeFile(safePath, scriptContent, "utf-8");
       
       return {
         content: [
@@ -274,41 +430,80 @@ ${scriptContent.substring(0, 200)}...`,
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to create GDScript: ${error.message}`);
+      throw new Error(`Failed to create GDScript at ${filePath}: ${error.message}`);
     }
+  }
+
+  analyzeGDScript(content) {
+    const analysis = {
+      extends: "Unknown",
+      className: null,
+      functions: [],
+      variables: [],
+      signals: [],
+      annotations: [],
+      typedVariables: [],
+    };
+
+    const lines = content.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Annotations (e.g., @export, @onready, @icon)
+      if (trimmed.startsWith("@")) {
+        const annotation = trimmed.split(" ")[0];
+        if (!analysis.annotations.includes(annotation)) {
+          analysis.annotations.push(annotation);
+        }
+      }
+      if (trimmed.startsWith("extends ")) {
+        analysis.extends = trimmed.substring(8);
+      } else if (trimmed.startsWith("class_name ")) {
+        analysis.className = trimmed.substring(11);
+      } else if (trimmed.startsWith("func ")) {
+        const funcMatch = trimmed.match(/func\s+(\w+)/);
+        if (funcMatch) analysis.functions.push(funcMatch[1]);
+      } else if (trimmed.match(/^var\s+\w+\s*:/)) {
+        // Typed variable
+        const varMatch = trimmed.match(/^var\s+(\w+)\s*:\s*([\w\[\]]+)/);
+        if (varMatch) {
+          analysis.typedVariables.push({ name: varMatch[1], type: varMatch[2] });
+          analysis.variables.push(varMatch[1]);
+        }
+      } else if (trimmed.startsWith("var ") || trimmed.startsWith("@export var ")) {
+        const varMatch = trimmed.match(/var\s+(\w+)/);
+        if (varMatch) analysis.variables.push(varMatch[1]);
+      } else if (trimmed.startsWith("signal ")) {
+        const signalMatch = trimmed.match(/signal\s+(\w+)/);
+        if (signalMatch) analysis.signals.push(signalMatch[1]);
+      }
+    }
+    return analysis;
   }
 
   async readGDScript(filePath) {
     try {
-      const content = await fs.readFile(filePath, "utf-8");
+      const safePath = this.validatePath(filePath);
+      const content = await fs.readFile(safePath, "utf-8");
       const analysis = this.analyzeGDScript(content);
-      
+      // Enhanced summary for Godot 4.4
+      let summary = `GDScript File: ${filePath}\n\nAnalysis:\n- Extends: ${analysis.extends}\n- Class Name: ${analysis.className || "None"}\n- Functions: ${analysis.functions.join(", ") || "None"}\n- Variables: ${analysis.variables.join(", ") || "None"}\n- Typed Variables: ${analysis.typedVariables.map(v => `${v.name}: ${v.type}`).join(", ") || "None"}\n- Annotations: ${analysis.annotations.join(", ") || "None"}\n- Signals: ${analysis.signals.join(", ") || "None"}\n\nFull Content:\n${content}`;
       return {
         content: [
           {
             type: "text",
-            text: `GDScript File: ${filePath}
-
-Analysis:
-- Extends: ${analysis.extends}
-- Class Name: ${analysis.className || "None"}
-- Functions: ${analysis.functions.join(", ") || "None"}
-- Variables: ${analysis.variables.join(", ") || "None"}
-- Signals: ${analysis.signals.join(", ") || "None"}
-
-Full Content:
-${content}`,
+            text: summary,
           },
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to read GDScript: ${error.message}`);
+      throw new Error(`Failed to read GDScript at ${filePath}: ${error.message}`);
     }
   }
 
   async modifyGDScript(filePath, functionName, functionContent, insertAfter) {
     try {
-      let content = await fs.readFile(filePath, "utf-8");
+      const safePath = this.validatePath(filePath);
+      let content = await fs.readFile(safePath, "utf-8");
       const lines = content.split("\n");
       
       // Find existing function and replace it, or add new function
@@ -346,7 +541,7 @@ ${content}`,
         }
       }
       
-      await fs.writeFile(filePath, content, "utf-8");
+      await fs.writeFile(safePath, content, "utf-8");
       
       return {
         content: [
@@ -361,13 +556,14 @@ ${functionContent}`,
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to modify GDScript: ${error.message}`);
+      throw new Error(`Failed to modify GDScript at ${filePath}: ${error.message}`);
     }
   }
 
   async createSceneTemplate(scenePath, rootNodeType, sceneName) {
     try {
-      const dir = path.dirname(scenePath);
+      const safePath = this.validatePath(scenePath);
+      const dir = path.dirname(safePath);
       await fs.mkdir(dir, { recursive: true });
       
       const sceneContent = `[gd_scene load_steps=1 format=3]
@@ -375,7 +571,7 @@ ${functionContent}`,
 [node name="${sceneName}" type="${rootNodeType}"]
 `;
       
-      await fs.writeFile(scenePath, sceneContent, "utf-8");
+      await fs.writeFile(safePath, sceneContent, "utf-8");
       
       return {
         content: [
@@ -390,13 +586,13 @@ You can now open this scene in Godot and add more nodes!`,
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to create scene template: ${error.message}`);
+      throw new Error(`Failed to create scene template at ${scenePath}: ${error.message}`);
     }
   }
 
-  async analyzeProjectStructure(projectPath) {
+  async analyzeProjectStructure(projectPath, maxDepth = 4) {
     try {
-      const structure = await this.getDetailedStructure(projectPath);
+      const structure = await this.getDetailedStructure(projectPath, maxDepth);
       const scripts = await this.findAllScripts(projectPath);
       const scenes = await this.findAllScenes(projectPath);
       
@@ -424,8 +620,12 @@ DEVELOPMENT RECOMMENDATIONS:
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to analyze project structure: ${error.message}`);
+      throw new Error(`Failed to analyze project structure at ${projectPath}: ${error.message}`);
     }
+  }
+
+  async getDetailedStructure(projectPath, maxDepth = 4) {
+    return await this.getDirectoryStructure(projectPath, "", maxDepth, 0);
   }
 
   // Helper methods
@@ -478,10 +678,6 @@ DEVELOPMENT RECOMMENDATIONS:
     }
   }
 
-  async getDetailedStructure(projectPath) {
-    return await this.getDirectoryStructure(projectPath, "", 4, 0);
-  }
-
   async findAllScripts(projectPath) {
     const scripts = [];
     await this.findFilesByExtension(projectPath, ".gd", scripts);
@@ -513,39 +709,6 @@ DEVELOPMENT RECOMMENDATIONS:
     } catch (error) {
       // Ignore errors for inaccessible directories
     }
-  }
-
-  analyzeGDScript(content) {
-    const analysis = {
-      extends: "Unknown",
-      className: null,
-      functions: [],
-      variables: [],
-      signals: [],
-    };
-
-    const lines = content.split("\n");
-    
-    for (const line of lines) {
-      const trimmed = line.trim();
-      
-      if (trimmed.startsWith("extends ")) {
-        analysis.extends = trimmed.substring(8);
-      } else if (trimmed.startsWith("class_name ")) {
-        analysis.className = trimmed.substring(11);
-      } else if (trimmed.startsWith("func ")) {
-        const funcMatch = trimmed.match(/func\s+(\w+)/);
-        if (funcMatch) analysis.functions.push(funcMatch[1]);
-      } else if (trimmed.startsWith("var ") || trimmed.startsWith("@export var ")) {
-        const varMatch = trimmed.match(/var\s+(\w+)/);
-        if (varMatch) analysis.variables.push(varMatch[1]);
-      } else if (trimmed.startsWith("signal ")) {
-        const signalMatch = trimmed.match(/signal\s+(\w+)/);
-        if (signalMatch) analysis.signals.push(signalMatch[1]);
-      }
-    }
-
-    return analysis;
   }
 
   getFileIcon(filename) {

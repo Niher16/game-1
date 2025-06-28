@@ -9,5 +9,9 @@
             }
         }
     },
-    "godotTools.editorPath.godot4": "d:\\Godot_Engine\\Godot_v4.4.1-stable_win64.exe"
+    "godotTools.editorPath.godot4": "d:\\Godot_Engine\\Godot_v4.4.1-stable_win64.exe",
+    "task.autoDetect": "off",
+    "tasks.runOnOpen": [
+        "Start Godot MCP Server"
+    ]
 }

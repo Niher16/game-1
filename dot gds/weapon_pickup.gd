@@ -545,14 +545,14 @@ func _update_interaction_text():
 		print("⚠️ No floating_text found!")
 		return
 	print("🏷️ Updating interaction text...")
-	if weapon_resource and weapon_resource.has("weapon_name"):
+	if weapon_resource and weapon_resource.weapon_name != "":
 		var weapon_name = weapon_resource.weapon_name
-		print("  - Weapon name found: '", weapon_name, "'")
+		print("  - Weapon name found: ", weapon_name, "")
 		floating_text.text = "Press E to Pick Up " + str(weapon_name)
 	else:
 		print("  - No weapon resource or weapon_name, using default")
 		floating_text.text = "Press E to Pick Up"
-	print("  - Final text: '", floating_text.text, "'")
+	print("  - Final text: ", floating_text.text, "\n")
 
 # Debug function to inspect weapon resource and WeaponPool
 func debug_weapon_resource():

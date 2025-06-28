@@ -25,16 +25,27 @@ func _ready():
 	_load_all_weapons()
 
 func _load_all_weapons():
-	"""Load all weapon resources from the Weapons folder"""
-	# Common weapons (starting tier)
-	_add_weapon_to_pool("res://Weapons/iron_sword.tres", "common")
-	
-	# Uncommon weapons (mid-tier)
-	
-	# Rare weapons (high-tier)
-	
-	# Add legendary weapons as you create them:
-	# _add_weapon_to_pool("res://Weapons/excalibur.tres", "legendary")
+	"""Load all weapon resources from the Weapons folder automatically (MCP)"""
+	var dir = DirAccess.open("res://Weapons")
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			if file_name.ends_with(".tres"):
+				var weapon_path = "res://Weapons/" + file_name
+				# Default all to common, or use naming for rarity
+				var rarity = "common"
+				if file_name.findn("bow") != -1:
+					rarity = "uncommon"
+				elif file_name.findn("legendary") != -1:
+					rarity = "legendary"
+				elif file_name.findn("rare") != -1:
+					rarity = "rare"
+				_add_weapon_to_pool(weapon_path, rarity)
+			file_name = dir.get_next()
+		dir.list_dir_end()
+	else:
+		print("⚠️ Could not open Weapons directory!")
 
 func _add_weapon_to_pool(weapon_path: String, rarity: String):
 	"""Add a weapon resource to the specified pool"""
