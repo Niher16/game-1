@@ -47,12 +47,32 @@ func equip_weapon(weapon_resource: WeaponResource) -> void:
 				sword_node.add_child(MeshInstance3D.new())
 			var mesh_instance = sword_node.get_child(0) as MeshInstance3D
 			mesh_instance.mesh = preload("res://3d Models/Sword/broadsword.obj")
+
+			# Set iron sword material
+			var iron_material = StandardMaterial3D.new()
+			iron_material.albedo_color = Color(0.6, 0.6, 0.65) # iron gray
+			iron_material.metallic = 0.85
+			iron_material.roughness = 0.25
+			iron_material.emission_enabled = false
+			mesh_instance.material_override = iron_material
+
 			sword_node.visible = true
 		elif weapon_resource.weapon_type == WeaponResource.WeaponType.BOW and bow_node:
 			if bow_node.get_child_count() == 0:
 				bow_node.add_child(MeshInstance3D.new())
 			var mesh_instance = bow_node.get_child(0) as MeshInstance3D
 			mesh_instance.mesh = preload("res://3d Models/Bow/bow_01.obj")
+
+			# Set bow material to match pickup
+			var bow_material = StandardMaterial3D.new()
+			bow_material.albedo_color = Color(0.7, 0.5, 0.3)
+			bow_material.metallic = 0.2
+			bow_material.roughness = 0.5
+			bow_material.emission_enabled = true
+			var glow_intensity = 1.5 # Match pickup default
+			bow_material.emission = Color(0.3, 0.6, 0.2) * glow_intensity * 0.2
+			mesh_instance.material_override = bow_material
+
 			bow_node.visible = true
 		# You can add staff logic here if needed
 	else:

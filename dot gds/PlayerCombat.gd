@@ -7,14 +7,13 @@ extends Node
 class_name PlayerCombat
 
 # Signals for combat events and animation coordination
-signal attack_started(combo_index: int)
-signal attack_finished(combo_index: int)
-signal enemy_hit(enemy: Node, damage: int, combo_index: int)
+signal attack_started()
+signal attack_finished()
+signal enemy_hit(enemy: Node, damage: int)
 signal attack_state_changed(state: int) # For animation handoff
-signal punch_animation_changed(is_animating: bool)
 
 # Combat state enum (expanded)
-enum CombatState { IDLE, ATTACKING, COMBO, BLOCKING, COOLDOWN }
+enum CombatState { IDLE, ATTACKING, BLOCKING, COOLDOWN }
 var state: CombatState = CombatState.IDLE
 
 # References
@@ -33,10 +32,6 @@ var is_punch_animating: bool = false
 # Attack/combo system
 var last_attack_time: float = 0.0
 var attack_cooldown: float = 1.0
-var combo_index: int = 0
-var combo_max: int = 3
-var combo_reset_time: float = 1.0
-var last_combo_time: float = 0.0
 
 var attack_timer: Timer = null
 
@@ -54,8 +49,6 @@ func initialize(player_ref: CharacterBody3D, movement_ref: Node = null):
 	state = CombatState.IDLE
 	weapon = null
 	last_attack_time = 0.0
-	combo_index = 0
-	last_combo_time = 0.0
 	attack_cooldown = player.attack_cooldown if "attack_cooldown" in player else 1.0
 	weapon_animation_player = player.get_node('WeaponAnimationPlayer')
 	if weapon_animation_player:
@@ -70,16 +63,6 @@ func initialize(player_ref: CharacterBody3D, movement_ref: Node = null):
 			punch_sounds.append(player.get_node(node_name))
 	whoosh_sound = player.get_node_or_null("WhooshSound")
 	impact_sound = player.get_node_or_null("ImpactSound")
-	# Connect punch animation signal to movement for hand animation blocking
-	if movement_component and movement_component.has_method("set_punch_animating"):
-		punch_animation_changed.connect(
-			func(is_animating):
-				if movement_component and movement_component.has_method("set_punch_animating"):
-					movement_component.set_punch_animating(is_animating)
-					print("[Combat] punch_animation_changed signal delivered to movement_component: ", is_animating)
-				else:
-					print("[Combat] movement_component missing set_punch_animating()")
-		)
 	if not attack_timer:
 		attack_timer = Timer.new()
 		attack_timer.one_shot = true
@@ -150,17 +133,12 @@ func _start_attack_sequence():
 		print("[Combat][", Time.get_ticks_msec()/1000.0, "] Attack blocked: not IDLE (state=", state, ")")
 		return
 	var now = Time.get_ticks_msec() / 1000.0
-	if now - last_combo_time > combo_reset_time:
-		combo_index = 0
-	else:
-		combo_index = (combo_index + 1) % combo_max
-	last_combo_time = now
 	last_attack_time = now
 	state = CombatState.ATTACKING
-	print("[Combat][", now, "] State -> ATTACKING (combo ", combo_index, ")")
+	print("[Combat][", now, "] State -> ATTACKING")
 	attack_state_changed.emit(state)
-	attack_started.emit(combo_index)
-	_play_attack_animation(combo_index)
+	attack_started.emit()
+	_play_attack_animation()
 	# Windup phase
 	attack_timer.stop()
 	attack_timer.wait_time = 0.12
@@ -174,11 +152,11 @@ func _on_attack_timer_timeout():
 		print("[Combat][", Time.get_ticks_msec()/1000.0, "] Timer fired but not in ATTACKING state")
 		return
 	# Hit phase
-	_damage_enemies_in_cone(combo_index)
+	_damage_enemies_in_cone()
 	state = CombatState.COOLDOWN
-	print("[Combat][", Time.get_ticks_msec()/1000.0, "] State -> COOLDOWN (combo ", combo_index, ")")
+	print("[Combat][", Time.get_ticks_msec()/1000.0, "] State -> COOLDOWN")
 	attack_state_changed.emit(state)
-	attack_finished.emit(combo_index)
+	attack_finished.emit()
 	# Recovery/cooldown phase
 	attack_timer.wait_time = attack_cooldown
 	attack_timer.start()
@@ -196,60 +174,24 @@ func _on_attack_cooldown_finished():
 	if not attack_timer.timeout.is_connected(_on_attack_timer_timeout):
 		attack_timer.timeout.connect(_on_attack_timer_timeout)
 
-func _play_attack_animation(combo_idx: int):
+func _play_attack_animation():
 	# Handles hand animation for attacks (punch, sword, etc.)
 	var current_weapon = WeaponManager.get_current_weapon() if WeaponManager.is_weapon_equipped() else null
 	if not current_weapon:
 		# Unarmed: play punch animation on hand
 		if right_hand:
-			_play_punch_animation(combo_idx)
+			_play_punch_animation()
 	else:
 		# Armed: play weapon animation using player reference (NOT weapon_attach_point!)
 		if player.weapon_attach_point and is_instance_valid(player.weapon_attach_point):
 			WeaponAnimationManager.play_attack_animation(current_weapon, player)
 		else:
 			WeaponAnimationManager.play_attack_animation(current_weapon, player)
-	# Combo feedback (debug only, replace with real effects as needed)
-	# --- Combo particle effects ---
-	_spawn_combo_particles(combo_idx)
-	_update_combo_ui(combo_idx)
-	# --- Play punch sound ---
-	_play_punch_sound(combo_idx)
-	if combo_idx == 0:
-		print("[Combat] Combo 1: light punch")
-	elif combo_idx == 1:
-		print("[Combat] Combo 2: medium punch, particles")
-	elif combo_idx == 2:
-		print("[Combat] Combo 3: heavy punch, big particles")
 
-
-func _spawn_combo_particles(combo_idx: int):
-	# Spawn different particles for each combo level
-	var particle_name = "ComboParticles%d" % combo_idx
-	if player.has_node(particle_name):
-		var particles = player.get_node(particle_name)
-		particles.restart()
-
-func _update_combo_ui(combo_idx: int):
-	# Update combo counter UI if available
-	if has_node("/root/ComboUI"):
-		get_node("/root/ComboUI").show_combo(combo_idx + 1)
-
-func _play_punch_sound(combo_idx: int):
-	if combo_idx < punch_sounds.size():
-		punch_sounds[combo_idx].play()
-	elif whoosh_sound:
-		whoosh_sound.play()
-
-func _play_impact_sound():
-	if impact_sound:
-		impact_sound.play()
-
-func _play_punch_animation(combo_idx := 0):
+func _play_punch_animation():
 	if not right_hand or is_punch_animating:
 		return
 	is_punch_animating = true
-	punch_animation_changed.emit(true)
 	# Play punch animation using AnimationPlayer
 	weapon_animation_player.play('punch')
 
@@ -258,26 +200,14 @@ func _play_punch_animation(combo_idx := 0):
 	var punch_distance = Vector3(0, 0.05, 0.6)
 	var _anticipation_distance = punch_distance * -anticipation_factor
 
-	# Combo feedback (debug only, replace with real effects as needed)
-	# --- Play punch sound ---
-	_play_punch_sound(combo_idx)
-	if combo_idx == 0:
-		print("[Combat] Combo 1: light punch")
-	elif combo_idx == 1:
-		print("[Combat] Combo 2: medium punch, particles")
-	elif combo_idx == 2:
-		print("[Combat] Combo 3: heavy punch, big particles")
-
-
 func _on_animation_finished(anim_name: StringName):
 	if anim_name == 'punch':
 		_on_punch_animation_finished()
 
 func _on_punch_animation_finished():
 	is_punch_animating = false
-	punch_animation_changed.emit(false)
 
-func _damage_enemies_in_cone(combo_idx: int):
+func _damage_enemies_in_cone():
 	# Always get weapon from WeaponManager
 	var current_weapon = WeaponManager.get_current_weapon() if WeaponManager.is_weapon_equipped() else null
 	
@@ -309,7 +239,7 @@ func _damage_enemies_in_cone(combo_idx: int):
 			if abs(angle_to_enemy) <= cone / 2:
 				if enemy.has_method("take_damage"):
 					enemy.take_damage(dmg)
-				enemy_hit.emit(enemy, dmg, combo_idx)
+				enemy_hit.emit(enemy, dmg)
 				_spawn_impact_effect(enemy.global_position, current_weapon)
 				_play_impact_sound()
 				hit_any = true
@@ -527,7 +457,7 @@ func _stick_arrow_to_enemy(arrow: MeshInstance3D, enemy: Node3D):
 	
 	if enemy.has_method("take_damage"):
 		enemy.take_damage(dmg)
-	enemy_hit.emit(enemy, dmg, combo_index)
+	enemy_hit.emit(enemy, dmg)
 	_spawn_impact_effect(enemy.global_position, WeaponManager.get_current_weapon() if WeaponManager.is_weapon_equipped() else null)
 	_play_impact_sound()
 	
@@ -566,6 +496,10 @@ func _stick_arrow_to_wall(arrow: MeshInstance3D, hit_position: Vector3, wall: No
 func _on_arrow_despawn(arrow: MeshInstance3D):
 	if is_instance_valid(arrow):
 		arrow.queue_free()
+
+func _play_impact_sound():
+	if impact_sound:
+		impact_sound.play()
 
 func _ready():
 	if not player:

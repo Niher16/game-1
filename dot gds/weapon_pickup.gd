@@ -181,68 +181,16 @@ func _create_enhanced_sword():
 	# Use preloaded mesh constant
 	sword_mesh_instance.mesh = SWORD_MESH
 
-	# Default material (bluish, shiny)
-	# Removed unused sword_material and sword_name variables after enchanted sword removal
-	# var sword_material = StandardMaterial3D.new()
-	# var sword_name = ""
-	# if weapon_resource and "weapon_name" in weapon_resource:
-	# 	sword_name = weapon_resource.weapon_name
-	# Removed enchanted sword special visuals
-	# if sword_name.to_lower().find("enchanted") != -1:
-	# 	# Enchanted sword: magical color, strong emission, floating runes
-	# 	sword_material.albedo_color = Color(0.5, 0.7, 1.0)
-	# 	sword_material.metallic = 0.8
-	# 	sword_material.roughness = 0.1
-	# 	sword_material.emission_enabled = true
-	# 	sword_material.emission = Color(0.3, 0.7, 1.0) * glow_intensity
-	# 	sword_material.rim_enabled = true
-	# 	sword_material.rim = 0.8
-	# 	# Validate material before assignment
-	# 	if sword_material and sword_mesh_instance:
-	# 		safe_set_material(sword_mesh_instance, sword_material)
-	# 	else:
-	# 		print("❌ Sword material or mesh is null, creating fallback")
-	# 		var fallback = StandardMaterial3D.new()
-	# 		fallback.albedo_color = Color.SILVER
-	# 		safe_set_material(sword_mesh_instance, fallback)
-	# 	# Add magical floating runes
-	# 	_create_floating_runes(sword_mesh_instance)
-	# elif sword_name.to_lower().find("steel") != -1 or sword_name.to_lower().find("iron") != -1:
-	# 	# Steel/Iron sword: gold/silver, extra shiny
-	# 	sword_material.albedo_color = Color(0.9, 0.9, 0.7) # pale gold
-	# 	sword_material.metallic = 1.0
-	# 	sword_material.roughness = 0.03
-	# 	sword_material.emission_enabled = true
-	# 	sword_material.emission = Color(1.0, 0.95, 0.7) * 0.2
-	# 	sword_material.rim_enabled = true
-	# 	sword_material.rim = 0.9
-	# 	if sword_material and sword_mesh_instance:
-	# 		safe_set_material(sword_mesh_instance, sword_material)
-	# 	else:
-	# 		print("❌ Sword material or mesh is null, creating fallback")
-	# 		var fallback = StandardMaterial3D.new()
-	# 		fallback.albedo_color = Color.SILVER
-	# 		safe_set_material(sword_mesh_instance, fallback)
-	# else:
-	# 	# Default sword (bluish, shiny)
-	# 	sword_material.albedo_color = Color(0.85, 0.9, 1.0)
-	# 	sword_material.metallic = 1.0
-	# 	sword_material.roughness = 0.07
-	# 	sword_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	# 	sword_material.emission_enabled = true
-	# 	sword_material.emission = Color(0.7, 0.85, 1.0) * glow_intensity * 0.25
-	# 	sword_material.rim_enabled = true
-	# 	sword_material.rim = 0.7
-	# 	if sword_material and sword_mesh_instance:
-	# 		safe_set_material(sword_mesh_instance, sword_material)
-	# 	else:
-	# 		print("❌ Sword material or mesh is null, creating fallback")
-	# 		var fallback = StandardMaterial3D.new()
-	# 		fallback.albedo_color = Color.SILVER
-	# 		safe_set_material(sword_mesh_instance, fallback)
+	# Iron sword material
+	var iron_material = StandardMaterial3D.new()
+	iron_material.albedo_color = Color(0.6, 0.6, 0.65) # iron gray
+	iron_material.metallic = 0.85
+	iron_material.roughness = 0.25
+	iron_material.emission_enabled = false
+	safe_set_material(sword_mesh_instance, iron_material)
 
 	# Position and scale for pickup (tweak as needed for your mesh)
-	sword_mesh_instance.position = Vector3(0, -4.5, 0)
+	sword_mesh_instance.position = Vector3(0, -4.9, 0) # Lowered from -4.5 to -4.9
 	sword_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
 	add_child(sword_mesh_instance)
 	weapon_parts.append(sword_mesh_instance)
@@ -271,7 +219,7 @@ func _create_simple_bow_visual():
 		fallback.albedo_color = Color(0.7, 0.5, 0.3)
 		safe_set_material(bow_mesh_instance, fallback)
 	# Raise the bow even higher above the ground
-	bow_mesh_instance.position = Vector3(0, -4.0, 0) # was 0.6
+	bow_mesh_instance.position = Vector3(0, -4.4, 0) # Lowered from -4.0 to -4.4
 	bow_mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
 	add_child(bow_mesh_instance)
 	weapon_parts.append(bow_mesh_instance)
@@ -617,6 +565,24 @@ func _interact_with_weapon():
 	else:
 		# Fallback: try to equip directly via WeaponManager
 		if WeaponManager:
+			# Copilot: Drop currently equipped weapon as a pickup if player has one
+			if WeaponManager.get_current_weapon() != null:
+				var old_weapon = WeaponManager.get_current_weapon()
+				if old_weapon != weapon_resource:
+					var pickup_scene = preload("res://Scenes/weapon_pickup.tscn")
+					var dropped_pickup = pickup_scene.instantiate()
+					if player.is_inside_tree() and dropped_pickup.is_inside_tree():
+						# Safe to set global_position
+						dropped_pickup.global_position = player.global_position + Vector3(1, 0, 0) # Offset to avoid overlap
+					else:
+						# Fallback: set position after adding to tree
+						get_tree().current_scene.add_child(dropped_pickup)
+						await get_tree().process_frame
+						dropped_pickup.global_position = player.global_position + Vector3(1, 0, 0)
+					dropped_pickup.set_weapon_resource(old_weapon)
+					if not dropped_pickup.is_inside_tree():
+						get_tree().current_scene.add_child(dropped_pickup)
+			
 			WeaponManager.equip_weapon(weapon_resource)
 			print("✅ Weapon equipped via WeaponManager fallback")
 		else:

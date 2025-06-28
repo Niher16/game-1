@@ -35,9 +35,3 @@ script = ExtResource("4_combat")
 
 [node name="AIComponent" type="Node3D" parent="."]
 script = ExtResource("5_ai")
-
-[node name="LeftFoot" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, -0.9, 0.1)
-
-[node name="RightFoot" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.9, 0.1)

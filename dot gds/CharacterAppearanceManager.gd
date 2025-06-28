@@ -174,10 +174,11 @@ static func _create_hands(character: CharacterBody3D, cfg := {}, skin_material: 
 		
 		# Add hand as child of anchor
 		anchor.add_child(hand)
-		print("✅ Created ", hand.name, " at anchor")
+		print("[DEBUG] Created ", hand.name, " for ", character.name, " in _create_hands (CharacterAppearanceManager.gd)")
 
 # Keep the old function as backup
 static func _create_hands_old_way(character: CharacterBody3D, cfg := {}, skin_material: StandardMaterial3D = null):
+	print("[DEBUG] _create_hands_old_way called for ", character.name)
 	"""Original hand creation code (backup)"""
 	var _shape = cfg.get("shape", "fist")
 	var size = cfg.get("size", HAND_SIZE)
@@ -233,8 +234,7 @@ static func _create_feet(character: CharacterBody3D, cfg := {}, skin_material: S
 		foot.position = Vector3(i * dist, height, 0)
 		foot.material_override = skin_material if skin_material else SKIN_MATERIAL
 		character.add_child(foot)
-		foot.name = foot_name
-		print("✅ Created foot: ", foot.name, " at position: ", foot.position, " actual name: ", foot.name)
+		print("[DEBUG] Created foot: ", foot.name, " for ", character.name, " in _create_feet (CharacterAppearanceManager.gd)")
 		
 static func get_eye_z_position(body_radius: float) -> float:
 	# For skinny (radius ~0.15): Z = -0.15 (closer to center)

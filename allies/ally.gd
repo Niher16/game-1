@@ -82,8 +82,14 @@ func _create_character_appearance():
 	var config = CharacterGenerator.generate_random_character_config()
 	# Don't override skin_tone - let it use the random one from generate_random_character_config()
 	CharacterAppearanceManager.create_player_appearance(self, config)
-	print("🎨 Created ally with skin tone: ", config["skin_tone"])
-
+	print("[DEBUG] Called create_player_appearance for ", self.name, " in ally.gd")
+	print("[DEBUG] Config used: ", config)
+	# --- Debug: Log assigned skin tone ---
+	var skin_tone = config.get("skin_tone", null)
+	if skin_tone != null:
+		print("🎨 Assigned skin tone: ", skin_tone)
+	else:
+		print("⚠️ Skin tone not found in config")
 
 func _setup_foot_references() -> void:
 	# Wait multiple frames to ensure nodes are fully created

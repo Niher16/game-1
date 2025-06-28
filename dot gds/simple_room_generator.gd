@@ -401,16 +401,49 @@ func generate_starting_room():
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
-	# Spawn a sword in the starting room
+	# Always spawn a recruiter NPC in the starting room
+	var recruiter_npc_scene = load("res://Scenes/recruiter_npc.tscn")
+	if recruiter_npc_scene:
+		var recruiter_npc_instance = recruiter_npc_scene.instantiate()
+		add_child(recruiter_npc_instance)
+		var safe_position = _find_safe_recruiter_position(starting_room)
+		if safe_position != Vector3.ZERO:
+			recruiter_npc_instance.global_position = safe_position
+		print("👤 Recruiter NPC spawned in starting room!")
+		if recruiter_npc_instance.has_method("connect_recruit_signal"):
+			recruiter_npc_instance.connect_recruit_signal()
+	else:
+		print("⚠️ Recruiter NPC scene not loaded, cannot spawn recruiter!")
+
+	# Spawn a bow in the starting room instead of a sword
 	var starting_room_center = starting_room.get_center()
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
-	var sword_spawn_pos = Vector3(
+	var bow_spawn_pos = Vector3(
 		(starting_room_center.x - half_map_x) * 2.0,
 		DEFAULT_OBJECT_HEIGHT,
 		(starting_room_center.y - half_map_y) * 2.0
 	)
-	_spawn_weapon_pickup(sword_spawn_pos)
+	if weapon_pickup_scene:
+		var weapon_pickup = weapon_pickup_scene.instantiate()
+		add_child(weapon_pickup)
+		weapon_pickup.global_position = bow_spawn_pos
+		var bow_resource = load("res://Weapons/wooden_bow.tres")
+		if bow_resource:
+			weapon_pickup.weapon_resource = bow_resource
+		generated_objects.append(weapon_pickup)
+
+		# Spawn a sword in the starting room as well
+		var sword_spawn_pos = bow_spawn_pos + Vector3(1.5, 0, 0) # Offset sword by 1.5 units on X
+		var sword_pickup = weapon_pickup_scene.instantiate()
+		add_child(sword_pickup)
+		sword_pickup.global_position = sword_spawn_pos
+		var sword_resource = load("res://Weapons/iron_sword.tres")
+		if sword_resource:
+			sword_pickup.weapon_resource = sword_resource
+		generated_objects.append(sword_pickup)
+	else:
+		print("❌ No weapon pickup scene available!")
 
 	# --- CREATE FIRST WAVE ROOM FARTHER AWAY ---
 	print("🗡️ Creating first wave room connected to starting room...")

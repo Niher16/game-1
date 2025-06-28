@@ -23,59 +23,27 @@ func _ready():
 	collision_mask = 0  # NPCs don't need to collide with anything
 
 func _setup_enhanced_visual():
-	# Create main body with better proportions
-	var mesh_instance = MeshInstance3D.new()
-	var body_mesh = CapsuleMesh.new()
-	body_mesh.radius = 0.4
-	body_mesh.height = 2.0
-	mesh_instance.mesh = body_mesh
-	
-	# Enhanced material with better colors
-	var material = StandardMaterial3D.new()
-	material.albedo_color = Color(0.2, 0.6, 0.8)  # Blue color for recruiter
-	material.roughness = 0.6
-	material.metallic = 0.1
-	material.emission = Color(0.1, 0.3, 0.4) * 0.3  # Slight glow
-	mesh_instance.material_override = material
-	add_child(mesh_instance)
-	
-	# Add a hat/helmet to distinguish from allies
-	var hat_instance = MeshInstance3D.new()
-	var hat_mesh = CylinderMesh.new()
-	hat_mesh.top_radius = 0.45
-	hat_mesh.bottom_radius = 0.35
-	hat_mesh.height = 0.2
-	hat_instance.mesh = hat_mesh
-	hat_instance.position = Vector3(0, 1.1, 0)
-	
-	var hat_material = StandardMaterial3D.new()
-	hat_material.albedo_color = Color(0.8, 0.7, 0.2)  # Golden hat
-	hat_material.metallic = 0.7
-	hat_material.roughness = 0.3
-	hat_instance.material_override = hat_material
-	add_child(hat_instance)
-	
-	# Add a banner/flag to make it more visible
-	var banner_instance = MeshInstance3D.new()
-	var banner_mesh = BoxMesh.new()
-	banner_mesh.size = Vector3(0.1, 0.8, 0.6)
-	banner_instance.mesh = banner_mesh
-	banner_instance.position = Vector3(0.6, 1.4, 0)
-	
-	var banner_material = StandardMaterial3D.new()
-	banner_material.albedo_color = Color(0.9, 0.2, 0.2)  # Red banner
-	banner_material.flags_unshaded = true
-	banner_instance.material_override = banner_material
-	add_child(banner_instance)
-	
+	# Use the imported .scn scene for the recruiter mesh
+	var cage_scene = load("res://.godot/imported/medievalcage.blend-14d3afa47da1639ae57efe60aa635ba5.scn")
+	if cage_scene:
+		var cage_instance = cage_scene.instantiate()
+		cage_instance.scale = Vector3(0.7, 0.7, 0.7)
+		cage_instance.position.y = -0.7 # Lower the cage to sit on the ground
+		add_child(cage_instance)
+	else:
+		# Fallback: show a simple box if mesh can't be loaded
+		var mesh_instance = MeshInstance3D.new()
+		var fallback_mesh = BoxMesh.new()
+		mesh_instance.mesh = fallback_mesh
+		add_child(mesh_instance)
+
 	# Create main collision shape
 	var collision = CollisionShape3D.new()
-	var shape = CapsuleShape3D.new()
-	shape.radius = 0.4
-	shape.height = 2.0
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(1.5, 2.0, 1.5)
 	collision.shape = shape
 	add_child(collision)
-	
+
 	# Enhanced floating text with better visibility
 	interaction_text = Label3D.new()
 	interaction_text.text = "Press E to Recruit Ally"
@@ -141,9 +109,10 @@ func recruit_ally():
 	if ally_scene:
 		var new_ally = ally_scene.instantiate()
 		if not new_ally:
-			print("❌ Failed to instantiate ally scene!")
+			print("\u274c Failed to instantiate ally scene!")
 			return
-			
+		print("[DEBUG] Recruiter NPC spawned ally: ", new_ally.name)
+		
 		# Add to scene tree first
 		get_parent().add_child(new_ally)
 		
@@ -163,8 +132,6 @@ func recruit_ally():
 		# Force visual setup if method exists
 		if new_ally.has_method("_create_visual"):
 			new_ally._create_visual()
-		elif new_ally.has_method("_create_character_appearance"):
-			new_ally._create_character_appearance()
 		
 		# Update UI
 		_update_ui_units()
