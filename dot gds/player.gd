@@ -100,15 +100,13 @@ func _on_dash_charges_changed(current_charges: int, max_charges: int):
 func _ready():
 	# --- Safety checks for required components (Godot 4.1+ best practice) ---
 	if not health_component:
-		push_error("❌ HealthComponent not found! Player won't work properly.")
 		return
 	if not movement_component:
-		push_warning("⚠️ MovementComponent not found! Movement may not work.")
+		return
 
 	# Setup health component ONCE
 	if health_component:
 		health_component.setup(self, 100)
-		print("🔧 Health component initialized")
 
 	# Initialize other components...
 	if movement_component and movement_component.has_method("initialize"):
@@ -149,9 +147,6 @@ func _ready():
 		_connect_signal_safely(progression_component, "xp_changed", Callable(self, "_on_xp_changed"))
 		_connect_signal_safely(progression_component, "coin_collected", Callable(self, "_on_coin_collected"))
 		_connect_signal_safely(progression_component, "level_up_stats", Callable(self, "_on_level_up_stats"))
-		
-		# ADD THIS LINE TO DEBUG CONNECTIONS
-		_verify_signal_connections()
 
 	# Add verification after signal connections
 	call_deferred("verify_signal_methods")
@@ -191,13 +186,8 @@ func _setup_player():
 	_create_arrow_system()
 
 func _configure_collision():
-	# FIXED: Set player to Layer 3 (binary 100 = 4) so weapon pickups can detect it
 	collision_layer = 4  # Layer 3 (Player) - binary 100
 	collision_mask = (1 << 0) | (1 << 1) | (1 << 3) | (1 << 4)  # Collide with World, Walls, Ally, Boss
-	
-	print("✅ Player collision configured:")
-	print("  - Player collision layer: ", collision_layer)
-	print("  - Player collision mask: ", collision_mask)
 
 # Add this debug function to test your collision setup
 func debug_collision_layers():
@@ -206,11 +196,11 @@ func debug_collision_layers():
 	print("  - collision_mask: ", collision_mask)
 	print("  - Global position: ", global_position)
 	print("  - Is in player group: ", is_in_group("player"))
-	
+
 	# Test weapon pickup detection
 	var weapon_pickups = get_tree().get_nodes_in_group("weapon_pickup")
 	print("  - Weapon pickups in scene: ", weapon_pickups.size())
-	
+
 	for pickup in weapon_pickups:
 		var distance = global_position.distance_to(pickup.global_position)
 		print("    - Pickup at distance: ", distance)
@@ -233,7 +223,6 @@ func _create_visual():
 	else:
 		# Always duplicate the material to guarantee uniqueness
 		mesh_instance.material_override = mesh_instance.material_override.duplicate()
-	print("✅ Player visual created successfully!")
 
 func _setup_attack_system():
 	attack_area = Area3D.new()
@@ -317,9 +306,6 @@ func _pickup_xp_orb(area: Area3D):
 	
 	if progression_component:
 		progression_component.add_xp(xp_value)
-	else:
-		print("❌ ERROR: progression_component is null!")
-	
 	if is_instance_valid(area):
 		area.queue_free()
 
@@ -378,7 +364,12 @@ func _on_combat_attack_state_changed(_state: int) -> void:
 	# Handle combat state changes if needed
 	pass
 
+# DEBUG: Track all changes to player position
+var _last_position: Vector3 = Vector3.ZERO
+
 func _process(_delta):
+	if global_position != _last_position:
+		_last_position = global_position
 	pass
 
 func _schedule_next_blink():
@@ -487,15 +478,13 @@ func get_look_input() -> Vector2:
 func _check_initial_controllers():
 	var connected_controllers = Input.get_connected_joypads()
 	if connected_controllers.size() > 0:
-		print("Controllers detected: ", connected_controllers.size())
+		pass
 
 func _on_controller_connection_changed(device_id: int, connected: bool):
 	if connected:
-		print("Controller ", device_id, " connected")
-		var controller_name = Input.get_joy_name(device_id)
-		print("Controller name: ", controller_name)
+		var _controller_name = Input.get_joy_name(device_id)
 	else:
-		print("Controller ", device_id, " disconnected")
+		pass
 
 # --- Optional: Controller Vibration Feedback ---
 func add_controller_feedback(strength: float = 0.5, duration: float = 0.2):
@@ -516,7 +505,6 @@ func _input(_event):
 			interact_with_nearest()
 	# DEBUG: Spawn ally with F6
 	if Input.is_key_pressed(KEY_F6):
-		print("[Debug] is_inside_tree(): ", is_inside_tree())
 		_spawn_debug_ally()
 	# DEBUG: Kill all enemies one by one with F10
 	if Input.is_key_pressed(KEY_F10):
@@ -536,19 +524,16 @@ func _kill_enemies_one_by_one():
 func _spawn_debug_ally():
 	# Check if node is NOT in scene tree before proceeding
 	if not is_inside_tree():
-		print("[Debug] Cannot spawn ally - not in scene tree")
 		return Transform3D()
 
 	# Load ally scene safely with error checking
 	var ally_scene = preload("res://allies/Ally.tscn")
 	if not ally_scene:
-		print("[Error] Failed to load ally scene")
 		return Transform3D()
 
 	# Create instance and verify it was created
 	var ally_instance = ally_scene.instantiate()
 	if not ally_instance:
-		print("[Error] Failed to instantiate ally")
 		return Transform3D()
 
 	# Set spawn position (adjust offset as needed)
@@ -561,7 +546,6 @@ func _spawn_debug_ally():
 	# Update UI for ally count
 	get_tree().call_group("UI", "_update_units", get_tree().get_nodes_in_group("allies").size())
 
-	print("[Debug] Spawned ally at ", ally_instance.global_transform.origin)
 	return ally_instance.global_transform
 
 
@@ -730,7 +714,7 @@ func take_damage(amount: int, from: Node3D = null):
 
 func interact_with_nearest():
 	# Implement interaction logic here or leave as a stub for now
-	print("Player: interact_with_nearest() called (stub)")
+	pass
 
 func _setup_ally_command_manager():
 	"""Setup the ally command system"""
@@ -740,12 +724,11 @@ func _setup_ally_command_manager():
 		ally_command_manager.command_issued.connect(_on_ally_command_issued)
 	print("🎮 Ally command system initialized! Press '1' to command allies")
 
-func _on_ally_command_issued(command_type: String, cmd_position: Vector3):
+func _on_ally_command_issued(command_type: String, _cmd_position: Vector3):
 	"""Handle ally command feedback"""
 	match command_type:
 		"move_to_position":
-			print("✅ Command issued: Move allies to search at ", cmd_position)
-			# You can add sound effects, UI feedback, etc. here
+			pass
 
 # If you want to add controller vibration feedback for commands
 func _add_command_feedback():
@@ -757,7 +740,6 @@ func _on_player_died():
 	if is_dead:
 		return
 	is_dead = true
-	print("💀 Player died - restarting in 2 seconds...")
 	set_process_input(false)
 	if movement_component:
 		movement_component.set_physics_process(false)
@@ -783,20 +765,16 @@ func _connect_component_signals():
 	# Connect directly to UI instead of using call_group
 	var ui_node = get_tree().get_first_node_in_group('UI')
 	if ui_node:
-		print('✅ Found UI node, connecting direct signals')
 		if health_component and health_component.has_signal('health_changed'):
 			if not health_component.health_changed.is_connected(ui_node._on_player_health_changed):
 				health_component.health_changed.connect(ui_node._on_player_health_changed)
-				print('✅ Connected health_changed directly to UI')
 		if progression_component:
 			if progression_component.has_signal('xp_changed'):
 				if not progression_component.xp_changed.is_connected(ui_node._on_player_xp_changed):
 					progression_component.xp_changed.connect(ui_node._on_player_xp_changed)
-					print('✅ Connected xp_changed directly to UI')
 			if progression_component.has_signal('coin_collected'):
 				if not progression_component.coin_collected.is_connected(ui_node._on_player_coin_collected):
 					progression_component.coin_collected.connect(ui_node._on_player_coin_collected)
-					print('✅ Connected coin_collected directly to UI')
 	else:
 		print('❌ UI node not found for direct connection!')
 
@@ -805,18 +783,15 @@ func _flash_red():
 	pass
 
 func _on_show_level_up_choices(options: Array):
-	print("🎮 Player: Received level up choices signal with ", options.size(), " options")
-	print("🔍 Looking for levelupui node...")
 	var level_up_ui = get_tree().get_first_node_in_group("levelupui")
 	if level_up_ui:
-		print("✅ Found LevelUpUI node: ", level_up_ui.name)
 		level_up_ui.show_upgrade_choices(options)
 	else:
 		print("❌ ERROR: LevelUpUI node not found in group 'levelupui'!")
 
 func _on_stat_choice_made():
-	print("[Signal] _on_stat_choice_made called (stub)")
 	# TODO: Implement stat choice logic here
+	pass
 
 func verify_signal_methods():
 	var required_methods = [
@@ -828,7 +803,7 @@ func verify_signal_methods():
 	]
 	for method in required_methods:
 		if has_method(method):
-			print("✅ Found method: ", method)
+			pass
 		else:
 			print("❌ MISSING method: ", method)
 
@@ -841,10 +816,9 @@ func heal(amount: int):
 		health_component.heal(amount)
 
 
-func show_message(text: String):
+func show_message(_text: String):
 	"""Shows a message to the player"""
-	print("📢 Message: ", text)
-	# Add your UI message system here if you have one
+	pass
 
 # Handle health changes (already present as _on_health_changed)
 # Handle player death (already present as _on_player_died)
