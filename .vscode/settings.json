@@ -1,3 +1,13 @@
 {
+    // Add your VS Code workspace settings here
+    "mcp.servers": {
+        "godot-assistant": {
+            "command": "node",
+            "args": ["D:/GAME PROJECT/Game/game/mcp-server/godot-mcp-server.js"],
+            "env": {
+                "NODE_ENV": "production"
+            }
+        }
+    },
     "godotTools.editorPath.godot4": "d:\\Godot_Engine\\Godot_v4.4.1-stable_win64.exe"
 }

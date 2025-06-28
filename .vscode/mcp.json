@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "godot-assistant": {
+      "command": "node",
+      "args": ["D:/GAME PROJECT/Game/game/mcp-server/godot-mcp-server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
