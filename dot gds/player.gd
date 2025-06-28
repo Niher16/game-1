@@ -51,9 +51,6 @@ var is_dead := false
 var nearby_weapon_pickup = null
 @onready var death_timer: Timer
 
-# --- Health System Component ---
-# Removed duplicate declaration of health_component
-
 # Mouse look system
 var camera: Camera3D = null
 var mouse_position_3d: Vector3
@@ -70,10 +67,6 @@ var left_foot_is_moving := false
 var right_foot_is_moving := false
 var left_foot_step_progress := 1.0
 var right_foot_step_progress := 1.0
-
-# Visual effects
-# var invulnerability_timer := 0.0
-# const INVULNERABILITY_DURATION := 0.5
 
 # Node references (cached in _ready)
 var attack_area: Area3D
@@ -95,20 +88,15 @@ var is_blinking := false
 var next_blink_time := 0.0
 
 func _on_dash_charges_changed(current_charges: int, max_charges: int):
-	dash_charges_changed.emit(current_charges, max_charges)  # Re-emit for UI
+	dash_charges_changed.emit(current_charges, max_charges)
 
 func _ready():
-	# --- Safety checks for required components (Godot 4.1+ best practice) ---
 	if not health_component:
 		return
 	if not movement_component:
 		return
-
-	# Setup health component ONCE
 	if health_component:
 		health_component.setup(self, 100)
-
-	# Initialize other components...
 	if movement_component and movement_component.has_method("initialize"):
 		movement_component.initialize(self)
 	if combat_component and combat_component.has_method("initialize"):
@@ -125,14 +113,11 @@ func _ready():
 			"foot_step_strength": foot_step_strength,
 			"side_step_modifier": side_step_modifier
 		})
-
-	# Connect signals ONCE at the end
 	if health_component:
 		if health_component.has_signal("health_changed"):
 			_connect_signal_safely(health_component, "health_changed", _on_health_changed)
 		_connect_signal_safely(health_component, "player_died", _on_player_died)
 		_connect_signal_safely(health_component, "health_depleted", _on_health_depleted)
-
 	if movement_component:
 		_connect_signal_safely(movement_component, "dash_charges_changed", _on_dash_charges_changed)
 		_connect_signal_safely(movement_component, "hand_animation_update", _on_hand_animation_update)
@@ -147,10 +132,6 @@ func _ready():
 		_connect_signal_safely(progression_component, "xp_changed", Callable(self, "_on_xp_changed"))
 		_connect_signal_safely(progression_component, "coin_collected", Callable(self, "_on_coin_collected"))
 		_connect_signal_safely(progression_component, "level_up_stats", Callable(self, "_on_level_up_stats"))
-
-	# Add verification after signal connections
-	call_deferred("verify_signal_methods")
-
 	_reset_blink_timer()
 	var config = CharacterGenerator.generate_random_character_config()
 	CharacterAppearanceManager.create_player_appearance(self, config)
@@ -158,71 +139,27 @@ func _ready():
 	Input.joy_connection_changed.connect(_on_controller_connection_changed)
 	_check_initial_controllers()
 	_setup_ally_command_manager()
-
-	# Setup death timer
 	death_timer = Timer.new()
 	death_timer.wait_time = 2.0
 	death_timer.one_shot = true
 	add_child(death_timer)
 	death_timer.timeout.connect(_restart_scene)
-
-	# Ensure player is in the correct group and setup
 	_setup_player()
 
 func _setup_player():
 	add_to_group("player")
 	_configure_collision()
-	_create_visual()
 	_setup_attack_system()
 	_setup_hand_references()
 	_setup_weapon_attach_point()
-	# Ensure WeaponAnimationPlayer exists
 	if not has_node("WeaponAnimationPlayer"):
 		var weapon_anim_player = AnimationPlayer.new()
 		weapon_anim_player.name = "WeaponAnimationPlayer"
 		add_child(weapon_anim_player)
-	else:
-		print("✅ WeaponAnimationPlayer node already exists")
-	_create_arrow_system()
 
 func _configure_collision():
-	collision_layer = 4  # Layer 3 (Player) - binary 100
-	collision_mask = (1 << 0) | (1 << 1) | (1 << 3) | (1 << 4)  # Collide with World, Walls, Ally, Boss
-
-# Add this debug function to test your collision setup
-func debug_collision_layers():
-	print("🔍 [PLAYER COLLISION DEBUG]")
-	print("  - collision_layer: ", collision_layer)
-	print("  - collision_mask: ", collision_mask)
-	print("  - Global position: ", global_position)
-	print("  - Is in player group: ", is_in_group("player"))
-
-	# Test weapon pickup detection
-	var weapon_pickups = get_tree().get_nodes_in_group("weapon_pickup")
-	print("  - Weapon pickups in scene: ", weapon_pickups.size())
-
-	for pickup in weapon_pickups:
-		var distance = global_position.distance_to(pickup.global_position)
-		print("    - Pickup at distance: ", distance)
-		if distance < 2.0:
-			print("      ⚠️ Close to pickup but not detecting? Check collision layers!")
-
-func _create_visual():
-	var existing_mesh = get_node_or_null("MeshInstance3D")
-	if not existing_mesh:
-		mesh_instance = MeshInstance3D.new()
-		mesh_instance.name = "MeshInstance3D"
-		add_child(mesh_instance)
-	else:
-		mesh_instance = existing_mesh
-	# Ensure material_override is set and unique so dash and effects never share it
-	if not mesh_instance.material_override:
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.9, 0.7, 0.6) # Default skin tone
-		mesh_instance.material_override = mat
-	else:
-		# Always duplicate the material to guarantee uniqueness
-		mesh_instance.material_override = mesh_instance.material_override.duplicate()
+	collision_layer = 4
+	collision_mask = (1 << 0) | (1 << 1) | (1 << 3) | (1 << 4)
 
 func _setup_attack_system():
 	attack_area = Area3D.new()
@@ -234,12 +171,11 @@ func _setup_attack_system():
 	attack_collision.shape = sphere_shape
 	attack_area.add_child(attack_collision)
 	attack_area.collision_layer = 0
-	attack_area.collision_mask = 1 << 4  # Only hit Boss
+	attack_area.collision_mask = 1 << 4
 	if not attack_area.is_connected("area_entered", _on_area_pickup_entered):
 		attack_area.area_entered.connect(_on_area_pickup_entered)
 
 func _setup_hand_references():
-	# --- FEET (find them after character creation) ---
 	left_foot = get_node_or_null("LeftFoot")
 	right_foot = get_node_or_null("RightFoot")
 	if left_foot:
@@ -248,9 +184,6 @@ func _setup_hand_references():
 	if right_foot:
 		right_foot_original_pos = right_foot.position
 		right_foot_planted_pos = right_foot.position
-		print("✅ Found RightFoot at: ", right_foot.get_path())
-	else:
-		print("❌ RightFoot not found!")
 
 func _setup_weapon_attach_point():
 	if not has_node("WeaponAttachPoint"):
@@ -258,23 +191,11 @@ func _setup_weapon_attach_point():
 		attach_point.name = "WeaponAttachPoint"
 		add_child(attach_point)
 		weapon_attach_point = attach_point
-		print("✅ Created WeaponAttachPoint node")
 	else:
 		weapon_attach_point = get_node("WeaponAttachPoint")
-		print("✅ Found existing WeaponAttachPoint node")
 
 var weapon_attach_point: Node3D = null
 
-# --- Removed old weapon management functions ---
-# func _connect_weapon_manager_signals():
-# func _on_weapon_equipped(weapon_resource):
-# func _on_weapon_unequipped():
-# func _show_weapon_visual(weapon_resource):
-# func _hide_weapon_visual():
-# func _create_simple_sword_mesh() -> MeshInstance3D:
-# func _create_simple_staff_mesh() -> MeshInstance3D:
-
-# Coin/XP pickup system
 func _on_area_pickup_entered(area: Area3D):
 	if area.is_in_group("health_potion"):
 		_pickup_health_potion(area)
@@ -286,7 +207,6 @@ func _on_area_pickup_entered(area: Area3D):
 func _pickup_coin(area: Area3D):
 	var coin_value = area.get_meta("coin_value") if area.has_meta("coin_value") else 10
 	progression_component.add_currency(coin_value)
-	# coin_collected.emit(coin_value)  # Now handled by PlayerProgression
 	if is_instance_valid(area):
 		area.queue_free()
 
@@ -303,29 +223,21 @@ func _pickup_health_potion(area: Area3D):
 
 func _pickup_xp_orb(area: Area3D):
 	var xp_value = area.get_meta("xp_value") if area.has_meta("xp_value") else 10
-	
 	if progression_component:
 		progression_component.add_xp(xp_value)
 	if is_instance_valid(area):
 		area.queue_free()
 
-# --- Health System Component Handlers ---
 func _on_health_changed(current_health: int, max_health: int):
-	get_tree().call_group("UI", "_on_player_health_changed", current_health, max_health)  # Direct connection now
+	get_tree().call_group("UI", "_on_player_health_changed", current_health, max_health)
 
 func _on_health_depleted():
-	# Handle logic when health reaches zero (game over, respawn, etc.)
 	pass
 
-# Update max health through health component and heal player
 func _on_level_up_stats(health_increase: int, _damage_increase: int):
-	# Get current values
 	var current_max = health_component.get_max_health()
 	var new_max_health = current_max + health_increase
-	
-	# Set new max health
 	health_component.set_max_health(new_max_health)
-	# Heal player by the health increase amount
 	health_component.heal(health_increase)
 
 func _on_xp_changed(xp: int, xp_to_next: int, level: int):
@@ -334,7 +246,6 @@ func _on_xp_changed(xp: int, xp_to_next: int, level: int):
 func _on_coin_collected(total_currency: int):
 	get_tree().call_group("UI", "_on_player_coin_collected", total_currency)
 
-# Animation signal handlers for movement component
 func _on_hand_animation_update(left_pos: Vector3, right_pos: Vector3, left_rot: Vector3, right_rot: Vector3) -> void:
 	var left_hand = get_node_or_null("LeftHandAnchor/LeftHand")
 	if left_hand:
@@ -352,7 +263,6 @@ func _on_foot_animation_update(left_pos: Vector3, right_pos: Vector3) -> void:
 		right_foot.position = right_pos
 
 func _on_animation_state_changed(_is_idle: bool) -> void:
-	# Handle animation state changes if needed
 	pass
 
 func _on_body_animation_update(body_pos: Vector3, body_rot: Vector3) -> void:
@@ -361,10 +271,8 @@ func _on_body_animation_update(body_pos: Vector3, body_rot: Vector3) -> void:
 		mesh_instance.rotation_degrees = body_rot
 
 func _on_combat_attack_state_changed(_state: int) -> void:
-	# Handle combat state changes if needed
 	pass
 
-# DEBUG: Track all changes to player position
 var _last_position: Vector3 = Vector3.ZERO
 
 func _process(_delta):
@@ -379,10 +287,8 @@ func _schedule_next_blink():
 func _handle_advanced_blinking(delta: float):
 	if is_dead or is_blinking:
 		return
-
 	blink_timer += delta
 	if blink_timer >= next_blink_time:
-		# 20% chance for double blink
 		if randf() < 0.2:
 			_do_double_blink()
 		else:
@@ -407,62 +313,16 @@ func _reset_blink_timer():
 		func(): is_blinking = false
 	)
 
-# --- Mouth Expression Test System ---
-var _mouth_expression_timer: Timer = null
-var _mouth_expression_index := 0
-var _mouth_expressions := [
-	"neutral",
-	"smile",
-	"frown",
-	"surprise"
-]
-
-func _start_mouth_expression_test():
-	if not mesh_instance:
-		return
-	if not _mouth_expression_timer:
-		_mouth_expression_timer = Timer.new()
-		_mouth_expression_timer.wait_time = 2.0
-		_mouth_expression_timer.one_shot = false
-		_mouth_expression_timer.autostart = true
-		add_child(_mouth_expression_timer)
-		_mouth_expression_timer.timeout.connect(_cycle_mouth_expression)
-	_mouth_expression_index = 0
-	_set_mouth_expression(_mouth_expressions[_mouth_expression_index])
-
-func _cycle_mouth_expression():
-	_mouth_expression_index = (_mouth_expression_index + 1) % _mouth_expressions.size()
-	_set_mouth_expression(_mouth_expressions[_mouth_expression_index])
-
-func _set_mouth_expression(expr: String):
-	if not mesh_instance:
-		return
-	match expr:
-		"neutral":
-			CharacterAppearanceManager.set_mouth_neutral(mesh_instance)
-		"smile":
-			CharacterAppearanceManager.set_mouth_smile(mesh_instance)
-		"frown":
-			CharacterAppearanceManager.set_mouth_frown(mesh_instance)
-		"surprise":
-			CharacterAppearanceManager.set_mouth_surprise(mesh_instance)
-		_:
-			CharacterAppearanceManager.set_mouth_neutral(mesh_instance)
-
 # --- Controller/Keyboard Movement Input ---
 func get_movement_input() -> Vector2:
-	# Use Godot's built-in input vector normalization
 	var input_vector = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if input_vector.length() < 0.2:
 		input_vector = Vector2.ZERO
 	return input_vector
 
-# --- Look Input Variables ---
 @export_group("Look")
 @export var look_sensitivity: float = 2.0
-var current_look_direction: Vector3 = Vector3.ZERO
 
-# --- Controller/Keyboard Look Input ---
 func get_look_input() -> Vector2:
 	var look_vector = Vector2.ZERO
 	look_vector.x = Input.get_action_strength("look_right") - Input.get_action_strength("look_left")
@@ -470,10 +330,6 @@ func get_look_input() -> Vector2:
 	if look_vector.length() < 0.2:
 		look_vector = Vector2.ZERO
 	return look_vector
-
-# --- Controller Detection ---
-# (Controller detection logic moved into the main _ready() function above)
-# ...existing code...
 
 func _check_initial_controllers():
 	var connected_controllers = Input.get_connected_joypads()
@@ -486,14 +342,12 @@ func _on_controller_connection_changed(device_id: int, connected: bool):
 	else:
 		pass
 
-# --- Optional: Controller Vibration Feedback ---
 func add_controller_feedback(strength: float = 0.5, duration: float = 0.2):
 	var connected_controllers = Input.get_connected_joypads()
 	for controller_id in connected_controllers:
 		Input.start_joy_vibration(controller_id, strength, strength, duration)
 
 func _input(_event):
-	# Enhanced input checking for controller/keyboard
 	if Input.is_action_just_pressed("attack"):
 		if combat_component and combat_component.has_method("perform_attack"):
 			combat_component.perform_attack()
@@ -503,113 +357,28 @@ func _input(_event):
 	if Input.is_action_just_pressed("interaction"):
 		if has_method("interact_with_nearest"):
 			interact_with_nearest()
-	# DEBUG: Spawn ally with F6
-	if Input.is_key_pressed(KEY_F6):
-		_spawn_debug_ally()
-	# DEBUG: Kill all enemies one by one with F10
-	if Input.is_key_pressed(KEY_F10):
-		_kill_enemies_one_by_one()
-	# DEBUG: F11 - Kill all enemies, go to wave 10, spawn boss
-	if Input.is_key_pressed(KEY_F11):
-		_activate_boss_debug()
-
-# Coroutine to kill all enemies one by one every 0.2 seconds
-func _kill_enemies_one_by_one():
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
-		if enemy and enemy.has_method("die") and not enemy.is_dead:
-			enemy.die()
-			await get_tree().create_timer(0.2).timeout
-
-func _spawn_debug_ally():
-	# Check if node is NOT in scene tree before proceeding
-	if not is_inside_tree():
-		return Transform3D()
-
-	# Load ally scene safely with error checking
-	var ally_scene = preload("res://allies/Ally.tscn")
-	if not ally_scene:
-		return Transform3D()
-
-	# Create instance and verify it was created
-	var ally_instance = ally_scene.instantiate()
-	if not ally_instance:
-		return Transform3D()
-
-	# Set spawn position (adjust offset as needed)
-	var spawn_offset = Vector3(2, 0, 0)
-	ally_instance.global_transform.origin = global_transform.origin + spawn_offset
-
-	# Add to scene tree
-	get_tree().current_scene.add_child(ally_instance)
-
-	# Update UI for ally count
-	get_tree().call_group("UI", "_update_units", get_tree().get_nodes_in_group("allies").size())
-
-	return ally_instance.global_transform
-
 
 func _physics_process(delta):
 	if is_dead:
 		return
-
-	# --- Controller Look Input Handling ---
-
-	# Always let movement component handle look (controller or mouse)
 	movement_component.handle_mouse_look()
-
 	if movement_component.is_being_knocked_back:
 		movement_component.handle_knockback(delta)
 		movement_component.apply_gravity(delta)
 		move_and_slide()
-		# Prevent being pushed into the ground
 		if is_on_floor() and velocity.y < 0:
 			velocity.y = 0
 		return
-
 	movement_component.handle_movement_and_dash(delta)
 	combat_component.handle_attack_input()
 	movement_component.handle_dash_cooldown(delta)
 	_handle_advanced_blinking(delta)
-
-	# Prevent being pushed into the ground
 	if is_on_floor() and velocity.y < 0:
 		velocity.y = 0
 
 func set_character_appearance(config: Dictionary):
 	if mesh_instance and CharacterAppearanceManager:
 		CharacterAppearanceManager.create_player_appearance(self, config)
-
-func randomize_character():
-	if mesh_instance and CharacterAppearanceManager:
-		var config = CharacterGenerator.generate_random_character_config()
-		set_character_appearance(config)
-
-func get_character_seed_config(seed_value: int):
-	return CharacterGenerator.generate_character_with_seed(seed_value)
-
-func _create_arrow_system():
-	# We'll create arrows on-demand instead of a particle system
-	print("🏹 Simple arrow system ready!")
-
-# Change the player's skin tone at runtime
-func change_player_skin_tone(skin_color: Color):
-	var mesh = get_node_or_null("MeshInstance3D")
-	if mesh and mesh.material_override:
-		mesh.material_override.albedo_color = skin_color
-	# Update hands and feet
-	for part in ["LeftHand", "RightHand", "LeftFoot", "RightFoot"]:
-		var node = get_node_or_null(part)
-		if node and node.material_override:
-			node.material_override.albedo_color = skin_color
-	print("✅ Player skin tone updated to: ", skin_color)
-# Disabled staff logic for now
-# case int(WeaponResource.WeaponType.STAFF):
-# ...existing code...
-
-
-# === FIXED UI ACCESS METHODS ===
-# Use progression_component directly since that's where the data and signals are
 
 func get_health() -> int:
 	return health_component.get_health() if health_component else 0
@@ -621,120 +390,38 @@ func get_currency() -> int:
 	return progression_component.get_currency() if progression_component else 0
 
 func get_xp() -> int:
-	# FIX: Use progression_component directly, not stats_component
 	return progression_component.get_xp() if progression_component else 0
 
 func get_level() -> int:
-	# FIX: Use progression_component directly, not stats_component  
 	return progression_component.level if progression_component else 1
 
 func get_xp_to_next_level() -> int:
-	# FIX: Use progression_component directly, not stats_component
 	return progression_component.xp_to_next_level if progression_component else 100
 
 func get_dash_charges() -> int:
 	return movement_component.current_dash_charges if movement_component else 1
 
 func get_max_dash_charges() -> int:
-	return max_dash_charges if "max_dash_charges" in self else 1
-
-# Debug method to verify all components exist
-func debug_components():
-	print("🔍 Player Components Debug:")
-	print("  - health_component: ", health_component != null)
-	print("  - progression_component: ", progression_component != null)
-	print("  - movement_component: ", movement_component != null)
-	print("  - combat_component: ", combat_component != null)
-	print("  - stats_component: ", stats_component != null if "stats_component" in self else false)
-	if health_component:
-		print("  - Current Health: ", health_component.get_health())
-		print("  - Max Health: ", health_component.get_max_health())
-	if progression_component:
-		print("  - Currency: ", progression_component.get_currency())
-		print("  - XP: ", progression_component.get_xp())
-		print("  - Level: ", progression_component.level)
-		print("  - XP to Next: ", progression_component.xp_to_next_level)
-	print("🔍 Testing UI access methods:")
-	print("  - get_currency(): ", get_currency())
-	print("  - get_xp(): ", get_xp())
-	print("  - get_level(): ", get_level())
-	print("  - get_health(): ", get_health())
-# ...existing code...
-
-func _verify_signal_connections():
-	print("🔍 SIGNAL CONNECTION DEBUG:")
-	if progression_component:
-		print("✅ ProgressionComponent found: ", progression_component)
-		print("🔗 xp_changed signal connections: ", progression_component.get_signal_connection_list("xp_changed"))
-		print("🔗 coin_collected signal connections: ", progression_component.get_signal_connection_list("coin_collected"))
-	else:
-		print("❌ ProgressionComponent not found!")
-
-
-func test_skin_tones():
-	print("=== TESTING SKIN TONES ===")
-	for i in range(5):
-		var config = CharacterGenerator.generate_random_character_config()
-		print("Test ", i, " skin tone: ", config["skin_tone"])
+	return max_dash_charges
 
 func take_damage(amount: int, from: Node3D = null):
 	if health_component and health_component.has_method("take_damage"):
 		health_component.take_damage(amount, from)
-		# Apply knockback if movement_component exists
 		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
 			movement_component.apply_knockback_from_enemy(from)
-		# Flash red when taking damage
-		_flash_red()
-	else:
-		print("❌ ERROR: health_component not found or missing take_damage method!")
-
-
-
-	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
-	if health_component and health_component.has_method("take_damage"):
-		health_component.take_damage(amount, from)
-		# Apply knockback if movement_component exists
-		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
-			movement_component.apply_knockback_from_enemy(from)
-		# Flash red when taking damage
-		_flash_red()
-	else:
-		print("❌ ERROR: health_component not found or missing take_damage method!")
-
-
-
-	print("🩸 Player: take_damage called with amount: ", amount, " from: ", from)
-	if health_component and health_component.has_method("take_damage"):
-		health_component.take_damage(amount, from)
-		# Apply knockback if movement_component exists
-		if movement_component and movement_component.has_method("apply_knockback_from_enemy") and from:
-			movement_component.apply_knockback_from_enemy(from)
-	else:
-		print("❌ ERROR: health_component not found or missing take_damage method!")
 
 func interact_with_nearest():
-	# Implement interaction logic here or leave as a stub for now
 	pass
 
 func _setup_ally_command_manager():
-	"""Setup the ally command system"""
 	add_child(ally_command_manager)
-	# Connect signals if needed
 	if ally_command_manager.has_signal("command_issued"):
 		ally_command_manager.command_issued.connect(_on_ally_command_issued)
-	print("🎮 Ally command system initialized! Press '1' to command allies")
 
 func _on_ally_command_issued(command_type: String, _cmd_position: Vector3):
-	"""Handle ally command feedback"""
 	match command_type:
 		"move_to_position":
 			pass
-
-# If you want to add controller vibration feedback for commands
-func _add_command_feedback():
-	"""Add controller feedback when commanding allies"""
-	if has_method("add_controller_feedback"):
-		add_controller_feedback(0.3, 0.1) # Light vibration
 
 func _on_player_died():
 	if is_dead:
@@ -748,113 +435,25 @@ func _on_player_died():
 	death_timer.start()
 
 func _restart_scene():
-	var error = get_tree().reload_current_scene()
-	if error != OK:
-		print("❌ Failed to restart scene: ", error)
+	var _error = get_tree().reload_current_scene()
 
 func _connect_signal_safely(source_object, signal_name: String, target_callable: Callable):
 	if source_object and source_object.has_signal(signal_name):
 		if not source_object.is_connected(signal_name, target_callable):
 			source_object.connect(signal_name, target_callable)
-			print("✅ Connected signal: ", signal_name)
-		else:
-			print("⚠️ Signal already connected: ", signal_name)
-
-
-func _connect_component_signals():
-	# Connect directly to UI instead of using call_group
-	var ui_node = get_tree().get_first_node_in_group('UI')
-	if ui_node:
-		if health_component and health_component.has_signal('health_changed'):
-			if not health_component.health_changed.is_connected(ui_node._on_player_health_changed):
-				health_component.health_changed.connect(ui_node._on_player_health_changed)
-		if progression_component:
-			if progression_component.has_signal('xp_changed'):
-				if not progression_component.xp_changed.is_connected(ui_node._on_player_xp_changed):
-					progression_component.xp_changed.connect(ui_node._on_player_xp_changed)
-			if progression_component.has_signal('coin_collected'):
-				if not progression_component.coin_collected.is_connected(ui_node._on_player_coin_collected):
-					progression_component.coin_collected.connect(ui_node._on_player_coin_collected)
-	else:
-		print('❌ UI node not found for direct connection!')
-
-func _flash_red():
-	# Disabled to prevent player turning red on damage or dash
-	pass
 
 func _on_show_level_up_choices(options: Array):
 	var level_up_ui = get_tree().get_first_node_in_group("levelupui")
 	if level_up_ui:
 		level_up_ui.show_upgrade_choices(options)
-	else:
-		print("❌ ERROR: LevelUpUI node not found in group 'levelupui'!")
 
 func _on_stat_choice_made():
-	# TODO: Implement stat choice logic here
 	pass
-
-func verify_signal_methods():
-	var required_methods = [
-		"_on_show_level_up_choices",
-		"_on_stat_choice_made",
-		"_on_xp_changed",
-		"_on_coin_collected",
-		"_on_level_up_stats"
-	]
-	for method in required_methods:
-		if has_method(method):
-			pass
-		else:
-			print("❌ MISSING method: ", method)
-
-# --- Health Potion Integration Methods ---
-# Health system reference (already declared as health_component)
-
-func heal(amount: int):
-	"""Heals the player - called by health potions"""
-	if health_component:
-		health_component.heal(amount)
-
 
 func show_message(_text: String):
-	"""Shows a message to the player"""
 	pass
-
-# Handle health changes (already present as _on_health_changed)
-# Handle player death (already present as _on_player_died)
-
-# Example of how to spawn health potions (for testing)
-func _spawn_test_potion():
-	"""Spawns a health potion for testing"""
-	var potion_scene = preload("res://scenes/health_potion.tscn")
-	var potion = potion_scene.instantiate()
-	get_parent().add_child(potion)
-	potion.global_position = global_position + Vector3(2, 1, 0)
-	print("🧪 Test potion spawned!")
-
-# Call this in _unhandled_input for testing
-func _unhandled_input(_event):
-	# No test actions for space or enter
-	pass
-
-# F11 debug: Kill all enemies, set wave 10, spawn boss
-func _activate_boss_debug():
-	# Kill all enemies
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
-		if enemy and enemy.has_method("die") and not enemy.is_dead:
-			enemy.die()
-	# Find spawner and set wave to 10, spawn boss
-	var spawner = get_tree().get_first_node_in_group("spawner")
-	if spawner:
-		spawner.current_wave = 10
-		spawner._start_boss_wave()
-		show_message("F11: All enemies killed, wave 10, boss spawned!")
-	else:
-		show_message("F11: Spawner not found!")
 
 func ensure_safe_spawn(min_distance: float = 5.0):
-	"""Move player to a safe spot if enemies are too close at spawn."""
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	var safe = true
 	for enemy in enemies:
@@ -862,7 +461,6 @@ func ensure_safe_spawn(min_distance: float = 5.0):
 			safe = false
 			break
 	if not safe:
-		# Try to find a safe spot nearby
 		for attempt in range(20):
 			var angle = randf() * TAU
 			var distance = randf_range(min_distance, min_distance + 5.0)
@@ -875,4 +473,3 @@ func ensure_safe_spawn(min_distance: float = 5.0):
 			if not too_close:
 				global_position = test_pos
 				return
-		# If no safe spot found, just stay in place

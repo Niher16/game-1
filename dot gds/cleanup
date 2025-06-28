@@ -1,0 +1,24 @@
+Godot GDScript Cleanup Template
+1. Remove Debug/Print/Test Code
+
+Delete all print(), push_error(), push_warning(), and similar debug/logging statements.
+Remove any functions or code blocks used only for debugging or testing (e.g., debug_*, test_*, _verify_*, _spawn_debug_*, etc.).
+2. Remove Redundant or Duplicate Systems
+
+If a function or system is not called anywhere, remove it.
+If there are multiple functions doing the same thing, merge them into one and update all references.
+3. Remove Unused Variables and Parameters
+
+Delete variables that are declared but never used.
+For unused function parameters that must remain (e.g., for signal compatibility), prefix them with an underscore: _param.
+4. Remove Unnecessary Comments and Disabled Code
+
+Delete commented-out code and comments that are no longer relevant.
+Remove TODOs and FIXMEs that are obsolete.
+5. Simplify and Inline Where Possible
+
+Inline simple wrapper functions if they are only used once or twice.
+Remove unnecessary wrappers and stubs.
+6. Remove Unused Exported Properties
+
+If an exported property is not used in the script or scene, remove it.
