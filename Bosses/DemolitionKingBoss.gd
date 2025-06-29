@@ -1,4 +1,4 @@
-# enhanced_demolition_king_boss.gd - Fixed version with proper attack behavior
+# enhanced_demolition_king_boss.gd - Cleaned version
 extends CharacterBody3D
 
 # === SIGNALS ===
@@ -79,11 +79,6 @@ var safe_ground_level: float
 var last_safe_position: Vector3
 var ground_normal: Vector3 = Vector3.UP
 
-# === DEBUGGING ===
-var debug_enabled: bool = true
-var walls_broken_this_frame: int = 0
-var debug_collision_timer: float = 0.0
-
 func _ready() -> void:
 	health = max_health
 	_setup_boss()
@@ -93,11 +88,6 @@ func _ready() -> void:
 	# Load wall chunk scene
 	if ResourceLoader.exists("res://Bosses/wall_chunk.tscn"):
 		wall_chunk_scene = load("res://Bosses/wall_chunk.tscn")
-		if debug_enabled:
-			print("🪨 BOSS: Wall chunk scene loaded successfully!")
-	else:
-		if debug_enabled:
-			print("🪨 BOSS: Wall chunk scene not found at res://Bosses/wall_chunk.tscn")
 	
 	# Load red slime scene (try multiple possible paths)
 	var slime_paths = [
@@ -106,83 +96,49 @@ func _ready() -> void:
 		"res://Enemy/enemy.tscn",
 		"res://Enemies/slime.tscn"
 	]
-	
 	for path in slime_paths:
 		if ResourceLoader.exists(path):
 			red_slime_scene = load(path)
-			if debug_enabled:
-				print("🟥 BOSS: Red slime scene loaded from: ", path)
 			break
-	
-	if not red_slime_scene and debug_enabled:
-		print("🟥 BOSS: Could not find slime scene in any expected location")
-	
-	if debug_enabled:
-		print("🤖 ENHANCED BOSS: Spawning Enhanced Demolition King")
-		print("🤖 ENHANCED BOSS: Health: ", health, "/", max_health)
 
 func _physics_process(delta: float) -> void:
 	state_timer += delta
-	debug_collision_timer += delta
-	walls_broken_this_frame = 0
-	
 	if attack_cooldown > 0:
 		attack_cooldown -= delta
-	
 	_handle_boss_state(delta)
 	_apply_safe_physics(delta)
-	
-	# Store last position before moving
 	if is_on_floor():
 		last_safe_position = global_position
-	
 	move_and_slide()
 	_check_wall_collisions()
-	_check_player_collision()  # NEW: Check for touch damage
+	_check_player_collision()
 	_safety_checks()
-	
-	# Debug output
-	if debug_enabled and debug_collision_timer >= 2.0:
-		_debug_status()
-		debug_collision_timer = 0.0
 
 func _setup_boss() -> void:
-	# Get scene components
 	mesh_instance = get_node_or_null("MeshInstance3D")
 	collision_shape = get_node_or_null("CollisionShape3D")
-	
 	if mesh_instance:
 		original_scale = mesh_instance.scale
 		_setup_boss_material()
-	
-	# Find player
 	player = get_tree().get_first_node_in_group("player")
-	if not player:
-		push_error("❌ ENHANCED BOSS: No player found!")
 
 func _setup_boss_material() -> void:
-	"""Setup visual effects for the boss"""
 	if not mesh_instance:
 		return
-	
 	var material = mesh_instance.get_surface_override_material(0)
 	if not material:
 		material = StandardMaterial3D.new()
 		mesh_instance.set_surface_override_material(0, material)
-	
 	boss_material = material
-	# Set boss to red color by default
 	boss_material.albedo_color = original_color
 	boss_material.metallic = 0.1
 	boss_material.roughness = 0.7
 
 func _setup_physics_layers() -> void:
-	"""Setup collision layers properly"""
-	collision_layer = 1 << 2  # Boss on layer 3 (bit 2)
-	collision_mask = (1 << 0) | (1 << 1) | (1 << 2)  # Detect ground, walls, enemies
+	collision_layer = 1 << 2
+	collision_mask = (1 << 0) | (1 << 1) | (1 << 2)
 
 func _handle_boss_state(delta: float) -> void:
-	"""Enhanced state machine with more attack patterns"""
 	match current_state:
 		BossState.SPAWNING:
 			_handle_spawning()
@@ -223,19 +179,12 @@ func _handle_enhanced_idle_state() -> void:
 	velocity.x = 0
 	velocity.z = 0
 	
-	if debug_enabled and state_timer < 0.1:  # Only print once when entering state
-		print("🤖 BOSS: ENTERING IDLE STATE - Distance: ", distance_to_player, " Cooldown: ", attack_cooldown, " Timer: ", state_timer)
-	
 	# Must stay in idle for minimum time to prevent rapid state switching
 	if state_timer < min_idle_time:
-		if debug_enabled and int(state_timer * 2) % 2 == 0:  # Print every 0.5 seconds
-			print("🤖 BOSS: Waiting in IDLE... Timer: ", state_timer, "/", min_idle_time)
 		return
 	
 	# Don't attack while falling or unstable
 	if not is_on_floor() or velocity.y < -2.0:
-		if debug_enabled:
-			print("🤖 BOSS: Not stable - on_floor: ", is_on_floor(), " velocity.y: ", velocity.y)
 		_transition_to_movement()
 		return
 	
@@ -245,21 +194,15 @@ func _handle_enhanced_idle_state() -> void:
 	
 	# PRIORITY: Attack if conditions are met
 	if attack_cooldown <= 0:
-		if debug_enabled:
-			print("🤖 BOSS: ATTACK CONDITIONS MET! Distance: ", distance_to_player, " Executing attack...")
 		_choose_attack(distance_to_player)
 		return
 	
 	# If attack is on cooldown but we've been idle long enough, move strategically
 	if attack_cooldown > 0 and state_timer >= min_idle_time + 1.0:
-		if debug_enabled:
-			print("🤖 BOSS: Attack on cooldown (", attack_cooldown, "), transitioning to movement")
 		_transition_to_movement()
 
 func _choose_attack(distance: float) -> void:
 	"""Intelligently choose which attack to use - FIXED VERSION"""
-	if debug_enabled:
-		print("🤖 BOSS: CHOOSING ATTACK for distance: ", distance)
 	
 	var attack_choice: int
 	
@@ -296,18 +239,12 @@ func _transition_to_movement() -> void:
 	state_timer = 0.0
 	_set_movement_target()
 	
-	if debug_enabled:
-		print("🤖 BOSS: TRANSITIONING TO MOVEMENT")
-
 func _handle_strategic_movement() -> void:
 	"""More intelligent movement patterns - FIXED VERSION"""
 	if not player:
 		return
 	
-	var distance_to_player = global_position.distance_to(player.global_position)
-	
-	if debug_enabled and int(state_timer * 2) % 4 == 0:  # Print every 2 seconds
-		print("🤖 BOSS: MOVING - Timer: ", state_timer, " Distance to player: ", distance_to_player)
+	var _distance_to_player = global_position.distance_to(player.global_position)
 	
 	# Update movement target if player moved significantly
 	if last_player_position.distance_to(player.global_position) > 3.0:
@@ -322,8 +259,6 @@ func _handle_strategic_movement() -> void:
 	var been_moving_long_enough = state_timer >= 2.0  # Reduced from 3.0
 	
 	if target_reached or been_moving_long_enough:
-		if debug_enabled:
-			print("🤖 BOSS: MOVEMENT COMPLETE - Returning to IDLE. Target reached: ", target_reached, " Time: ", state_timer)
 		current_state = BossState.IDLE
 		state_timer = 0.0
 
@@ -335,30 +270,21 @@ func _set_movement_target() -> void:
 	var player_pos = player.global_position
 	var current_distance = global_position.distance_to(player_pos)
 	
-	if debug_enabled:
-		print("🤖 BOSS: Setting movement target. Current distance: ", current_distance)
-	
 	# Choose movement strategy based on current distance
 	if current_distance < 5.0:
 		# Too close - back away while circling
 		var away_direction = (global_position - player_pos).normalized()
 		movement_target = player_pos + away_direction * 8.0
-		if debug_enabled:
-			print("🤖 BOSS: Too close - backing away")
 	elif current_distance > 15.0:
 		# Too far - get closer
 		var toward_direction = (player_pos - global_position).normalized()
 		movement_target = global_position + toward_direction * 6.0
-		if debug_enabled:
-			print("🤖 BOSS: Too far - moving closer")
 	else:
 		# Good distance - circle around player
 		circle_angle += PI / 4  # 45 degrees
 		var circle_radius = 10.0
 		var circle_offset = Vector3(cos(circle_angle), 0, sin(circle_angle)) * circle_radius
 		movement_target = player_pos + circle_offset
-		if debug_enabled:
-			print("🤖 BOSS: Good distance - circling")
 	
 	# Make sure target is on ground level
 	movement_target.y = global_position.y
@@ -390,9 +316,6 @@ func _start_charge_attack() -> void:
 	
 	_show_attack_tell("charge")
 	boss_attack_started.emit("charge")
-	
-	if debug_enabled:
-		print("⚡ BOSS: Starting CHARGE ATTACK!")
 
 func _handle_charging(delta: float) -> void:
 	"""Handle charge attack"""
@@ -423,9 +346,6 @@ func _end_charge() -> void:
 	# Brief stun after charge
 	current_state = BossState.STUNNED
 	state_timer = 0.0
-	
-	if debug_enabled:
-		print("⚡ BOSS: Charge attack complete!")
 
 func _start_leap_attack() -> void:
 	"""Begin leap attack"""
@@ -442,9 +362,6 @@ func _start_leap_attack() -> void:
 	
 	_show_attack_tell("leap")
 	boss_attack_started.emit("leap")
-	
-	if debug_enabled:
-		print("🦘 BOSS: Starting LEAP ATTACK!")
 
 func _handle_leap_wind_up() -> void:
 	"""Wind-up for leap attack"""
@@ -467,9 +384,6 @@ func _execute_leap() -> void:
 	
 	_clear_attack_tell()
 	
-	if debug_enabled:
-		print("🦘 BOSS: LEAPING!")
-
 func _handle_leaping() -> void:
 	"""Handle boss while in air"""
 	# Break walls during leap
@@ -491,9 +405,6 @@ func _land_from_leap() -> void:
 	# Brief stun after landing
 	current_state = BossState.STUNNED
 	state_timer = 0.0
-	
-	if debug_enabled:
-		print("🦘 BOSS: Landed from leap!")
 
 func _start_slam_attack() -> void:
 	"""Begin slam attack"""
@@ -505,9 +416,6 @@ func _start_slam_attack() -> void:
 	
 	_show_attack_tell("slam")
 	boss_attack_started.emit("slam")
-	
-	if debug_enabled:
-		print("💥 BOSS: Starting SLAM ATTACK!")
 
 func _handle_slam_wind_up() -> void:
 	"""Wind-up for slam attack"""
@@ -556,15 +464,10 @@ func _slam_impact() -> void:
 	# Stun after slam
 	current_state = BossState.STUNNED
 	state_timer = 0.0
-	
-	if debug_enabled:
-		print("💥 BOSS: SLAM IMPACT!")
 
 func _start_wall_throw_attack() -> void:
 	"""Begin wall throwing attack"""
 	if not wall_chunk_scene:
-		if debug_enabled:
-			print("🪨 BOSS: No wall chunk scene - skipping throw attack")
 		_start_charge_attack()  # Fallback to charge
 		return
 	
@@ -577,9 +480,6 @@ func _start_wall_throw_attack() -> void:
 	
 	_show_attack_tell("throw")
 	boss_attack_started.emit("throw")
-	
-	if debug_enabled:
-		print("🪨 BOSS: Starting WALL THROW ATTACK!")
 
 func _handle_throw_wind_up() -> void:
 	"""Wind-up for throwing attack"""
@@ -611,9 +511,6 @@ func _handle_throwing(delta: float) -> void:
 		current_state = BossState.STUNNED
 		state_timer = 0.0
 		
-		if debug_enabled:
-			print("🪨 BOSS: Wall throw attack complete!")
-
 func _throw_wall_chunk() -> void:
 	"""Throw a single wall chunk at player"""
 	if not wall_chunk_scene or not player:
@@ -635,9 +532,6 @@ func _throw_wall_chunk() -> void:
 	
 	if chunk.has_method("throw"):
 		chunk.throw(throw_force)
-	
-	if debug_enabled:
-		print("🪨 BOSS: Threw wall chunk!")
 
 func _handle_stunned() -> void:
 	"""Handle stun state after attacks"""
@@ -646,9 +540,6 @@ func _handle_stunned() -> void:
 	if state_timer >= 1.0:  # 1 second stun
 		current_state = BossState.IDLE
 		state_timer = 0.0
-		
-		if debug_enabled:
-			print("🤖 BOSS: Recovering from stun - returning to IDLE")
 
 # === SPAWNING AND POSITIONING ===
 func _find_safe_spawn() -> void:
@@ -658,9 +549,6 @@ func _find_safe_spawn() -> void:
 	last_safe_position = global_position
 	
 	current_state = BossState.POSITIONING
-	
-	if debug_enabled:
-		print("🤖 BOSS: Safe spawn found at: ", global_position)
 
 func _handle_spawning() -> void:
 	"""Handle spawning state"""
@@ -680,8 +568,6 @@ func _handle_positioning() -> void:
 		if state_timer >= 1.0:
 			current_state = BossState.IDLE
 			state_timer = 0.0
-			if debug_enabled:
-				print("🤖 BOSS: Positioning complete")
 
 # === PHYSICS AND UTILITIES ===
 func _apply_safe_physics(delta: float) -> void:
@@ -796,13 +682,11 @@ func _handle_dying() -> void:
 	boss_died.emit()
 
 # === VISUAL EFFECTS (ENHANCED IMPLEMENTATIONS) ===
-func _show_attack_tell(attack_type: String) -> void:
+func _show_attack_tell(_attack_type: String) -> void:
 	"""Show visual tell for incoming attack with color flash"""
 	is_showing_tell = true
 	
 	if not boss_material:
-		if debug_enabled:
-			print("📢 BOSS: Showing attack tell for: ", attack_type, " (no material)")
 		return
 	
 	# Stop any existing flash
@@ -816,9 +700,6 @@ func _show_attack_tell(attack_type: String) -> void:
 	var warning_color = Color(1.0, 0.7, 0.2, 1.0)  # Bright orange/yellow
 	flash_tween.tween_property(boss_material, "albedo_color", warning_color, 0.3)
 	flash_tween.tween_property(boss_material, "albedo_color", original_color, 0.3)
-	
-	if debug_enabled:
-		print("📢 BOSS: Flashing yellow/orange for attack: ", attack_type)
 
 func _clear_attack_tell() -> void:
 	"""Clear attack tell and return to normal color"""
@@ -832,9 +713,6 @@ func _clear_attack_tell() -> void:
 	# Return to normal red color
 	if boss_material:
 		boss_material.albedo_color = original_color
-	
-	if debug_enabled:
-		print("📢 BOSS: Attack tell cleared, returning to red color")
 
 func _screen_shake(intensity: float) -> void:
 	"""Create screen shake effect"""
@@ -842,9 +720,6 @@ func _screen_shake(intensity: float) -> void:
 	var camera = get_viewport().get_camera_3d()
 	if camera and camera.has_method("add_trauma"):
 		camera.add_trauma(intensity)
-	
-	if debug_enabled:
-		print("📳 BOSS: Screen shake with intensity: ", intensity)
 
 # === DAMAGE AND HEALTH ===
 func take_damage(amount: int, _source: Node = null) -> void:
@@ -854,17 +729,12 @@ func take_damage(amount: int, _source: Node = null) -> void:
 	# Spawn red slime when hit
 	_spawn_red_slime()
 	
-	if debug_enabled:
-		print("🤖 BOSS: Took ", amount, " damage. Health: ", health, "/", max_health)
-	
 	if health <= 0:
 		current_state = BossState.DYING
 
 func _spawn_red_slime() -> void:
 	"""Spawn a red slime when boss takes damage"""
 	if not red_slime_scene:
-		if debug_enabled:
-			print("🟥 BOSS: No red slime scene available")
 		return
 	
 	var slime = red_slime_scene.instantiate()
@@ -881,9 +751,6 @@ func _spawn_red_slime() -> void:
 	# Make slime red if it has material
 	if slime.has_method("_setup_slime_material"):
 		call_deferred("_make_slime_red", slime)
-	
-	if debug_enabled:
-		print("🟥 BOSS: Spawned red slime at: ", slime.global_position)
 
 func _make_slime_red(slime: Node) -> void:
 	"""Make the spawned slime red colored"""
@@ -915,28 +782,3 @@ func _check_player_collision() -> void:
 				var movement_comp = player.get("movement_component")
 				if movement_comp and movement_comp.has_method("apply_knockback_from_enemy"):
 					movement_comp.apply_knockback_from_enemy(self)
-			
-			if debug_enabled:
-				print("🤖 BOSS: Touch damage dealt to player! Distance: ", distance_to_player)
-
-# === DEBUG ===
-func _debug_status() -> void:
-	"""Debug output"""
-	if not debug_enabled:
-		return
-	
-	var state_names = ["SPAWNING", "POSITIONING", "IDLE", "MOVING", "CHARGING", 
-					   "LEAP_WIND_UP", "LEAPING", "SLAM_WIND_UP", "SLAMMING", 
-					   "THROW_WIND_UP", "THROWING", "STUNNED", "DYING"]
-	var state_name = state_names[current_state] if current_state < state_names.size() else "UNKNOWN"
-	
-	print("🤖 ENHANCED BOSS STATUS:")
-	print("  State: ", state_name, " Timer: ", state_timer)
-	print("  Health: ", health, "/", max_health)
-	print("  Attack Cooldown: ", attack_cooldown)
-	print("  Position: ", global_position)
-	print("  On Floor: ", is_on_floor())
-	
-	if player:
-		var distance = global_position.distance_to(player.global_position)
-		print("  Distance to Player: ", distance)
