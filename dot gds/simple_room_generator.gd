@@ -259,6 +259,17 @@ func generate_starting_room():
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
+	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
+	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
+	var recruiter = recruiter_scene.instantiate()
+	add_child(recruiter)
+	var center = starting_room.position + starting_room.size / 2
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var offset = Vector2(2, 0) # Offset by +2 units on X axis
+	var spawn_pos = center + offset
+	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
+
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:

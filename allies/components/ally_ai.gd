@@ -1,7 +1,7 @@
 extends Node
 class_name AllyAI
 
-enum State { FOLLOWING, MOVING_TO_TARGET, ATTACKING, RETREATING }
+enum State { FOLLOWING, MOVING_TO_TARGET, ATTACKING, RETREATING, PATROLLING }
 
 var ally_ref
 var current_state := State.FOLLOWING
@@ -12,6 +12,9 @@ var state_update_interval := 0.1
 var attack_delay_timer := 0.0
 var attack_delay := 0.0
 var retreat_timer := 0.0
+
+# Ally modes
+var mode = null
 
 var first_names = [
 	"Aiden", "Luna", "Kai", "Mira", "Rowan", "Zara", "Finn", "Nova", "Ezra", "Lyra",
@@ -38,10 +41,8 @@ var last_names = [
 ]
 
 func _ready():
-	while first_names.size() < 1000:
-		first_names.append("Name%d" % first_names.size())
-	while last_names.size() < 1000:
-		last_names.append("Surname%d" % last_names.size())
+	# No need to pad name lists; use only the names provided in the arrays
+	pass
 
 func generate_random_name() -> String:
 	var first = first_names[randi() % first_names.size()]
@@ -58,6 +59,34 @@ func setup(ally):
 func set_player_target(player):
 	player_target = player
 
+var patrol_point: Vector3 = Vector3.ZERO
+var is_patrolling := false
+var moving_to_patrol_point := false
+var patrol_radius := 3.0
+var patrol_timer := 0.0
+var patrol_wait_time := 0.0
+
+func command_patrol_at_point(position: Vector3):
+	print("[DEBUG] Patrol command received at position: ", position)
+	patrol_point = position
+	is_patrolling = true
+	moving_to_patrol_point = true
+	current_state = State.PATROLLING
+	patrol_timer = 0.0
+	patrol_wait_time = 0.0
+	print("[DEBUG] Ally ", ally_ref.name, " is now patrolling at ", patrol_point)
+
+func set_mode(new_mode):
+	mode = new_mode
+	if current_state == State.PATROLLING:
+		print("[DEBUG] Patrol cancelled by mode change to ", new_mode)
+		is_patrolling = false
+		moving_to_patrol_point = false
+		patrol_point = Vector3.ZERO
+		if mode == 1 or mode == 2:
+			current_state = State.FOLLOWING
+			print("[DEBUG] Ally ", ally_ref.name, " returning to FOLLOWING mode")
+
 func _process(delta):
 	state_update_timer += delta
 	if state_update_timer >= state_update_interval:
@@ -68,20 +97,27 @@ func _process(delta):
 func _update_ai_state():
 	if not player_target:
 		return
+	if is_patrolling and current_state == State.PATROLLING:
+		# Stay in PATROLLING until cancelled
+		return
 	enemy_target = ally_ref.combat_component.find_nearest_enemy()
 	var _previous_state = current_state
+	if mode == null:
+		mode = 1 # fallback to ATTACK
+	if mode == 2: # PASSIVE
+		current_state = State.FOLLOWING
+		return
 	if ally_ref.health_component.current_health < ally_ref.max_health * 0.25 and enemy_target:
 		current_state = State.RETREATING
 		retreat_timer = 1.0 + randf() * 1.5
 		return
 	if enemy_target:
 		var distance_to_enemy = ally_ref.global_position.distance_to(enemy_target.global_position)
-		if distance_to_enemy <= ally_ref.combat_component.attack_range:
-			current_state = State.ATTACKING
-		elif distance_to_enemy <= ally_ref.combat_component.detection_range:
-			current_state = State.MOVING_TO_TARGET
-		else:
-			current_state = State.FOLLOWING
+		if mode == 1: # ATTACK (charge far)
+			if distance_to_enemy <= ally_ref.combat_component.detection_range:
+				current_state = State.ATTACKING
+			else:
+				current_state = State.MOVING_TO_TARGET
 	else:
 		current_state = State.FOLLOWING
 
@@ -95,6 +131,8 @@ func _execute_current_state(delta: float):
 			_handle_attacking(delta)
 		State.RETREATING:
 			_handle_retreating(delta)
+		State.PATROLLING:
+			_handle_patrolling(delta)
 
 func _handle_following(delta: float):
 	if not player_target:
@@ -117,6 +155,11 @@ func _handle_attacking(delta: float):
 	if not enemy_target:
 		current_state = State.FOLLOWING
 		return
+	# Ensure ally faces the enemy before attacking
+	var ally_pos = ally_ref.global_position
+	var enemy_pos = enemy_target.global_position
+	# Only rotate on the Y axis (assuming Y is up)
+	ally_ref.look_at(Vector3(enemy_pos.x, ally_pos.y, enemy_pos.z), Vector3.UP)
 	if attack_delay_timer > 0:
 		attack_delay_timer -= delta
 		return
@@ -135,6 +178,45 @@ func _handle_retreating(delta: float):
 			ally_ref.movement_component.move_away_from_target(enemy_target.global_position, delta)
 		return
 	current_state = State.FOLLOWING
+
+func _handle_patrolling(delta: float):
+	if not is_patrolling:
+		print("[DEBUG] Patrol ended, switching to FOLLOWING")
+		current_state = State.FOLLOWING
+		return
+	if moving_to_patrol_point:
+		var dist = ally_ref.global_position.distance_to(patrol_point)
+		if dist > 2.0:
+			print("[DEBUG] Ally ", ally_ref.name, " moving directly to patrol point ", patrol_point, " (distance: ", dist, ")")
+			ally_ref.movement_component.move_towards_target(patrol_point, delta)
+			ally_ref.movement_component.apply_separation(delta)
+			return
+		else:
+			print("[DEBUG] Ally ", ally_ref.name, " arrived at patrol point (within 2.0 units), starting patrol.")
+			moving_to_patrol_point = false
+			ally_ref.velocity.x = 0
+			ally_ref.velocity.z = 0
+	# Engage enemy if found
+	enemy_target = ally_ref.combat_component.find_nearest_enemy()
+	if enemy_target and ally_ref.global_position.distance_to(enemy_target.global_position) < ally_ref.combat_component.detection_range:
+		print("[DEBUG] Ally ", ally_ref.name, " found enemy while patrolling, switching to ATTACKING")
+		current_state = State.ATTACKING
+		return
+	# Wander around patrol point
+	patrol_timer -= delta
+	if patrol_timer <= 0.0:
+		var angle = randf() * TAU
+		var dist = randf() * patrol_radius
+		var offset = Vector3(cos(angle), 0, sin(angle)) * dist
+		var target = patrol_point + offset
+		print("[DEBUG] Ally ", ally_ref.name, " patrolling to ", target)
+		ally_ref.movement_component.move_towards_target(target, delta)
+		patrol_wait_time = 0.5 + randf() * 1.5
+		patrol_timer = patrol_wait_time
+	else:
+		ally_ref.velocity.x = move_toward(ally_ref.velocity.x, 0, ally_ref.speed * 2 * delta)
+		ally_ref.velocity.z = move_toward(ally_ref.velocity.z, 0, ally_ref.speed * 2 * delta)
+	ally_ref.movement_component.apply_separation(delta)
 
 func command_move_to_position(position: Vector3):
 	ally_ref.movement_component.move_towards_target(position, 0.1)

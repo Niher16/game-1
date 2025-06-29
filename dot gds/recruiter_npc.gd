@@ -1,7 +1,7 @@
 # recruiter_npc.gd - Enhanced NPC that spawns allies
 extends StaticBody3D
 
-@export var ally_scene: PackedScene = preload("res://allies/Ally.tscn")  # Fixed: Capital A
+@export var ally_scene: PackedScene = preload("res://allies/ally.tscn")  # Fixed: lowercase a
 @export var recruitment_cost := 0  # Could add coin cost later
 @export var max_allies := 5  # Increased from 3
 
@@ -10,6 +10,8 @@ signal ally_recruited
 var player_in_range := false
 var interaction_text: Label3D
 var current_allies_count := 0
+var has_been_clicked := false
+var recruitment_done := false # New flag to track recruitment
 
 func _ready():
 	add_to_group("npcs")
@@ -17,7 +19,6 @@ func _ready():
 	_setup_enhanced_visual()
 	_setup_interaction_area()
 	_update_ally_counter()
-	
 	# Set proper collision layers - Layer 5 for NPCs
 	collision_layer = 1 << 4  # Layer 5 (NPCs)
 	collision_mask = 0  # NPCs don't need to collide with anything
@@ -80,7 +81,8 @@ func _setup_interaction_area():
 func _on_player_entered(body):
 	if body.is_in_group("player"):
 		player_in_range = true
-		interaction_text.visible = true
+		if not recruitment_done:
+			interaction_text.visible = true
 		print("👤 Player entered recruiter range")
 
 func _on_player_exited(body):
@@ -90,68 +92,83 @@ func _on_player_exited(body):
 		print("👤 Player left recruiter range")
 
 func _input(event):
-	if event.is_action_pressed("interaction") and player_in_range:
+	if event.is_action_pressed("interaction") and player_in_range and not has_been_clicked and not recruitment_done:
+		has_been_clicked = true
 		recruit_ally()
 
 func recruit_ally():
-	print("🎯 Attempting to recruit ally...")
-	
 	# Check if we have too many allies
 	var current_allies = get_tree().get_nodes_in_group("allies")
 	if current_allies.size() >= max_allies:
-		print("❌ Max allies reached: ", current_allies.size(), "/", max_allies)
-		# Update text to show max reached
-		interaction_text.text = "Max Allies Reached (%d/%d)" % [current_allies.size(), max_allies]
-		interaction_text.modulate = Color(1.0, 0.3, 0.3)  # Red color
+		interaction_text.text = "Max allies reached!"
+		interaction_text.modulate = Color(1.0, 0.2, 0.2)  # Red
+		interaction_text.visible = true
+		has_been_clicked = false
 		return
-	
-	# Spawn ally with better error handling
+	# Spawn ally
 	if ally_scene:
 		var new_ally = ally_scene.instantiate()
 		if not new_ally:
-			print("\u274c Failed to instantiate ally scene!")
+			interaction_text.text = "Failed to spawn ally!"
+			interaction_text.modulate = Color(1.0, 0.2, 0.2)
+			interaction_text.visible = true
+			has_been_clicked = false
 			return
-		print("[DEBUG] Recruiter NPC spawned ally: ", new_ally.name)
-		
-		# Add to scene tree first
 		get_parent().add_child(new_ally)
-		
-		# Position ally properly on ground (not floating)
-		var spawn_position = global_position + Vector3(randf_range(-2, 2), 0.1, randf_range(-2, 2))
+		# Find a valid spawn position (not in wall/cage, on floor)
+		var valid_position_found = false
+		var spawn_position = global_position
+		var max_attempts = 10
+		var attempt = 0
+		while not valid_position_found and attempt < max_attempts:
+			spawn_position = global_position + Vector3(randf_range(-2, 2), 0.1, randf_range(-2, 2))
+			var space_state = get_world_3d().direct_space_state
+			var collision_shape_node = new_ally.get_node_or_null("CollisionShape3D")
+			var result = []
+			if collision_shape_node:
+				var shape_query = PhysicsShapeQueryParameters3D.new()
+				shape_query.shape = collision_shape_node.shape
+				shape_query.transform = Transform3D(Basis(), spawn_position)
+				shape_query.margin = 0.01
+				result = space_state.intersect_shape(shape_query)
+			if result.size() == 0:
+				# Optionally, check if on floor (raycast down)
+				var ray_query = PhysicsRayQueryParameters3D.new()
+				ray_query.from = spawn_position + Vector3(0, 1, 0)
+				ray_query.to = spawn_position + Vector3(0, -2, 0)
+				ray_query.exclude = [new_ally]
+				var ray_result = space_state.intersect_ray(ray_query)
+				if ray_result and ray_result.has("position"):
+					spawn_position.y = ray_result.position.y + 0.1
+					valid_position_found = true
+			attempt += 1
+		if not valid_position_found:
+			print("⚠️ Could not find valid spawn position for ally after ", max_attempts, " attempts. Using fallback.")
+		# Place ally
 		new_ally.global_position = spawn_position
-		
-		# Ensure ally is in proper group
 		new_ally.add_to_group("allies")
-		print("✅ Ally added to group, total allies: ", get_tree().get_nodes_in_group("allies").size())
-		
-		# Connect ally death signal for UI updates
 		if new_ally.has_signal("ally_died"):
 			if not new_ally.ally_died.is_connected(_on_ally_died):
 				new_ally.ally_died.connect(_on_ally_died)
-		
-		# Force visual setup if method exists
 		if new_ally.has_method("_create_visual"):
 			new_ally._create_visual()
-		
-		# Update UI
 		_update_ui_units()
-		
-		# Emit signal and remove recruiter
 		ally_recruited.emit()
-		print("🎉 Ally recruited successfully!")
-		
-		# Visual feedback before removal
-		_play_recruitment_effect()
-		await get_tree().create_timer(0.5).timeout
-		queue_free()
+		_play_recruitment_effect() # Show feedback
+		interaction_text.visible = true # Show feedback after recruitment
+		recruitment_done = true # Set flag so text doesn't reappear
 	else:
 		print("❌ No ally scene assigned!")
+		interaction_text.text = "No ally scene!"
+		interaction_text.modulate = Color(1.0, 0.2, 0.2)
+		interaction_text.visible = true
+		has_been_clicked = false
 
 func _play_recruitment_effect():
 	"""Add visual/audio feedback for recruitment"""
-	# Change interaction text
 	interaction_text.text = "Ally Recruited!"
 	interaction_text.modulate = Color(0.2, 1.0, 0.2)  # Green
+	# Optionally, add sound or particles here
 
 func _on_ally_died():
 	print("💀 Ally died, updating UI...")

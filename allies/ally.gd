@@ -45,11 +45,17 @@ const DEFAULT_ALLY_COLOR = Color(0.9, 0.7, 0.6)  # Default skin tone
 
 var last_valid_position: Vector3
 
+# Ally modes
+enum Mode { ATTACK = 1, PASSIVE }
+var mode: Mode = Mode.ATTACK
+
 func _ready():
 	add_to_group("allies")
 	_setup_components()
 	_ensure_hands_visible()
 	_find_player()
+	if ai_component:
+		ai_component.set_mode(mode)
 	# Connect health component death signal
 	if health_component:
 		health_component.health_depleted.connect(_on_health_depleted)
@@ -59,7 +65,21 @@ func _ready():
 	# 🔧 FIXED: Initialize last valid position
 	last_valid_position = global_position
 	# --- Ally UI and Name ---
-	_assign_random_name()
+	# Name assignment is now handled by AllyAI component in its setup()
+
+func _input(event):
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_1:
+				mode = Mode.ATTACK
+				if ai_component:
+					ai_component.set_mode(mode)
+				print("Ally mode: ATTACK")
+			KEY_2:
+				mode = Mode.PASSIVE
+				if ai_component:
+					ai_component.set_mode(mode)
+				print("Ally mode: PASSIVE")
 
 func _setup_components() -> void:
 	# Initialize each component with needed references
@@ -352,27 +372,3 @@ func apply_knockback(force: Vector3, duration: float = 0.4):
 	knockback_velocity = force
 	knockback_timer = duration
 	is_being_knocked_back = true
-
-func _assign_random_name():
-	"""Assign a random name to this ally if not already set"""
-	if not has_meta("display_name"):
-		var random_name = _generate_random_name()
-		set_meta("display_name", random_name)
-		name = random_name
-		print("🆕 Ally assigned name: ", random_name)
-
-func _generate_random_name() -> String:
-	"""Generate a random fantasy name"""
-	var first_names = [
-		"Aiden", "Luna", "Kai", "Mira", "Rowan", "Zara", "Finn", "Nova", "Ezra", "Lyra",
-		"Orin", "Sage", "Rhea", "Jax", "Vera", "Theo", "Ivy", "Dax", "Nia", "Kian",
-		"Tara", "Milo", "Suri", "Riven", "Elara", "Bryn", "Juno", "Vale", "Niko", "Sable"
-	]
-	var last_names = [
-		"Stormrider", "Dawnbringer", "Nightshade", "Ironwood", "Starfall", "Ashwalker",
-		"Frostwind", "Shadowmere", "Brightblade", "Moonwhisper", "Stonehelm", "Swiftarrow",
-		"Emberforge", "Mistvale", "Oakenshield", "Riversong", "Wolfbane", "Sunstrider"
-	]
-	var first = first_names[randi() % first_names.size()]
-	var last = last_names[randi() % last_names.size()]
-	return first + " " + last

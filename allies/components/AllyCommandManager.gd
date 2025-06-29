@@ -34,6 +34,8 @@ func _input(event):
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_1:
 			_issue_move_command()
+		elif event.keycode == KEY_3:
+			_issue_patrol_command()
 
 func _issue_move_command():
 	"""Issue move-to-position command at mouse location"""
@@ -64,6 +66,36 @@ func _issue_move_command():
 	if commanded_count > 0:
 		_show_command_feedback(mouse_world_pos)
 		command_issued.emit("move_to_position", mouse_world_pos)
+
+func _issue_patrol_command():
+	"""Issue patrol-at-point command at mouse location"""
+	var mouse_world_pos = _get_mouse_world_position()
+	
+	if mouse_world_pos == Vector3.ZERO:
+		return
+	
+	# Check if position is within command range
+	var distance_to_player = mouse_world_pos.distance_to(player_ref.global_position)
+	if distance_to_player > command_range:
+		return
+	
+	# Command all allies to patrol at position
+	var allies = get_tree().get_nodes_in_group("allies")
+	var commanded_count = 0
+	for ally in allies:
+		if not _is_valid_ally(ally):
+			continue
+		var ai_component = ally.get_node_or_null("AIComponent")
+		if not ai_component:
+			continue
+		if not ai_component.has_method("command_patrol_at_point"):
+			continue
+		ai_component.command_patrol_at_point(mouse_world_pos)
+		commanded_count += 1
+	
+	if commanded_count > 0:
+		_show_command_feedback(mouse_world_pos)
+		command_issued.emit("patrol_at_point", mouse_world_pos)
 
 func _get_mouse_world_position() -> Vector3:
 	# Raycast from camera to mouse position onto the XZ plane (y=0)
