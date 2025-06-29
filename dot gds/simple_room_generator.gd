@@ -259,6 +259,21 @@ func generate_starting_room():
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
+	# Ensure at least one torch in starter room
+	var torch_found := false
+	var torch_script = preload("res://dot gds/enhanced_torch.gd")
+	for obj in generated_objects:
+		if obj.get_script() == torch_script:
+			torch_found = true
+			break
+	if not torch_found:
+		# Spawn a torch at the center of the room
+		var center_torch = starting_room.position + starting_room.size / 2
+		var half_map_x_torch = map_size.x / 2
+		var half_map_y_torch = map_size.y / 2
+		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
+		spawn_torch_at_position(center_pos)
+
 	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
 	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
 	var recruiter = recruiter_scene.instantiate()

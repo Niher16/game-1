@@ -387,11 +387,10 @@ func _on_body_entered(body: Node3D):
 		if floating_text:
 			floating_text.visible = true
 	elif body.is_in_group("allies"):
-		# Ally picks up weapon
-		if body.has_method("equip_weapon") and weapon_resource:
+		# Ally picks up weapon only if unarmed
+		if body.has_method("equip_weapon") and weapon_resource and body.current_weapon == null:
 			body.equip_weapon(weapon_resource)
 			# Optionally, play a pickup sound or effect here
-			# Remove the pickup from the scene
 			queue_free()
 
 func _on_body_exited(body: Node3D):

@@ -189,7 +189,7 @@ libraries = {
 transform = Transform3D(-4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0, 1, 0.44, -0.2, 0)
 
 [node name="SwordNode" type="MeshInstance3D" parent="WeaponAttachPoint"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0766866, 0.0476032, -0.0139694)
+transform = Transform3D(-0.0353006, -4.52543e-08, 0.999377, -4.52545e-08, 1, 4.36841e-08, -0.999377, -4.36842e-08, -0.0353006, -0.0766866, 0.0476032, -0.0139694)
 visible = false
 mesh = ExtResource("6_j353k")
 

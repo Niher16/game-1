@@ -75,8 +75,12 @@ func spawn_ally_near_player():
 	var ally_instance = ally_scene.instantiate()
 	# Spawn position: 2 units beside the player
 	var spawn_offset = Vector3(2, 0, 0)
-	ally_instance.global_transform.origin = player.global_transform.origin + spawn_offset
+	# Ensure the player is inside the tree before accessing global_transform
+	if not player.is_inside_tree():
+		print("[DEBUG] Player is not inside the tree. Cannot spawn ally.")
+		return
 	get_tree().current_scene.add_child(ally_instance)
+	ally_instance.global_transform.origin = player.global_transform.origin + spawn_offset
 	print("[DEBUG] Spawned ally near player at ", ally_instance.global_transform.origin)
 
 # Call this function to start killing enemies one by one

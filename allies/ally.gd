@@ -73,6 +73,15 @@ func _ready():
 	# --- Ally UI and Name ---
 	# Name assignment is now handled by AllyAI component in its setup()
 
+	# Animation validation
+	if not weapon_animation_player:
+		push_error("WeaponAnimationPlayer not found on ally!")
+		return
+	if not weapon_animation_player.has_animation("sword_slash"):
+		push_warning("sword_slash animation missing on ally!")
+	if not weapon_animation_player.has_animation("Bow"):
+		push_warning("Bow animation missing on ally!")
+
 func _input(event):
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -224,6 +233,7 @@ func _prevent_wall_clipping():
 		velocity.y = max(0, velocity.y)
 
 func _physics_process(delta):
+	_seek_and_equip_weapon()
 	# Add gravity
 	if not is_on_floor():
 		velocity.y -= ProjectSettings.get_setting("physics/3d/default_gravity") * delta
@@ -380,6 +390,8 @@ func apply_knockback(force: Vector3, duration: float = 0.4):
 	is_being_knocked_back = true
 
 func equip_weapon(weapon_resource: WeaponResource) -> void:
+	if current_weapon != null:
+		return # Only equip if unarmed
 	current_weapon = weapon_resource
 	if combat_component:
 		combat_component.equip_weapon(weapon_resource)
@@ -398,38 +410,95 @@ func equip_weapon(weapon_resource: WeaponResource) -> void:
 				var weapon_mesh_instance = MeshInstance3D.new()
 				weapon_mesh_instance.mesh = mesh_resource
 				weapon_mesh_instance.name = "WeaponMesh"
-				# Adjust transform for weapon type
+				# FIXED: Use exact same transforms as player's WeaponAttachPoint nodes
 				match weapon_resource.weapon_type:
 					WeaponResource.WeaponType.SWORD:
-						weapon_mesh_instance.rotation_degrees = Vector3(0, 180, 90)
-						weapon_mesh_instance.position = Vector3(0, 0, 0)
+						# CRITICAL FIX: Use exact same transform matrix as player's SwordNode
+						weapon_mesh_instance.transform = Transform3D(
+							Vector3(-1, 0, 0),                              # X axis (flipped)
+							Vector3(0, -1, 0),                              # Y axis (unchanged)
+							Vector3(0, 0, -1),                              # Z axis (flipped)
+							Vector3(-0.0766866, 0.0476032, -0.0139694)      # Position (unchanged)
+						)
+						# DO NOT set rotation_degrees - it will conflict with transform
 					WeaponResource.WeaponType.BOW:
-						weapon_mesh_instance.rotation_degrees = Vector3(0, 90, 0)
-						weapon_mesh_instance.position = Vector3(0, 0, 0)
+						# CRITICAL FIX: Use exact same transform matrix as player's BowNode
+						weapon_mesh_instance.transform = Transform3D(
+							Vector3(1.19374e-08, -0.0128768, 0.999917),    # X axis
+							Vector3(-1, -2.0979e-09, 1.19114e-08),         # Y axis  
+							Vector3(1.94435e-09, -0.999917, -0.0128768),   # Z axis
+							Vector3(0, 0, 0)                               # Position
+						)
+						# DO NOT set rotation_degrees - it will conflict with transform
 					_:
 						weapon_mesh_instance.rotation_degrees = Vector3.ZERO
 						weapon_mesh_instance.position = Vector3.ZERO
+				# Add weapon mesh instance after match
 				right_hand.add_child(weapon_mesh_instance)
+	# Debug the animation system after equipping
+	# debug_animation_system()  # Removed: function not defined
 
-# Call this when the ally attacks
+# Enhanced weapon attack animation with tree validation
 func play_weapon_attack_animation():
-	if current_weapon and weapon_animation_player:
-		var animation_name = ""
-		match current_weapon.weapon_type:
-			WeaponResource.WeaponType.SWORD:
-				animation_name = "sword_slash"
-			WeaponResource.WeaponType.BOW:
-				animation_name = "Bow"
-			WeaponResource.WeaponType.STAFF:
-				animation_name = "staff_cast"
-			_:
-				animation_name = "punch"
-		if weapon_animation_player.has_animation(animation_name):
-			weapon_animation_player.play(animation_name)
-		else:
+	# CRITICAL FIX: Validate scene tree state before animation
+	if not is_inside_tree():
+		push_warning("Ally not in scene tree - cannot play animation")
+		return
+	if not weapon_animation_player:
+		push_warning("No WeaponAnimationPlayer found on ally!")
+		return
+	if not weapon_animation_player.is_inside_tree():
+		push_warning("WeaponAnimationPlayer not in scene tree!")
+		return
+	if not current_weapon:
+		# Fallback to punch animation when no weapon equipped
+		if weapon_animation_player.has_animation("punch"):
 			weapon_animation_player.play("punch")
+		return
+	var animation_name = ""
+	match current_weapon.weapon_type:
+		WeaponResource.WeaponType.SWORD:
+			animation_name = "sword_slash"
+		WeaponResource.WeaponType.BOW:
+			animation_name = "Bow"  # Exact case match from AnimationPlayer
+		WeaponResource.WeaponType.STAFF:
+			animation_name = "staff_cast"  # Add this animation if needed
+		_:
+			animation_name = "punch"
+	# Play animation with error handling
+	if weapon_animation_player.has_animation(animation_name):
+		print("[ALLY DEBUG] Playing animation: ", animation_name)
+		weapon_animation_player.play(animation_name)
+	else:
+		print("[ALLY DEBUG] Animation not found: ", animation_name, " - using punch fallback")
+		if weapon_animation_player.has_animation("punch"):
+			weapon_animation_player.play("punch")
+		else:
+			push_error("No fallback punch animation found on ally!")
 
+# CRITICAL FIX: Safer attack start handler
 func _on_ally_attack_started():
 	# Reset animation state so ally can attack again
-	if weapon_animation_player:
+	if weapon_animation_player and weapon_animation_player.is_inside_tree():
 		weapon_animation_player.stop()
+	else:
+		push_warning("Cannot stop animation - WeaponAnimationPlayer invalid")
+
+func _seek_and_equip_weapon():
+	if current_weapon != null:
+		return
+	var pickups = get_tree().get_nodes_in_group("weapon_pickup")
+	var closest_pickup = null
+	var closest_dist = 99999.0
+	for pickup in pickups:
+		if not pickup or not pickup.is_inside_tree():
+			continue
+		var dist = global_position.distance_to(pickup.global_position)
+		if dist < 25.0 and dist < closest_dist:
+			closest_dist = dist
+			closest_pickup = pickup
+	if closest_pickup:
+		# Move toward the weapon pickup
+		var dir = (closest_pickup.global_position - global_position).normalized()
+		velocity.x = dir.x * speed
+		velocity.z = dir.z * speed

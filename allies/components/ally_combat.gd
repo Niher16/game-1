@@ -50,44 +50,55 @@ func attack_target(target: Node3D):
 	is_attacking = true
 	attack_timer = attack_cooldown
 	attack_started.emit()
+	# CRITICAL FIX: Validate ally before calling animation
+	if ally_ref and ally_ref.is_inside_tree() and ally_ref.has_method("play_weapon_attack_animation"):
+		ally_ref.play_weapon_attack_animation()
+	else:
+		push_warning("Cannot play ally animation - ally invalid or not in tree")
 	if current_weapon and current_weapon.weapon_type == WeaponResource.WeaponType.BOW:
-		WeaponAnimationManager.play_attack_animation(current_weapon, ally_ref)
 		_spawn_ally_arrow(target)
 		pending_damage_target = null
-		get_tree().create_timer(0.4).timeout.connect(func(): is_attacking = false, CONNECT_ONE_SHOT)
+		_setup_attack_finish_timer(0.4)
 	else:
-		WeaponAnimationManager.play_attack_animation(current_weapon, ally_ref)
+		# For melee weapons, set up damage delivery
 		pending_damage_target = target
-		get_tree().create_timer(0.2).timeout.connect(_execute_pending_damage, CONNECT_ONE_SHOT)
+		_setup_damage_delivery_timer(0.2)
+		_setup_attack_finish_timer(0.6)
 
-func _execute_pending_damage():
-	if pending_damage_target and is_instance_valid(pending_damage_target):
-		_deal_damage(pending_damage_target)
-	pending_damage_target = null
+# CRITICAL FIX: Use Timer nodes instead of lambda captures
+func _setup_attack_finish_timer(delay: float):
+	var timer = Timer.new()
+	timer.wait_time = delay
+	timer.one_shot = true
+	add_child(timer)
+	timer.timeout.connect(func():
+		is_attacking = false
+		timer.queue_free()
+	)
+	timer.start()
 
-func _deal_damage(target: Node3D):
-	if not is_instance_valid(target):
-		return
-	var distance = ally_ref.global_position.distance_to(target.global_position)
-	if distance > attack_range * 1.2:
-		return
-	if target.has_method("take_damage"):
-		target.take_damage(attack_damage)
-		attack_hit.emit(target)
+func _setup_damage_delivery_timer(delay: float):
+	var timer = Timer.new()
+	timer.wait_time = delay
+	timer.one_shot = true
+	add_child(timer)
+	timer.timeout.connect(func():
+		_execute_pending_damage()
+		timer.queue_free()
+	)
+	timer.start()
 
-func equip_weapon(weapon_resource: WeaponResource) -> void:
-	current_weapon = weapon_resource
-	if current_weapon:
-		attack_damage = current_weapon.attack_damage
-		attack_range = current_weapon.attack_range
-		attack_cooldown = current_weapon.attack_cooldown
-	else:
-		# fallback to ally base stats
-		attack_damage = ally_ref.attack_damage
-		attack_range = ally_ref.detection_range * 0.3
-		attack_cooldown = 1.2
-
+# CRITICAL FIX: Safe arrow spawning and orientation
 func _spawn_ally_arrow(target: Node3D):
+	# Safe position calculation to avoid !is_inside_tree() error
+	var start_pos: Vector3
+	if ally_ref.right_hand_anchor and ally_ref.right_hand_anchor.is_inside_tree():
+		start_pos = ally_ref.right_hand_anchor.global_position
+	elif ally_ref.is_inside_tree():
+		start_pos = ally_ref.global_position + Vector3(0.4, 0.5, 0)
+	else:
+		push_error("Ally not in scene tree when spawning arrow!")
+		return
 	# Spawn a simple arrow mesh and move it toward the target
 	var arrow = MeshInstance3D.new()
 	var cylinder = CylinderMesh.new()
@@ -124,29 +135,79 @@ func _spawn_ally_arrow(target: Node3D):
 	fletch_material.roughness = 0.9
 	fletching.material_override = fletch_material
 	arrow.add_child(fletching)
-	# Position arrow at right hand anchor
-	var start_pos = ally_ref.right_hand_anchor.global_position if ally_ref.right_hand_anchor else ally_ref.global_position + Vector3(0, 0.5, 0)
-	arrow.global_position = start_pos
-	# Make arrow look at target
-	arrow.look_at(target.global_position, Vector3.UP)
-	arrow.rotate_object_local(Vector3(1, 0, 0), -PI/2)
-	# Add to scene
-	ally_ref.get_parent().add_child(arrow)
-	# Move arrow toward target
-	var _direction = (target.global_position - start_pos).normalized()
+	# Set initial position (local, not global) before adding to tree
+	arrow.position = start_pos
+	# Add to scene - ensure we have valid parent
+	var scene_root = ally_ref.get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(arrow)
+	else:
+		ally_ref.get_parent().add_child(arrow)
+	# Now safe to use look_at and global transforms
+	var target_point = target.global_position
+	arrow.global_position = start_pos # Ensure correct global position
+	if not start_pos.is_equal_approx(target_point):
+		arrow.look_at(target_point, Vector3.UP)
+	else:
+		print("[ALLY ARROW DEBUG] Arrow start and target positions are the same. Skipping look_at.")
+	# Removed rotate_object_local to prevent sideways arrows
+	# Calculate movement
+	var direction = (target.global_position - start_pos).normalized()
 	var arrow_speed = 15.0
 	var travel_time = start_pos.distance_to(target.global_position) / arrow_speed
 	var tween = create_tween()
 	tween.tween_property(arrow, "global_position", target.global_position, travel_time)
-	tween.tween_callback(func():
-		if is_instance_valid(target) and target.has_method("take_damage"):
-			target.take_damage(attack_damage)
-			attack_hit.emit(target)
-		if is_instance_valid(arrow):
-			arrow.queue_free()
-	).set_delay(travel_time)
-	# Fade out arrow if it doesn't hit
-	get_tree().create_timer(travel_time + 0.5).timeout.connect(func():
+	# Use safer damage delivery without lambda captures
+	_setup_arrow_damage_delivery(arrow, target, travel_time)
+	# Auto cleanup
+	get_tree().create_timer(travel_time + 1.0).timeout.connect(func():
 		if is_instance_valid(arrow):
 			arrow.queue_free()
 	)
+	# Debug: Print arrow spawn information
+	print("[ALLY ARROW DEBUG] Spawning arrow:")
+	print("  Start position: ", start_pos)
+	print("  Target position: ", target.global_position)
+	print("  Direction: ", direction)
+	print("  Ally facing: ", -ally_ref.transform.basis.z if ally_ref else "unknown")
+
+# CRITICAL FIX: Separate damage delivery to avoid lambda capture issues
+func _setup_arrow_damage_delivery(arrow: MeshInstance3D, target: Node3D, delay: float):
+	var damage_timer = Timer.new()
+	damage_timer.wait_time = delay
+	damage_timer.one_shot = true
+	arrow.add_child(damage_timer)
+	damage_timer.timeout.connect(func():
+		if is_instance_valid(target) and target.has_method("take_damage"):
+			target.take_damage(attack_damage)
+			attack_hit.emit(target)
+		damage_timer.queue_free()
+	)
+	damage_timer.start()
+
+func _execute_pending_damage():
+	if pending_damage_target and is_instance_valid(pending_damage_target):
+		_deal_damage(pending_damage_target)
+	pending_damage_target = null
+
+func _deal_damage(target: Node3D):
+	if not is_instance_valid(target):
+		return
+	var distance = ally_ref.global_position.distance_to(target.global_position)
+	if distance > attack_range * 1.2:
+		return
+	if target.has_method("take_damage"):
+		target.take_damage(attack_damage)
+		attack_hit.emit(target)
+
+func equip_weapon(weapon_resource: WeaponResource) -> void:
+	current_weapon = weapon_resource
+	if current_weapon:
+		attack_damage = current_weapon.attack_damage
+		attack_range = current_weapon.attack_range
+		attack_cooldown = current_weapon.attack_cooldown
+	else:
+		# fallback to ally base stats
+		attack_damage = ally_ref.attack_damage
+		attack_range = ally_ref.detection_range * 0.3
+		attack_cooldown = 1.2
