@@ -35,7 +35,6 @@ func _ready():
 	_create_ember_system()
 	if smoke_enabled:
 		_create_smoke_system()
-	print("🔥 Enhanced torch created successfully!")
 
 func _process(delta: float):
 	time_passed += delta

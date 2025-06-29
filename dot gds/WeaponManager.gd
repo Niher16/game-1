@@ -29,10 +29,8 @@ func equip_weapon(weapon_resource: WeaponResource) -> void:
 	current_weapon = weapon_resource
 	_apply_weapon_to_player()
 
-	# --- Weapon mesh creation and attachment ---
 	var p = get_player()
 	if p and p.weapon_attach_point:
-		# Hide all weapon nodes first
 		var sword_node = p.weapon_attach_point.get_node_or_null("SwordNode")
 		var bow_node = p.weapon_attach_point.get_node_or_null("BowNode")
 		var staff_node = p.weapon_attach_point.get_node_or_null("StaffNode")
@@ -41,14 +39,12 @@ func equip_weapon(weapon_resource: WeaponResource) -> void:
 		if bow_node: bow_node.visible = false
 		if staff_node: staff_node.visible = false
 
-		# Show and set mesh for current weapon type
 		if weapon_resource.weapon_type == WeaponResource.WeaponType.SWORD and sword_node:
 			if sword_node.get_child_count() == 0:
 				sword_node.add_child(MeshInstance3D.new())
 			var mesh_instance = sword_node.get_child(0) as MeshInstance3D
 			mesh_instance.mesh = preload("res://3d Models/Sword/broadsword.obj")
 
-			# Set iron sword material
 			var iron_material = StandardMaterial3D.new()
 			iron_material.albedo_color = Color(0.6, 0.6, 0.65) # iron gray
 			iron_material.metallic = 0.85
@@ -63,7 +59,6 @@ func equip_weapon(weapon_resource: WeaponResource) -> void:
 			var mesh_instance = bow_node.get_child(0) as MeshInstance3D
 			mesh_instance.mesh = preload("res://3d Models/Bow/bow_01.obj")
 
-			# Set bow material to match pickup
 			var bow_material = StandardMaterial3D.new()
 			bow_material.albedo_color = Color(0.7, 0.5, 0.3)
 			bow_material.metallic = 0.2

@@ -18,11 +18,6 @@ signal new_room_generated(room_rect: Rect2)
 @export var boundary_thickness = 2
 @export var safe_zone_margin = 4
 
-@export_group("NPC Settings")
-@export var recruiter_base_chance: float = 0.25
-@export var recruiter_chance_increase: float = 0.1
-@export var recruiter_max_chance: float = 0.8
-
 @export_group("Torch Settings")
 @export var torch_spacing_in_corridors: float = 8.0
 @export var torch_height_offset: float = 1.5
@@ -41,8 +36,6 @@ var corridors: Array = []
 var generated_objects: Array = []
 var current_room_count = 0
 var corridor_connections: Array = []
-var pending_weapon_room: bool = false
-var last_weapon_room_wave: int = 0
 var wall_lookup: Dictionary = {}
 var boundary_walls: Dictionary = {}
 var wall_material: StandardMaterial3D
@@ -262,42 +255,9 @@ func generate_starting_room():
 	room_types.append(RoomType.STARTING)
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
-	_move_player_to_room(starting_room)
 	_spawn_destructible_objects_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
-	var recruiter_npc_scene = load("res://Scenes/recruiter_npc.tscn")
-	if recruiter_npc_scene:
-		var recruiter_npc_instance = recruiter_npc_scene.instantiate()
-		add_child(recruiter_npc_instance)
-		var safe_position = _find_safe_recruiter_position(starting_room)
-		if safe_position != Vector3.ZERO:
-			recruiter_npc_instance.global_position = safe_position
-		if recruiter_npc_instance.has_method("connect_recruit_signal"):
-			recruiter_npc_instance.connect_recruit_signal()
-	var starting_room_center = starting_room.get_center()
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	var bow_spawn_pos = Vector3(
-		(starting_room_center.x - half_map_x) * 2.0,
-		DEFAULT_OBJECT_HEIGHT,
-		(starting_room_center.y - half_map_y) * 2.0
-	)
-	if weapon_pickup_scene:
-		var weapon_pickup = weapon_pickup_scene.instantiate()
-		add_child(weapon_pickup)
-		weapon_pickup.global_position = bow_spawn_pos
-		var bow_resource = load("res://Weapons/wooden_bow.tres")
-		if bow_resource:
-			weapon_pickup.weapon_resource = bow_resource
-		generated_objects.append(weapon_pickup)
-		var sword_spawn_pos = bow_spawn_pos + Vector3(1.5, 0, 0)
-		var sword_pickup = weapon_pickup_scene.instantiate()
-		add_child(sword_pickup)
-		sword_pickup.global_position = sword_spawn_pos
-		var sword_resource = load("res://Weapons/iron_sword.tres")
-		if sword_resource:
-			sword_pickup.weapon_resource = sword_resource
-		generated_objects.append(sword_pickup)
+
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:
@@ -329,20 +289,6 @@ func create_connected_room():
 	if corridor_connections.size() > 0:
 		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
 		_spawn_torches_in_corridor(latest_corridor)
-	var spawn_chance = min(recruiter_base_chance + (current_room_count * recruiter_chance_increase), recruiter_max_chance)
-	if randf() < spawn_chance:
-		var existing_recruiter = get_tree().get_first_node_in_group("recruiters")
-		if existing_recruiter:
-			return new_room
-		var recruiter_npc_scene = load("res://Scenes/recruiter_npc.tscn")
-		if recruiter_npc_scene:
-			var recruiter_npc_instance = recruiter_npc_scene.instantiate()
-			add_child(recruiter_npc_instance)
-			var safe_position = _find_safe_recruiter_position(new_room)
-			if safe_position != Vector3.ZERO:
-				recruiter_npc_instance.global_position = safe_position
-			if recruiter_npc_instance.has_method("connect_recruit_signal"):
-				recruiter_npc_instance.connect_recruit_signal()
 	return new_room
 
 func _clear_everything():
@@ -575,29 +521,6 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 		object_instance.global_position = world_pos
 		generated_objects.append(object_instance)
 
-func _find_safe_recruiter_position(room: Rect2) -> Vector3:
-	var attempts = 10
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	for attempt in range(attempts):
-		var random_pos = Vector2(
-			room.position.x + 1 + randf() * (room.size.x - 2),
-			room.position.y + 1 + randf() * (room.size.y - 2)
-		)
-		var world_pos = Vector3(
-			(random_pos.x - half_map_x) * 2.0,
-			DEFAULT_OBJECT_HEIGHT,
-			(random_pos.y - half_map_y) * 2.0
-		)
-		var safe = true
-		for obj in generated_objects:
-			if is_instance_valid(obj) and world_pos.distance_to(obj.global_position) < 3.0:
-				safe = false
-				break
-		if safe:
-			return world_pos
-	return Vector3.ZERO
-
 func _on_wave_completed(wave_number: int):
 	if randf() < 0.5:
 		var weapon_room = _create_weapon_room()
@@ -699,7 +622,6 @@ func _spawn_weapon_room_content(room: Rect2):
 	)
 	_spawn_weapon_pickup(weapon_world_pos)
 	_spawn_torch_circle_around_weapon(weapon_world_pos, room)
-	_apply_weapon_room_floor_material(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:
@@ -724,9 +646,6 @@ func _spawn_torch_circle_around_weapon(center_pos: Vector3, room: Rect2):
 		var grid_pos = _world_to_grid_position(torch_pos)
 		if _is_valid_torch_position(grid_pos, room):
 			spawn_torch_at_position(torch_pos)
-
-func _apply_weapon_room_floor_material(_room: Rect2):
-	pass
 
 func _world_to_grid_position(world_pos: Vector3) -> Vector2:
 	var half_map_x = map_size.x / 2

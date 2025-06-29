@@ -450,24 +450,3 @@ func _on_stat_choice_made():
 
 func show_message(_text: String):
 	pass
-
-func ensure_safe_spawn(min_distance: float = 5.0):
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	var safe = true
-	for enemy in enemies:
-		if is_instance_valid(enemy) and global_position.distance_to(enemy.global_position) < min_distance:
-			safe = false
-			break
-	if not safe:
-		for attempt in range(20):
-			var angle = randf() * TAU
-			var distance = randf_range(min_distance, min_distance + 5.0)
-			var test_pos = global_position + Vector3(cos(angle) * distance, 0, sin(angle) * distance)
-			var too_close = false
-			for enemy in enemies:
-				if is_instance_valid(enemy) and test_pos.distance_to(enemy.global_position) < min_distance:
-					too_close = true
-					break
-			if not too_close:
-				global_position = test_pos
-				return

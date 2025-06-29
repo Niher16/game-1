@@ -72,17 +72,13 @@ func _ready():
 func _auto_assign_weapon_if_missing():
 	"""Automatically assign a weapon resource if none exists"""
 	if not weapon_resource:
-		print("⚠️ No weapon resource found, auto-assigning...")
 		if WeaponPool and WeaponPool.has_method("get_random_weapon"):
 			var auto_weapon = WeaponPool.get_random_weapon()
 			if auto_weapon:
 				set_weapon_resource(auto_weapon)
-				print("✅ Auto-assigned weapon: ", auto_weapon.weapon_name)
 			else:
-				print("❌ WeaponPool returned null weapon!")
+				_create_fallback_weapon()
 		else:
-			# Fallback: create a basic sword
-			print("⚠️ WeaponPool not available, creating fallback weapon...")
 			_create_fallback_weapon()
 
 # NEW FUNCTION: Create a basic weapon as fallback
@@ -95,13 +91,11 @@ func _create_fallback_weapon():
 	fallback_weapon.attack_range = 2.5
 	fallback_weapon.attack_cooldown = 0.8
 	set_weapon_resource(fallback_weapon)
-	print("✅ Created fallback weapon: ", fallback_weapon.weapon_name)
 
 func validate_scene_materials():
 	var mesh_nodes = find_children("*", "MeshInstance3D", true, false)
 	for mesh_node in mesh_nodes:
 		if not mesh_node.material_override:
-			print("⚠️ Found MeshInstance3D without material: ", mesh_node.name)
 			var default_mat = StandardMaterial3D.new()
 			default_mat.albedo_color = Color.WHITE
 			mesh_node.material_override = default_mat
@@ -229,13 +223,7 @@ func _create_enhanced_staff():
 	var shaft_material = StandardMaterial3D.new()
 	shaft_material.albedo_color = Color(0.4, 0.25, 0.1)
 	shaft_material.roughness = 0.8
-	if shaft_material and shaft:
-		safe_set_material(shaft, shaft_material)
-	else:
-		print("❌ Staff shaft material or mesh is null, creating fallback")
-		var fallback = StandardMaterial3D.new()
-		fallback.albedo_color = Color(0.4, 0.25, 0.1)
-		safe_set_material(shaft, fallback)
+	safe_set_material(shaft, shaft_material)
 	add_child(shaft)
 	weapon_parts.append(shaft)
 	# Ornate top section
@@ -252,13 +240,7 @@ func _create_enhanced_staff():
 	ornate_material.roughness = 0.2
 	ornate_material.emission_enabled = true
 	ornate_material.emission = Color(0.6, 0.4, 0.1) * 0.5
-	if ornate_material and ornate_top:
-		safe_set_material(ornate_top, ornate_material)
-	else:
-		print("❌ Ornate material or mesh is null, creating fallback")
-		var fallback = StandardMaterial3D.new()
-		fallback.albedo_color = Color(0.8, 0.6, 0.2)
-		safe_set_material(ornate_top, fallback)
+	safe_set_material(ornate_top, ornate_material)
 	shaft.add_child(ornate_top)
 	weapon_parts.append(ornate_top)
 	# Crystal orb at top
@@ -427,30 +409,6 @@ func _create_weapon_visual():
 		_:
 			_create_default_sword_visual()
 
-# Copilot: Add floating rotation and bob animation to weapon mesh
-# (Already handled in _process, but ensure all weapon_parts animate)
-# ...existing code...
-
-# Copilot: Handle weapon pickup and swap logic with WeaponManager
-# (Already handled in _interact_with_weapon, but ensure logic is robust)
-# ...existing code...
-
-# Copilot: Create complete weapon pickup scene setup
-# (Scene structure is Area3D root, CollisionShape3D, MeshInstance3D children)
-# ...existing code...
-
-# Copilot: Create diagnostic function for weapon pickup debugging
-func _run_weapon_pickup_diagnostic():
-	print("[WeaponPickup Diagnostic]")
-	print("Collision Layer:", collision_layer)
-	print("Collision Mask:", collision_mask)
-	var found_player = get_tree().get_first_node_in_group("player")
-	print("Player found:", found_player)
-	var pickups = get_tree().get_nodes_in_group("weapon_pickup")
-	print("Weapon pickups in scene:", pickups.size())
-	for p in pickups:
-		print("- Pickup:", p, "Resource:", p.weapon_resource if "weapon_resource" in p else "None")
-
 # Copilot: Assign weapon resource and update pickup visuals
 func set_weapon_resource(new_resource: WeaponResource):
 	weapon_resource = new_resource
@@ -487,66 +445,23 @@ func _update_interaction_text():
 	else:
 		floating_text.text = "Press E to Pick Up"
 
-# Debug function to inspect weapon resource and WeaponPool
-func debug_weapon_resource():
-	print("🔍 WEAPON PICKUP DEBUG:")
-	print("  - weapon_resource exists: ", weapon_resource != null)
-	if weapon_resource:
-		print("  - weapon_name: '", weapon_resource.weapon_name, "'")
-		print("  - weapon_type: ", weapon_resource.weapon_type)
-		print("  - attack_damage: ", weapon_resource.attack_damage)
-	else:
-		print("  - NO WEAPON RESOURCE ASSIGNED!")
-	
-	# Test WeaponPool
-	if WeaponPool:
-		print("  - WeaponPool exists: ✅")
-		var test_weapon = WeaponPool.get_random_weapon()
-		if test_weapon:
-			print("  - WeaponPool test weapon: '", test_weapon.weapon_name, "'")
-		else:
-			print("  - WeaponPool returned null!")
-	else:
-		print("  - WeaponPool missing: ❌")
-
-# Create a test function to manually assign a weapon
-func assign_test_weapon():
-	print("🧪 Assigning test weapon...")
-	if WeaponPool:
-		var test_weapon = WeaponPool.get_random_weapon()
-		if test_weapon:
-			set_weapon_resource(test_weapon)
-			print("✅ Test weapon assigned: ", test_weapon.weapon_name)
-		else:
-			print("❌ WeaponPool returned null weapon!")
-	else:
-		print("❌ WeaponPool not found!")
-
 # Copilot: Implement weapon pickup interaction logic
 func _interact_with_weapon():
-	print("🗡️ WEAPON INTERACTION TRIGGERED")
-	
 	# Prevent pickup if already disabled
 	if get_meta("pickup_disabled", false):
-		print("❌ Pickup disabled, ignoring interaction")
 		return
 	
 	if not weapon_resource:
-		print("❌ No weapon resource assigned!")
 		return
 	
 	if not player:
 		player = get_tree().get_first_node_in_group("player")
 		if not player:
-			print("❌ No player found!")
 			return
-	
-	print("✅ Attempting weapon pickup: ", weapon_resource.weapon_name)
 	
 	# Check if player has pickup_weapon method
 	if player.has_method("pickup_weapon"):
 		player.pickup_weapon(weapon_resource)
-		print("✅ Weapon given to player via pickup_weapon()")
 	else:
 		# Fallback: try to equip directly via WeaponManager
 		if WeaponManager:
@@ -569,9 +484,7 @@ func _interact_with_weapon():
 						get_tree().current_scene.add_child(dropped_pickup)
 			
 			WeaponManager.equip_weapon(weapon_resource)
-			print("✅ Weapon equipped via WeaponManager fallback")
 		else:
-			print("❌ No pickup method available!")
 			return
 	
 	# Disable pickup and cleanup
@@ -583,15 +496,3 @@ func _interact_with_weapon():
 	# Cleanup after short delay
 	await get_tree().create_timer(0.2).timeout
 	queue_free()
-
-# Call this in your scene to test the pickup system
-func test_pickup_system():
-	print("🧪 TESTING WEAPON PICKUP SYSTEM")
-	_run_weapon_pickup_diagnostic()
-	
-	# Test interaction if player is nearby
-	var test_player = get_tree().get_first_node_in_group("player")
-	if test_player and global_position.distance_to(test_player.global_position) < 3.0:
-		print("🧪 Player nearby, testing interaction...")
-		player_in_range = true
-		_interact_with_weapon()
