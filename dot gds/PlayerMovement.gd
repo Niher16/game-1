@@ -127,16 +127,11 @@ signal foot_animation_update(left_pos: Vector3, right_pos: Vector3)
 signal body_animation_update(body_pos: Vector3, body_rot: Vector3)
 signal animation_state_changed(is_idle: bool)
 
-# Add these variables at class level
+# Controller input variables (add at class level)
 var using_controller: bool = false
 var controller_deadzone: float = 0.2
 
-func _ready():
-	randomize()
-	await get_tree().process_frame
-	current_dash_charges = get_safe_max_dash_charges()
-
-# Easing functions for cartoony animation
+# Restore easing functions (needed for animation)
 func _ease_in_out_cubic(t: float) -> float:
 	var _sign = 1.0
 	if t < 0.0:
@@ -157,6 +152,42 @@ func _ease_out_back(t: float, s: float = 1.70158) -> float:
 
 func _ease_in_out_sine(t: float) -> float:
 	return -(cos(PI * t) - 1.0) / 2.0
+
+func _ready():
+	randomize()
+	await get_tree().process_frame
+	current_dash_charges = get_safe_max_dash_charges()
+	# Schedule multiple foot reference checks to catch them after character creation
+	call_deferred("_find_foot_references")
+	get_tree().create_timer(0.1).timeout.connect(_find_foot_references)
+	get_tree().create_timer(0.3).timeout.connect(_find_foot_references)
+	get_tree().create_timer(0.5).timeout.connect(_find_foot_references)
+
+func _find_foot_references():
+	"""Actively search for foot nodes and update references"""
+	if left_foot_node and right_foot_node:
+		return  # Already found them
+	
+	# Try direct path first
+	left_foot_node = player.get_node_or_null("LeftFoot")
+	right_foot_node = player.get_node_or_null("RightFoot")
+	
+	# If not found, search recursively
+	if not left_foot_node:
+		left_foot_node = _find_node_recursive(player, "LeftFoot")
+	if not right_foot_node:
+		right_foot_node = _find_node_recursive(player, "RightFoot")
+	
+	# Update origins if we found the nodes
+	if left_foot_node and right_foot_node:
+		left_foot_origin = left_foot_node.position
+		right_foot_origin = right_foot_node.position
+		print("✅ Foot references restored: LeftFoot and RightFoot found")
+	else:
+		if not left_foot_node:
+			print("❌ LeftFoot node still missing")
+		if not right_foot_node:
+			print("❌ RightFoot node still missing")
 
 func initialize(player_ref: CharacterBody3D):
 	player = player_ref
@@ -219,18 +250,7 @@ func initialize_animations():
 
 func reinitialize_feet():
 	"""Call this after character appearance is created to find the feet"""
-	left_foot_node = player.get_node_or_null("LeftFoot")
-	right_foot_node = player.get_node_or_null("RightFoot")
-	
-	if left_foot_node and right_foot_node:
-		left_foot_origin = left_foot_node.position
-		right_foot_origin = right_foot_node.position
-	else:
-		print("❌ Still can't find feet after reinitialization")
-		if not left_foot_node:
-			print("   - Missing LeftFoot")
-		if not right_foot_node:
-			print("   - Missing RightFoot")
+	_find_foot_references()
 
 func _schedule_foot_recheck():
 	# Check for feet multiple times with delays to catch them after character creation
@@ -413,8 +433,11 @@ func _update_idle_animations(delta: float):
 			body_node.position = body_origin
 			body_node.rotation_degrees = body_origin_rotation
 	
-	# 🦶 Handle feet during idle - keep them at origin
-	if left_foot_node and right_foot_node:
+	# 🦶 Handle feet during idle - ensure we have foot node references
+	if not left_foot_node or not right_foot_node:
+		_find_foot_references()
+	
+	if left_foot_node and right_foot_node and left_foot_origin != Vector3.ZERO and right_foot_origin != Vector3.ZERO:
 		left_foot_node.position = left_foot_origin
 		right_foot_node.position = right_foot_origin
 
@@ -576,6 +599,7 @@ func _update_walking_animations(delta: float, input_direction: Vector3):
 	var left_foot_pos = null
 	var right_foot_pos = null
 	
+	# Calculate foot positions if origins are valid
 	if left_foot_origin != Vector3.ZERO and right_foot_origin != Vector3.ZERO:
 		if is_side_stepping:
 			# CROSSED FEET ANIMATION for side-stepping!
@@ -618,16 +642,28 @@ func _update_walking_animations(delta: float, input_direction: Vector3):
 				right_foot_swing * foot_direction_multiplier
 			)
 
-	# 🦶 DIRECT FOOT ANIMATION - Apply positions directly to foot nodes
+	# 🦶 FIXED FOOT ANIMATION - Check for missing nodes and try to find them
+	if not left_foot_node or not right_foot_node:
+		_find_foot_references()  # Try to find them again
+	
+	# Apply foot animations if we have valid nodes and positions
 	if left_foot_node and right_foot_node and left_foot_pos != null and right_foot_pos != null:
 		left_foot_node.position = left_foot_pos
 		right_foot_node.position = right_foot_pos
-	elif not left_foot_node or not right_foot_node:
-		print("❌ Can't animate feet - nodes missing! Left: ", left_foot_node != null, " Right: ", right_foot_node != null)
-
-	# Emit signal for other systems that might need foot positions
-	if left_foot_pos != null and right_foot_pos != null:
+		# Emit foot animation signal for other systems
 		foot_animation_update.emit(left_foot_pos, right_foot_pos)
+	else:
+		# Fallback: use CharacterAppearanceManager for foot animation
+		if left_foot_node and right_foot_node and left_foot_origin != Vector3.ZERO and right_foot_origin != Vector3.ZERO:
+			CharacterAppearanceManager.animate_feet_walk(
+				left_foot_node, 
+				right_foot_node, 
+				left_foot_origin, 
+				right_foot_origin, 
+				walk_cycle_time, 
+				player.velocity, 
+				delta
+			)
 
 # Defensive helper for dash charges
 func get_safe_max_dash_charges() -> int:
