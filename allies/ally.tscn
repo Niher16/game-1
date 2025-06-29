@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://sdrleb6nfb4n"]
+[gd_scene load_steps=15 format=3 uid="uid://sdrleb6nfb4n"]
 
 [ext_resource type="Script" uid="uid://dhnpo3b877ia2" path="res://allies/ally.gd" id="1_lx0ct"]
 [ext_resource type="Script" uid="uid://bssh4v2qws77k" path="res://allies/components/ally_health.gd" id="2_health"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://ljks40pdy6h8" path="res://allies/components/ally_ai.gd" id="5_ai"]
 [ext_resource type="ArrayMesh" uid="uid://dpkhctk1q0bpg" path="res://3d Models/Sword/broadsword.obj" id="6_j353k"]
 [ext_resource type="ArrayMesh" uid="uid://dagubfxbsoacu" path="res://3d Models/Bow/bow_01.obj" id="7_sxx78"]
+[ext_resource type="Script" uid="uid://b40c8miyr440i" path="res://allies/components/AllyPersonality.gd" id="8_sxx78"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_o1hd1"]
 
@@ -197,3 +198,8 @@ mesh = ExtResource("6_j353k")
 transform = Transform3D(1.19374e-08, -1, 1.94435e-09, -0.0128768, -2.0979e-09, -0.999917, 0.999917, 1.19114e-08, -0.0128768, 0, 0, 0)
 visible = false
 mesh = ExtResource("7_sxx78")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+
+[node name="PersonalityComponent" type="Node" parent="NavigationAgent3D"]
+script = ExtResource("8_sxx78")

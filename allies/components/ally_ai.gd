@@ -1,7 +1,7 @@
 extends Node
 class_name AllyAI
 
-enum State { FOLLOWING, MOVING_TO_TARGET, ATTACKING, RETREATING, PATROLLING }
+enum State { FOLLOWING, MOVING_TO_TARGET, ATTACKING, RETREATING, PATROLLING, EXPLORING, POSITIONING, WAITING, INVESTIGATING }
 
 var ally_ref
 var current_state := State.FOLLOWING
@@ -49,16 +49,6 @@ func generate_random_name() -> String:
 	var last = last_names[randi() % last_names.size()]
 	return first + " " + last
 
-func setup(ally):
-	ally_ref = ally
-	if not ally_ref.has_meta("display_name"):
-		var random_name = generate_random_name()
-		ally_ref.set_meta("display_name", random_name)
-		ally_ref.name = random_name
-
-func set_player_target(player):
-	player_target = player
-
 var patrol_point: Vector3 = Vector3.ZERO
 var is_patrolling := false
 var moving_to_patrol_point := false
@@ -86,6 +76,22 @@ func set_mode(new_mode):
 		if mode == 1 or mode == 2:
 			current_state = State.FOLLOWING
 			print("[DEBUG] Ally ", ally_ref.name, " returning to FOLLOWING mode")
+
+func set_player_target(player):
+	player_target = player
+
+# Add reference to personality
+var personality: AllyPersonality = null
+
+func setup(ally):
+	ally_ref = ally
+	if not ally_ref.has_meta("display_name"):
+		var random_name = generate_random_name()
+		ally_ref.set_meta("display_name", random_name)
+		ally_ref.name = random_name
+	# Get personality reference
+	if ally_ref.has_node("PersonalityComponent"):
+		personality = ally_ref.get_node("PersonalityComponent")
 
 func _process(delta):
 	state_update_timer += delta
@@ -133,6 +139,14 @@ func _execute_current_state(delta: float):
 			_handle_retreating(delta)
 		State.PATROLLING:
 			_handle_patrolling(delta)
+		State.EXPLORING:
+			_handle_exploring(delta)
+		State.POSITIONING:
+			_handle_positioning(delta)
+		State.WAITING:
+			_handle_waiting(delta)
+		State.INVESTIGATING:
+			_handle_investigating(delta)
 
 func _handle_following(delta: float):
 	if not player_target:
@@ -160,6 +174,9 @@ func _handle_attacking(delta: float):
 	var enemy_pos = enemy_target.global_position
 	# Only rotate on the Y axis (assuming Y is up)
 	ally_ref.look_at(Vector3(enemy_pos.x, ally_pos.y, enemy_pos.z), Vector3.UP)
+	# --- Move while attacking: strafe around the enemy ---
+	ally_ref.movement_component.strafe_around_target(enemy_target, delta)
+	ally_ref.movement_component.apply_separation(delta)
 	if attack_delay_timer > 0:
 		attack_delay_timer -= delta
 		return
@@ -168,8 +185,6 @@ func _handle_attacking(delta: float):
 		attack_delay_timer = attack_delay
 		return
 	ally_ref.combat_component.attack_target(enemy_target)
-	ally_ref.velocity.x = move_toward(ally_ref.velocity.x, 0, ally_ref.speed * 2 * delta)
-	ally_ref.velocity.z = move_toward(ally_ref.velocity.z, 0, ally_ref.speed * 2 * delta)
 
 func _handle_retreating(delta: float):
 	if retreat_timer > 0:
@@ -217,6 +232,41 @@ func _handle_patrolling(delta: float):
 		ally_ref.velocity.x = move_toward(ally_ref.velocity.x, 0, ally_ref.speed * 2 * delta)
 		ally_ref.velocity.z = move_toward(ally_ref.velocity.z, 0, ally_ref.speed * 2 * delta)
 	ally_ref.movement_component.apply_separation(delta)
+
+func _handle_exploring(delta: float):
+	# Personality-driven exploration
+	if personality and randf() < personality.curiosity * 0.05:
+		var explore_angle = randf() * TAU
+		var explore_dist = lerp(2.0, 6.0, personality.curiosity)
+		var offset = Vector3(cos(explore_angle), 0, sin(explore_angle)) * explore_dist
+		var explore_target = ally_ref.global_position + offset
+		ally_ref.movement_component.move_with_navigation(explore_target)
+		ally_ref.movement_component.apply_separation(delta)
+
+func _handle_positioning(delta: float):
+	# Smart formation positioning (stub, expand as needed)
+	if player_target and personality:
+		var formation_offset = Vector3(lerp(-2,2,personality.loyalty), 0, lerp(-2,2,personality.boldness))
+		var pos_target = player_target.global_position + formation_offset
+		ally_ref.movement_component.move_with_navigation(pos_target)
+		ally_ref.movement_component.apply_separation(delta)
+
+func _handle_waiting(_delta: float):
+	# Idle with personality-based quirks
+	if personality and randf() < 0.01 + personality.caution * 0.05:
+		# Play idle animation or look around
+		pass
+
+func _handle_investigating(delta: float):
+	# Investigate points of interest
+	if personality and randf() < personality.curiosity * 0.1:
+		# Move to a random nearby point
+		var angle = randf() * TAU
+		var dist = lerp(1.0, 4.0, personality.curiosity)
+		var offset = Vector3(cos(angle), 0, sin(angle)) * dist
+		var target = ally_ref.global_position + offset
+		ally_ref.movement_component.move_with_navigation(target)
+		ally_ref.movement_component.apply_separation(delta)
 
 func command_move_to_position(position: Vector3):
 	ally_ref.movement_component.move_towards_target(position, 0.1)

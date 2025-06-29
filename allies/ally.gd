@@ -15,6 +15,8 @@ signal ally_died
 @onready var movement_component: AllyMovement = $MovementComponent
 @onready var combat_component: AllyCombat = $CombatComponent
 @onready var ai_component: AllyAI = $AIComponent
+@onready var navigation_agent: NavigationAgent3D = $NavigationAgent3D
+@onready var personality: AllyPersonality = $PersonalityComponent if has_node("PersonalityComponent") else null
 
 # Visual references
 @onready var mesh_instance := $MeshInstance3D
@@ -52,6 +54,10 @@ var mode: Mode = Mode.ATTACK
 
 var current_weapon: WeaponResource = null
 
+# Formation and hallway navigation variables
+var formation_type: String = "default"
+var follow_distance: float = 2.0
+
 func _ready():
 	add_to_group("allies")
 	_setup_components()
@@ -81,6 +87,23 @@ func _ready():
 		push_warning("sword_slash animation missing on ally!")
 	if not weapon_animation_player.has_animation("Bow"):
 		push_warning("Bow animation missing on ally!")
+
+	# --- Navigation and Personality Integration ---
+	if movement_component and navigation_agent:
+		movement_component.setup_navigation(navigation_agent, speed, personality)
+	if personality:
+		print("[PERSONALITY] ", personality.get_trait_summary())
+		# Set follow distance and navigation params based on personality
+		follow_distance = lerp(1.0, 3.0, 1.0 - personality.loyalty)
+		navigation_agent.path_desired_distance = lerp(0.3, 1.0, personality.caution)
+		navigation_agent.target_desired_distance = 0.3
+		navigation_agent.max_speed = lerp(2.0, 5.0, personality.boldness)
+	else:
+		# Fallback defaults if personality is missing
+		follow_distance = 2.0
+		navigation_agent.path_desired_distance = 0.5
+		navigation_agent.target_desired_distance = 0.3
+		navigation_agent.max_speed = speed
 
 func _input(event):
 	if event is InputEventKey and event.pressed:
@@ -257,25 +280,27 @@ func _physics_process(delta):
 	move_and_slide()
 	# 🔧 FIXED: Prevent wall clipping after movement
 	_prevent_wall_clipping()
-	# Animate feet based on movement (with safety checks)
-	animation_time += delta
-	if left_foot and right_foot and left_foot is MeshInstance3D and right_foot is MeshInstance3D:
-		CharacterAppearanceManager.animate_feet_walk(
-			left_foot, right_foot, 
-			left_foot_original_pos, right_foot_original_pos,
-			animation_time, velocity, delta
-		)
-	elif animation_time > 1.0:  # Only try to find feet after 1 second
-		# Try to find feet again if they weren't found initially
-		if not left_foot:
-			left_foot = get_node_or_null("LeftFoot")
-			if left_foot and left_foot is MeshInstance3D:
-				left_foot_original_pos = left_foot.position
-		if not right_foot:
-			right_foot = get_node_or_null("RightFoot")
-			if right_foot and right_foot is MeshInstance3D:
-				right_foot_original_pos = right_foot.position
-				print("🦶 Found RightFoot late!")
+
+	# --- Formation and Navigation Updates ---
+	update_formation()
+	if navigation_agent and player_ref:
+		# Smart following: set target to player, use formation offset
+		var target_pos = player_ref.global_position
+		if formation_type == "single_file":
+			# Stack behind player
+			target_pos -= player_ref.transform.basis.z * follow_distance
+		else:
+			# Offset based on index in group (for demo, random offset)
+			target_pos += Vector3(randf_range(-follow_distance, follow_distance), 0, randf_range(-follow_distance, follow_distance))
+		navigation_agent.set_target_position(target_pos)
+		if not navigation_agent.is_navigation_finished():
+			var next_pos = navigation_agent.get_next_path_position()
+			var move_vec = (next_pos - global_position).normalized() * navigation_agent.max_speed
+			velocity.x = move_vec.x
+			velocity.z = move_vec.z
+
+	animate_feet_if_possible(delta)
+
 	# Very subtle sway and bob (no idle reset)
 	if body_node and velocity.length() > 0.1:
 		body_waddle_time += delta * 5.0
@@ -502,3 +527,45 @@ func _seek_and_equip_weapon():
 		var dir = (closest_pickup.global_position - global_position).normalized()
 		velocity.x = dir.x * speed
 		velocity.z = dir.z * speed
+
+func update_formation():
+	if personality:
+		if is_in_hallway():
+			formation_type = "single_file"
+			follow_distance = 1.0 + personality.caution
+		else:
+			formation_type = "default"
+			follow_distance = lerp(1.0, 3.0, 1.0 - personality.loyalty)
+	else:
+		if is_in_hallway():
+			formation_type = "single_file"
+			follow_distance = 1.5
+		else:
+			formation_type = "default"
+			follow_distance = 2.0
+func is_in_hallway() -> bool:
+	# Use PhysicsRayQueryParameters3D for Godot 4.x
+	var left_params = PhysicsRayQueryParameters3D.create(global_position, global_position + transform.basis.x * -1.5)
+	var right_params = PhysicsRayQueryParameters3D.create(global_position, global_position + transform.basis.x * 1.5)
+	var left_hit = get_world_3d().direct_space_state.intersect_ray(left_params)
+	var right_hit = get_world_3d().direct_space_state.intersect_ray(right_params)
+	return left_hit and right_hit
+
+func animate_feet_if_possible(delta):
+	animation_time += delta
+	if left_foot and right_foot and left_foot is MeshInstance3D and right_foot is MeshInstance3D:
+		CharacterAppearanceManager.animate_feet_walk(
+			left_foot, right_foot,
+			left_foot_original_pos, right_foot_original_pos,
+			animation_time, velocity, delta
+		)
+	elif animation_time > 1.0:
+		if not left_foot:
+			left_foot = get_node_or_null("LeftFoot")
+			if left_foot and left_foot is MeshInstance3D:
+				left_foot_original_pos = left_foot.position
+		if not right_foot:
+			right_foot = get_node_or_null("RightFoot")
+			if right_foot and right_foot is MeshInstance3D:
+				right_foot_original_pos = right_foot.position
+				print("🦶 Found RightFoot late!")

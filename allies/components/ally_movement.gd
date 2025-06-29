@@ -21,6 +21,9 @@ var walk_cycle_time: float = 0.0
 var personality_offset: float = 0.0
 var body_node
 
+var navigation_agent: NavigationAgent3D = null
+var personality: AllyPersonality = null
+
 func setup(ally, move_speed: float):
 	ally_ref = ally
 	speed = move_speed
@@ -51,6 +54,30 @@ func initialize_body_animation():
 	personality_offset = randf_range(-0.1, 0.1)
 	current_body_sway = Vector3.ZERO
 	target_body_sway = Vector3.ZERO
+
+# Always check if personality is not null before using its properties
+func setup_navigation(agent: NavigationAgent3D, move_speed: float, personality_ref = null):
+	navigation_agent = agent
+	speed = move_speed
+	if personality_ref:
+		personality = personality_ref
+	if personality:
+		navigation_agent.path_desired_distance = lerp(0.3, 1.0, personality.caution)
+		navigation_agent.max_speed = lerp(2.0, 5.0, personality.boldness)
+	else:
+		navigation_agent.path_desired_distance = 0.5
+		navigation_agent.max_speed = speed
+	navigation_agent.target_desired_distance = 0.3
+	navigation_agent.velocity_computed.connect(_on_velocity_computed)
+
+func move_with_navigation(target_pos: Vector3):
+	if navigation_agent:
+		navigation_agent.set_target_position(target_pos)
+
+func _on_velocity_computed(safe_velocity: Vector3):
+	if ally_ref:
+		ally_ref.velocity.x = safe_velocity.x
+		ally_ref.velocity.z = safe_velocity.z
 
 func move_towards_target(target_pos: Vector3, delta: float):
 	var direction = (target_pos - ally_ref.global_position)
@@ -194,6 +221,9 @@ func strafe_around_target(target: Node3D, delta: float):
 	_face_direction(to_enemy)
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
+	# --- Ensure foot animation is triggered during strafe movement ---
+	if ally_ref.has_method("animate_feet_if_possible"):
+		ally_ref.animate_feet_if_possible(delta)
 
 func move_away_from_target(target_pos: Vector3, delta: float):
 	var direction = (ally_ref.global_position - target_pos)
@@ -205,3 +235,13 @@ func move_away_from_target(target_pos: Vector3, delta: float):
 		_face_direction(-direction)
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
+
+# Always check if personality is not null before using its properties
+func move_with_formation(player: Node3D):
+	var offset = Vector3.ZERO
+	if personality:
+		offset = Vector3(lerp(-2,2,personality.loyalty), 0, lerp(-2,2,personality.boldness))
+	else:
+		offset = Vector3.ZERO
+	var target_pos = player.global_position + offset
+	move_with_navigation(target_pos)
