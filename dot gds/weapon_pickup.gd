@@ -2,12 +2,9 @@
 extends Area3D
 
 static func safe_set_material(mesh_target: MeshInstance3D, material: Material) -> bool:
-	"""Safely set material with null check - Godot 4.1 best practice"""
 	if not mesh_target:
-		push_warning("🚨 Mesh instance is null - cannot set material")
 		return false
 	if not material:
-		push_warning("🚨 Material is null - creating default material")
 		material = StandardMaterial3D.new()
 	mesh_target.material_override = material
 	return true
@@ -50,18 +47,12 @@ func _ready():
 	collision_layer = 8  # Layer 4 (weapon pickups)
 	collision_mask = 4   # Detect layer 3 (player) - binary 100 = 4
 	
-	print("🗡️ Weapon Pickup Setup:")
-	print("  - Collision Layer: ", collision_layer)
-	print("  - Collision Mask: ", collision_mask)
-	
 	# Connect signals properly (these are the correct signal names for Area3D)
 	if not is_connected("body_entered", Callable(self, "_on_body_entered")):
 		connect("body_entered", Callable(self, "_on_body_entered"))
-		print("  ✅ Connected body_entered signal")
 	
 	if not is_connected("body_exited", Callable(self, "_on_body_exited")):
 		connect("body_exited", Callable(self, "_on_body_exited"))
-		print("  ✅ Connected body_exited signal")
 	
 	# Continue with rest of setup
 	add_to_group("weapon_pickup")
@@ -327,7 +318,6 @@ func _create_default_sword_visual():
 func _create_default_visual():
 	"""Create enhanced default pickup visual"""
 	if not mesh_instance:
-		print("❌ mesh_instance is null, cannot create default visual")
 		return
 	var default_mesh = SphereMesh.new()
 	default_mesh.radius = 0.25
@@ -380,17 +370,17 @@ func _process(delta):
 	if weapon_resource and weapon_resource.weapon_type == WeaponResource.WeaponType.STAFF:
 		_animate_staff_effects(delta)
 
-func _animate_staff_effects(delta):
+func _animate_staff_effects(_delta):
 	"""Special animations for staff weapons"""
 	# Animate floating runes
 	for part in weapon_parts:
 		if part.name.begins_with("Rune") or part.get_parent().name.contains("orb"):
 			var float_offset = sin(time_alive * 3.0 + part.position.x * 10) * 0.02
-			part.position.y += float_offset * delta * 10
+			part.position.y += float_offset * _delta * 10
 			
 			# Rune rotation
 			if part.material_override and part.material_override.billboard_mode == BaseMaterial3D.BILLBOARD_ENABLED:
-				part.rotation_degrees.z += 45 * delta
+				part.rotation_degrees.z += 45 * _delta
 
 # Copilot: Create sphere collision shape for weapon pickup area
 func _setup_collision_shape():
@@ -490,17 +480,12 @@ func _add_glow_effect():
 # Copilot: Update the floating interaction text based on weapon_resource
 func _update_interaction_text():
 	if not floating_text:
-		print("⚠️ No floating_text found!")
 		return
-	print("🏷️ Updating interaction text...")
 	if weapon_resource and weapon_resource.weapon_name != "":
 		var weapon_name = weapon_resource.weapon_name
-		print("  - Weapon name found: ", weapon_name, "")
 		floating_text.text = "Press E to Pick Up " + str(weapon_name)
 	else:
-		print("  - No weapon resource or weapon_name, using default")
 		floating_text.text = "Press E to Pick Up"
-	print("  - Final text: ", floating_text.text, "\n")
 
 # Debug function to inspect weapon resource and WeaponPool
 func debug_weapon_resource():

@@ -3,7 +3,6 @@ extends CharacterBody3D
 
 signal enemy_died
 
-# Combat stats
 @export var health = 30
 @export var max_health = 30
 @export var speed = 2.0
@@ -11,79 +10,64 @@ signal enemy_died
 @export var attack_range = 1.5
 @export var attack_damage = 5
 @export var attack_cooldown = 2.0
-
-# Physics settings
 @export var slide_force = 1.5
 @export var separation_distance = 1.2
 @export var max_slide_speed = 2.0
 @export var slide_damping = 0.85
-
-# Knockback system
 @export var knockback_force = 15.0
 @export var knockback_duration = 0.8
 var knockback_velocity = Vector3.ZERO
 var knockback_timer = 0.0
 var is_being_knocked_back = false
 
-# Simple Slime Animation System
 var slime_scale = Vector3.ONE
 var base_scale = Vector3.ONE
 var animation_timer = 0.0
 var damage_flash_timer = 0.0
 var movement_intensity = 0.0
 
-# Animation states
 enum AnimState { IDLE, MOVING, ATTACKING, DAMAGED, SPAWNING, TELEGRAPHING }
 var current_anim_state = AnimState.SPAWNING
 
-# Telegraph system for fair combat
 var is_telegraphing = false
 var telegraph_timer = 0.0
-const TELEGRAPH_DURATION = 1.0  # Increased for better reaction time
+const TELEGRAPH_DURATION = 1.0
 var telegraph_start_scale = Vector3.ONE
 var telegraph_start_color = Color.WHITE
 
-# Spawn settings
 var spawn_timer = 0.0
 var is_spawn_complete = false
 const SPAWN_DURATION = 0.8
 
-# Core state
 var player: CharacterBody3D
 var last_attack_time = 0.0
 var is_dead = false
 var is_jumping = false
 
-# Jump attack
 var jump_start_pos = Vector3.ZERO
 var jump_target_pos = Vector3.ZERO
 var jump_timer = 0.0
 var jump_duration = 0.6
 var is_anticipating_jump = false
 
-# AI state
 enum AIState { SPAWNING, IDLE, PATROL, CHASE, TELEGRAPH, ATTACK }
 var current_state = AIState.SPAWNING
 var state_timer = 0.0
 var patrol_target = Vector3.ZERO
 var home_position = Vector3.ZERO
 
-# Scene components
 var mesh_instance: MeshInstance3D
 var collision_shape: CollisionShape3D
 var original_mesh_scale: Vector3
 
-# Slime visual properties
 const DEFAULT_SLIME_COLOR = Color(0.2, 0.7, 0.2, 0.95)
 var slime_material: StandardMaterial3D
 
-# Performance cache
 var player_check_timer = 0.0
 const PLAYER_CHECK_INTERVAL = 0.2
 var cached_distance = 999.0
 var cached_player_pos = Vector3.ZERO
 
-# Physics
 var slide_velocity = Vector3.ZERO
 var last_valid_position = Vector3.ZERO
 
@@ -188,7 +172,6 @@ func _physics_process(delta):
 			if player.has_method("take_damage"):
 				player.take_damage(attack_damage, self)
 
-# TELEGRAPH SYSTEM - This was missing!
 func _process_telegraph(delta):
 	"""Handle telegraph animation - this is the key function that was missing!"""
 	if is_telegraphing:

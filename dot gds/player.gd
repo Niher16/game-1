@@ -24,8 +24,6 @@ extends CharacterBody3D
 @export_group("Dash")
 @export var max_dash_charges := 1
 
-@export_group("Experience")
-
 @export_group("Animation")
 @export var body_lean_strength: float = 0.15
 @export var body_sway_strength: float = 0.50

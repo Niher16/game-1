@@ -77,13 +77,8 @@ func _setup_hand_references():
 	if right_hand:
 		right_hand_original_pos = right_hand.position
 		right_hand_original_rot = right_hand.rotation # <-- Store original rotation
-		print("✅ Combat: Found RightHand!")
-	else:
-		print("⚠️ Combat: RightHand not found!")
 	if left_hand:
-		print("✅ Combat: Found LeftHand!")
-	else:
-		print("⚠️ Combat: LeftHand not found!")
+		pass
 
 
 func set_weapon(_new_weapon: WeaponResource):
@@ -94,7 +89,6 @@ func can_attack() -> bool:
 	if movement_component and (
 		movement_component.is_dashing or movement_component.is_being_knocked_back
 	):
-		print("[Combat][", Time.get_ticks_msec()/1000.0, "] Attack blocked: dashing or knocked back")
 		return false
 	# Timer is stopped when ready to attack, running when on cooldown
 	return state == CombatState.IDLE and _attack_cooldown_ready()
@@ -130,12 +124,10 @@ func try_attack():
 func _start_attack_sequence():
 	# Prevent overlapping attacks
 	if state != CombatState.IDLE:
-		print("[Combat][", Time.get_ticks_msec()/1000.0, "] Attack blocked: not IDLE (state=", state, ")")
 		return
 	var now = Time.get_ticks_msec() / 1000.0
 	last_attack_time = now
 	state = CombatState.ATTACKING
-	print("[Combat][", now, "] State -> ATTACKING")
 	attack_state_changed.emit(state)
 	attack_started.emit()
 	_play_attack_animation()
@@ -149,12 +141,10 @@ func _start_attack_sequence():
 
 func _on_attack_timer_timeout():
 	if state != CombatState.ATTACKING:
-		print("[Combat][", Time.get_ticks_msec()/1000.0, "] Timer fired but not in ATTACKING state")
 		return
 	# Hit phase
 	_damage_enemies_in_cone()
 	state = CombatState.COOLDOWN
-	print("[Combat][", Time.get_ticks_msec()/1000.0, "] State -> COOLDOWN")
 	attack_state_changed.emit(state)
 	attack_finished.emit()
 	# Recovery/cooldown phase
@@ -166,7 +156,6 @@ func _on_attack_timer_timeout():
 
 func _on_attack_cooldown_finished():
 	state = CombatState.IDLE
-	print("[Combat][", Time.get_ticks_msec()/1000.0, "] State -> IDLE")
 	attack_state_changed.emit(state)
 	# Reconnect for next attack
 	if attack_timer.timeout.is_connected(_on_attack_cooldown_finished):
@@ -213,7 +202,6 @@ func _damage_enemies_in_cone():
 	
 	# For bow weapons, ONLY spawn arrow - arrow handles its own damage
 	if current_weapon and current_weapon.weapon_type == WeaponResource.WeaponType.BOW:
-		print("🏹 BOW ATTACK: Spawning arrow projectile...")
 		var player_forward = -player.transform.basis.z.normalized()
 		_spawn_arrow_effect(player_forward)
 		return  # Arrow handles its own collision and damage
