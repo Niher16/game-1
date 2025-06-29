@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://dioilysjxebvh"]
+[gd_scene load_steps=10 format=3 uid="uid://dioilysjxebvh"]
 
 [ext_resource type="Script" uid="uid://b5i856ttopent" path="res://dot gds/main_scene_setup.gd" id="1_mkato"]
 [ext_resource type="Script" uid="uid://34pvx714vsnb" path="res://dot gds/UI.gd" id="2_b0obt"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://davx6xri0n0vt" path="res://Scenes/player.tscn" id="4_00g5k"]
 [ext_resource type="Script" uid="uid://cb7skpumhkcp1" path="res://dot gds/Light.gd" id="6_21xkr"]
 [ext_resource type="Script" uid="uid://dmhde8iqvqhla" path="res://dot gds/camera_3d.gd" id="6_cbln3"]
+[ext_resource type="Script" uid="uid://bw601j24wdlu8" path="res://dot gds/debug.gd" id="7_6bp64"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
 size = Vector3(20000, 0.5, 20000)
@@ -66,3 +67,6 @@ transform = Transform3D(0.994303, 0.106594, -3.78621e-08, 0.0516436, -0.481729, 
 visible = false
 light_energy = 0.001
 script = ExtResource("6_21xkr")
+
+[node name="debug" type="Node" parent="."]
+script = ExtResource("7_6bp64")

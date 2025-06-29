@@ -47,6 +47,7 @@ var player: Node3D
 var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
+@export var altar_scene: PackedScene
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -159,84 +160,84 @@ func spawn_torch_at_position(pos: Vector3):
 	torch.global_position = pos
 	generated_objects.append(torch)
 
-func _spawn_torches_in_corridor(corridor_connection: Dictionary):
-	var start_room = corridor_connection.start_room
-	var end_room = corridor_connection.end_room
-	var start_center = start_room.get_center()
-	var end_center = end_room.get_center()
-	var corridor_length = start_center.distance_to(end_center)
-	var estimated_torches = max(2, int(corridor_length / torch_spacing_in_corridors))
-	var torch_count = min(estimated_torches, max_torches_per_corridor)
-	var direction = (end_center - start_center).normalized()
-	var is_horizontal = abs(direction.x) > abs(direction.y)
-	var placed_torches = 0
-	var _half_map_x = map_size.x / 2
-	var _half_map_y = map_size.y / 2
-	for i in range(torch_count):
-		if placed_torches >= max_torches_per_corridor:
-			break
-		var progress = (i + 1.0) / (torch_count + 1.0)
-		var torch_pos = start_center.lerp(end_center, progress)
-		var side_offset = corridor_torch_side_offset
-		if is_horizontal:
-			torch_pos.y += side_offset if (i % 2 == 0) else -side_offset
-		else:
-			torch_pos.x += side_offset if (i % 2 == 0) else -side_offset
-		if _try_place_corridor_torch(torch_pos):
-			placed_torches += 1
+# --- TORCH SPAWNING: DUNGEON STYLE ---
 
-func _try_place_corridor_torch(grid_pos: Vector2) -> bool:
-	var grid_x = int(round(grid_pos.x))
-	var grid_y = int(round(grid_pos.y))
-	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-		return false
-	if terrain_grid[grid_x][grid_y] == TileType.WALL:
-		return false
+func _spawn_torches_in_corridor(corridor_connection: Dictionary):
+	# Place torches at regular intervals on corridor walls, alternating sides
+	var path = corridor_connection.corridor_path
+	if path.size() < 2:
+		return
+	var interval = int(torch_spacing_in_corridors)
+	if interval < 2:
+		interval = 2
+	var side = 1
+	var placed_positions = {}
+	for i in range(0, path.size(), interval):
+		var pos = path[i]
+		# Find wall tile adjacent to corridor tile
+		var wall_pos = _find_adjacent_wall(pos, side)
+		if wall_pos != null and not placed_positions.has(wall_pos):
+			_spawn_torch_on_wall(wall_pos)
+			placed_positions[wall_pos] = true
+			side *= -1  # Alternate sides
+
+func _find_adjacent_wall(pos: Vector2, side: int) -> Vector2:
+	# Check 4 directions, prefer left/right for horizontal, up/down for vertical
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var check = pos + dir * side
+		var x = int(check.x)
+		var y = int(check.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL:
+				return Vector2(x, y)
+	return Vector2()
+
+func _spawn_torch_on_wall(wall_grid_pos: Vector2):
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
 	var world_pos = Vector3(
-		(grid_x - half_map_x) * 2.0,
+		(wall_grid_pos.x - half_map_x) * 2.0,
 		torch_height_offset,
-		(grid_y - half_map_y) * 2.0
+		(wall_grid_pos.y - half_map_y) * 2.0
 	)
+	# Offset torch away from wall into room/corridor
+	var offset_amount = 1.4  # Increased offset for more pronounced placement
+	# Determine wall normal by checking adjacent floor/corridor tile
+	var normal = Vector3.ZERO
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var x = int(wall_grid_pos.x + dir.x)
+		var y = int(wall_grid_pos.y + dir.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.FLOOR or terrain_grid[x][y] == TileType.CORRIDOR:
+				normal = Vector3(dir.x, 0, dir.y)
+				break
+	if normal != Vector3.ZERO:
+		world_pos += normal * offset_amount
 	spawn_torch_at_position(world_pos)
-	return true
 
 func _spawn_torches_in_room(room: Rect2):
-	var torch_height = torch_height_offset
-	var offset = 0.7
-	var try_offsets = [
-		Vector2(0, 0),
-		Vector2(offset, 0),
-		Vector2(0, offset),
-		Vector2(offset, offset),
-		Vector2(-offset, 0),
-		Vector2(0, -offset),
-		Vector2(-offset, -offset)
-	]
-	var corners = [
-		Vector2(room.position.x + offset, room.position.y + offset),
-		Vector2(room.position.x + room.size.x - offset, room.position.y + offset),
-		Vector2(room.position.x + offset, room.position.y + room.size.y - offset),
-		Vector2(room.position.x + room.size.x - offset, room.position.y + room.size.y - offset)
-	]
-	for corner in corners:
-		var _found = false
-		for local_offset in try_offsets:
-			var grid_x = int(round(corner.x + local_offset.x))
-			var grid_y = int(round(corner.y + local_offset.y))
-			if grid_x >= 0 and grid_x < map_size.x and grid_y >= 0 and grid_y < map_size.y:
-				if terrain_grid[grid_x][grid_y] == TileType.FLOOR or terrain_grid[grid_x][grid_y] == TileType.CORRIDOR:
-					var half_map_x = map_size.x / 2
-					var half_map_y = map_size.y / 2
-					var world_pos = Vector3(
-						(grid_x - half_map_x) * 2.0,
-						torch_height,
-						(grid_y - half_map_y) * 2.0
-					)
-					spawn_torch_at_position(world_pos)
-					_found = true
-					break
+	# Place torches near entrances/exits and at intervals along the room's walls
+	var wall_points = []
+	var interval = max(2, int(room.size.x / 2))
+	# Top and bottom walls
+	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
+		wall_points.append(Vector2(x, room.position.y))
+		wall_points.append(Vector2(x, room.position.y + room.size.y - 1))
+	# Left and right walls
+	for y in range(int(room.position.y), int(room.position.y + room.size.y), interval):
+		wall_points.append(Vector2(room.position.x, y))
+		wall_points.append(Vector2(room.position.x + room.size.x - 1, y))
+	# Place torches only if wall is present
+	var placed = {}
+	for pt in wall_points:
+		var x = int(pt.x)
+		var y = int(pt.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL and not placed.has(pt):
+				_spawn_torch_on_wall(pt)
+				placed[pt] = true
 
 func generate_starting_room():
 	_clear_everything()
@@ -620,8 +621,17 @@ func _spawn_weapon_room_content(room: Rect2):
 		DEFAULT_OBJECT_HEIGHT,
 		(room_center.y - half_map_y) * 2.0
 	)
+	# Spawn altar/slab under weapon, slightly lower for visibility
+	if altar_scene:
+		var altar = altar_scene.instantiate()
+		add_child(altar)
+		var altar_pos = weapon_world_pos
+		altar_pos.y -= 0.6
+		altar.global_position = altar_pos
+		generated_objects.append(altar)
 	_spawn_weapon_pickup(weapon_world_pos)
-	_spawn_torch_circle_around_weapon(weapon_world_pos, room)
+	# Spawn torches in weapon room just like other rooms
+	_spawn_torches_in_room(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:
