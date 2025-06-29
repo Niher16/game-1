@@ -45,7 +45,7 @@ var weapon_parts: Array[MeshInstance3D] = []
 func _ready():
 	# CRITICAL: Set up proper collision layers for weapon pickup Area3D
 	collision_layer = 8  # Layer 4 (weapon pickups)
-	collision_mask = 4   # Detect layer 3 (player) - binary 100 = 4
+	collision_mask = 4 | 8   # Detect player (layer 3) and allies (layer 4)
 	
 	# Connect signals properly (these are the correct signal names for Area3D)
 	if not is_connected("body_entered", Callable(self, "_on_body_entered")):
@@ -386,6 +386,13 @@ func _on_body_entered(body: Node3D):
 		_update_interaction_text()
 		if floating_text:
 			floating_text.visible = true
+	elif body.is_in_group("allies"):
+		# Ally picks up weapon
+		if body.has_method("equip_weapon") and weapon_resource:
+			body.equip_weapon(weapon_resource)
+			# Optionally, play a pickup sound or effect here
+			# Remove the pickup from the scene
+			queue_free()
 
 func _on_body_exited(body: Node3D):
 	if body.is_in_group("player"):

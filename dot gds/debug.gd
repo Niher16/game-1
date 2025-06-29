@@ -17,6 +17,8 @@ func _input(event):
 		elif event.keycode == KEY_F10:
 			print("[DEBUG] F10 pressed: Starting kill all enemies one by one.")
 			start_kill_all_enemies()
+		elif event.keycode == KEY_F6:
+			spawn_ally_near_player()
 
 func start_kill_all_enemies():
 	enemies = get_tree().get_nodes_in_group("enemies")
@@ -62,6 +64,20 @@ func set_wave_to_10_and_spawn_boss():
 			print("[DEBUG] Spawner does not have _start_boss_wave method!")
 	else:
 		print("[DEBUG] Spawner not found! Cannot set wave or spawn boss.")
+
+# Spawns an ally near the player
+func spawn_ally_near_player():
+	var player = get_tree().get_first_node_in_group("player")
+	if not player:
+		print("[DEBUG] No player found to spawn ally near.")
+		return
+	var ally_scene = preload("res://allies/ally.tscn")
+	var ally_instance = ally_scene.instantiate()
+	# Spawn position: 2 units beside the player
+	var spawn_offset = Vector3(2, 0, 0)
+	ally_instance.global_transform.origin = player.global_transform.origin + spawn_offset
+	get_tree().current_scene.add_child(ally_instance)
+	print("[DEBUG] Spawned ally near player at ", ally_instance.global_transform.origin)
 
 # Call this function to start killing enemies one by one
 # Example: $debug.start_kill_all_enemies()

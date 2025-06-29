@@ -270,6 +270,16 @@ func generate_starting_room():
 	var spawn_pos = center + offset
 	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
 
+	# --- Spawn a few weapons in the starter room ---
+	var center_vec = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
+	var weapon_offsets = [
+		Vector3(2.5, 0, 0),
+		Vector3(-1.5, 0, 2.2),
+		Vector3(-1.5, 0, -2.2)
+	]
+	for weapon_offset in weapon_offsets:
+		_spawn_weapon_pickup(center_vec + weapon_offset)
+
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:

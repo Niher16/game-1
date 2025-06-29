@@ -10,4 +10,4 @@ attack_range = 8.0
 attack_cooldown = 1.2
 attack_cone_angle = 20.0
 weapon_type = 2
-visual_scene_path = ""
+visual_scene_path = "res://3d Models/Bow/bow_01.obj"

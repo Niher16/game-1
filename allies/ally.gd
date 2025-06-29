@@ -20,6 +20,7 @@ signal ally_died
 @onready var mesh_instance := $MeshInstance3D
 @onready var left_hand_anchor := $LeftHandAnchor
 @onready var right_hand_anchor := $RightHandAnchor
+@onready var weapon_animation_player: AnimationPlayer = $WeaponAnimationPlayer
 
 # Foot animation references - no strict typing to avoid crashes
 var left_foot
@@ -49,6 +50,8 @@ var last_valid_position: Vector3
 enum Mode { ATTACK = 1, PASSIVE }
 var mode: Mode = Mode.ATTACK
 
+var current_weapon: WeaponResource = null
+
 func _ready():
 	add_to_group("allies")
 	_setup_components()
@@ -56,6 +59,9 @@ func _ready():
 	_find_player()
 	if ai_component:
 		ai_component.set_mode(mode)
+	# Connect to attack_started signal to reset animation state
+	if combat_component:
+		combat_component.attack_started.connect(_on_ally_attack_started)
 	# Connect health component death signal
 	if health_component:
 		health_component.health_depleted.connect(_on_health_depleted)
@@ -372,3 +378,58 @@ func apply_knockback(force: Vector3, duration: float = 0.4):
 	knockback_velocity = force
 	knockback_timer = duration
 	is_being_knocked_back = true
+
+func equip_weapon(weapon_resource: WeaponResource) -> void:
+	current_weapon = weapon_resource
+	if combat_component:
+		combat_component.equip_weapon(weapon_resource)
+	# Attach weapon mesh to right hand (as child of hand mesh)
+	if right_hand_anchor:
+		var right_hand = right_hand_anchor.get_node_or_null("RightHand")
+		if not right_hand:
+			print("⚠️ RightHand mesh not found! Weapon will not be visible.")
+			return
+		for child in right_hand.get_children():
+			if child is MeshInstance3D and child.name.begins_with("WeaponMesh"):
+				right_hand.remove_child(child)
+		if weapon_resource and weapon_resource.visual_scene_path != "":
+			var mesh_resource = load(weapon_resource.visual_scene_path)
+			if mesh_resource:
+				var weapon_mesh_instance = MeshInstance3D.new()
+				weapon_mesh_instance.mesh = mesh_resource
+				weapon_mesh_instance.name = "WeaponMesh"
+				# Adjust transform for weapon type
+				match weapon_resource.weapon_type:
+					WeaponResource.WeaponType.SWORD:
+						weapon_mesh_instance.rotation_degrees = Vector3(0, 180, 90)
+						weapon_mesh_instance.position = Vector3(0, 0, 0)
+					WeaponResource.WeaponType.BOW:
+						weapon_mesh_instance.rotation_degrees = Vector3(0, 90, 0)
+						weapon_mesh_instance.position = Vector3(0, 0, 0)
+					_:
+						weapon_mesh_instance.rotation_degrees = Vector3.ZERO
+						weapon_mesh_instance.position = Vector3.ZERO
+				right_hand.add_child(weapon_mesh_instance)
+
+# Call this when the ally attacks
+func play_weapon_attack_animation():
+	if current_weapon and weapon_animation_player:
+		var animation_name = ""
+		match current_weapon.weapon_type:
+			WeaponResource.WeaponType.SWORD:
+				animation_name = "sword_slash"
+			WeaponResource.WeaponType.BOW:
+				animation_name = "Bow"
+			WeaponResource.WeaponType.STAFF:
+				animation_name = "staff_cast"
+			_:
+				animation_name = "punch"
+		if weapon_animation_player.has_animation(animation_name):
+			weapon_animation_player.play(animation_name)
+		else:
+			weapon_animation_player.play("punch")
+
+func _on_ally_attack_started():
+	# Reset animation state so ally can attack again
+	if weapon_animation_player:
+		weapon_animation_player.stop()

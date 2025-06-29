@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3 uid="uid://davx6xri0n0vt"]
+[gd_scene load_steps=23 format=3 uid="uid://davx6xri0n0vt"]
 
 [ext_resource type="Script" uid="uid://bt47480nh31yn" path="res://dot gds/player.gd" id="1_4flbx"]
 [ext_resource type="Script" uid="uid://cqexju0dcbsij" path="res://dot gds/PlayerMovement.gd" id="2_cvnsp"]
@@ -21,11 +21,6 @@ radial_segments = 16
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_onrkg"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_i3pqv"]
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_fkybt"]
-top_radius = 0.025
-bottom_radius = 0.025
-height = 0.9
 
 [sub_resource type="BoxMesh" id="BoxMesh_fkybt"]
 size = Vector3(0.2, 0.12, 0.2)
@@ -208,11 +203,6 @@ mesh = ExtResource("4_fkybt")
 transform = Transform3D(1.19374e-08, -1, 1.94435e-09, -0.0128768, -2.0979e-09, -0.999917, 0.999917, 1.19114e-08, -0.0128768, 0, 0, 0)
 visible = false
 mesh = ExtResource("5_x3wgy")
-
-[node name="StaffNode" type="MeshInstance3D" parent="WeaponAttachPoint"]
-transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0.45, 0)
-visible = false
-mesh = SubResource("CylinderMesh_fkybt")
 
 [node name="RightHandAnchor" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, -0.2, 0)
