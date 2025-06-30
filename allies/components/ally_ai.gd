@@ -221,13 +221,13 @@ func _handle_patrolling(delta: float):
 		return
 	if moving_to_patrol_point:
 		var dist = ally_ref.global_position.distance_to(patrol_point)
-		if dist > 2.0:
+		if dist > 25.0:
 			print("[DEBUG] Ally ", ally_ref.name, " moving directly to patrol point ", patrol_point, " (distance: ", dist, ")")
 			ally_ref.movement_component.move_towards_target(patrol_point, delta)
 			ally_ref.movement_component.apply_separation(delta)
 			return
 		else:
-			print("[DEBUG] Ally ", ally_ref.name, " arrived at patrol point (within 2.0 units), starting patrol.")
+			print("[DEBUG] Ally ", ally_ref.name, " arrived at patrol point (within 25.0 units), starting patrol.")
 			moving_to_patrol_point = false
 			ally_ref.velocity.x = 0
 			ally_ref.velocity.z = 0

@@ -365,8 +365,13 @@ func _input(event):
 				_set_all_allies_mode(2) # PASSIVE
 				_update_ui_ally_mode_display(2)
 			KEY_3:
-				_set_all_allies_mode(3) # PATROL
-				_update_ui_ally_mode_display(3)
+				var mouse_world_pos = _get_mouse_world_position()
+				if mouse_world_pos != Vector3.ZERO:
+					_set_all_allies_mode(3) # PATROL
+					_command_all_allies_patrol_at(mouse_world_pos)
+					_update_ui_ally_mode_display(3)
+				else:
+					push_warning("No valid ground position under mouse for patrol command.")
 
 func _set_all_allies_mode(mode: int):
 	var allies = get_tree().get_nodes_in_group("allies")
@@ -478,3 +483,45 @@ func _on_stat_choice_made():
 
 func show_message(_text: String):
 	pass
+
+func _get_mouse_world_position() -> Vector3:
+	# Raycast from camera to mouse position onto the ground (y=0 or collision)
+	if not is_instance_valid(camera):
+		push_warning("Camera reference invalid for mouse world position.")
+		return Vector3.ZERO
+	var viewport := get_viewport()
+	if not viewport:
+		push_warning("Viewport not found for mouse world position.")
+		return Vector3.ZERO
+	var mouse_pos = viewport.get_mouse_position()
+	var from = camera.project_ray_origin(mouse_pos)
+	var dir = camera.project_ray_normal(mouse_pos)
+	var space_state = get_world_3d().direct_space_state
+	var ray_length = 1000.0
+	var to = from + dir * ray_length
+	var query = PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = false
+	query.collision_mask = 1 # Adjust to your ground/floor layer
+	var result = space_state.intersect_ray(query)
+	if result and result.has("position"):
+		return result["position"]
+	# Fallback: intersect with XZ plane at y=0
+	if abs(dir.y) < 0.0001:
+		return Vector3.ZERO
+	var t = -from.y / dir.y
+	if t < 0:
+		return Vector3.ZERO
+	return from + dir * t
+
+func _command_all_allies_patrol_at(patrol_position: Vector3):
+	var allies = get_tree().get_nodes_in_group("allies")
+	for ally in allies:
+		if not is_instance_valid(ally):
+			continue
+		var ai_component = ally.get_node_or_null("AIComponent")
+		if ai_component and ai_component.has_method("command_patrol_at_point"):
+			ai_component.command_patrol_at_point(patrol_position)
+		elif ally.has_method("command_patrol_at_point"):
+			ally.command_patrol_at_point(patrol_position)
+		else:
+			push_warning("Ally does not support patrol command: %s" % [ally.name])
