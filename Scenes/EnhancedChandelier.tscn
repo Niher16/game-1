@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://doetfya60q7on"]
+
+[ext_resource type="Script" uid="uid://mxgqet0onwee" path="res://dot gds/enhanced_chandelier.gd" id="1_nkw4w"]
+
+[node name="EnhancedChandelier" type="Node3D"]
+script = ExtResource("1_nkw4w")

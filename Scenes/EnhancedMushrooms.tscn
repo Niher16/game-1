@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://l1hw5clfg7i0"]
+
+[ext_resource type="Script" uid="uid://dmpls5hmr5iy7" path="res://dot gds/enhanced_mushrooms.gd" id="1_7my11"]
+
+[node name="EnhancedMushrooms" type="Node3D"]
+script = ExtResource("1_7my11")

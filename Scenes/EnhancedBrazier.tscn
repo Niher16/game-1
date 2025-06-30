@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://df1vew1bko5gi"]
+
+[ext_resource type="Script" uid="uid://7iuroww2rhrw" path="res://dot gds/enhanced_brazier.gd" id="1_3ofvu"]
+
+[node name="EnhancedBrazier" type="Node3D"]
+script = ExtResource("1_3ofvu")
