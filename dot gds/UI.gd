@@ -17,7 +17,7 @@ var unit_label: Label
 var speed_label: Label
 
 # Ally state UI
-var ally_state_labels := []
+var ally_state_label: Label # New label for overall ally state
 
 func _ready():
 	add_to_group("UI")
@@ -37,7 +37,7 @@ func _setup_ui():
 	_create_xp_ui()
 	_create_unit_ui()
 	_create_speed_ui()
-	_create_ally_state_ui()
+	_create_ally_state_ui() # Add new ally state UI
 
 func _create_health_ui():
 	var panel = _create_panel(Vector2(20, 20), Vector2(180, 50), Color.RED)
@@ -99,73 +99,81 @@ func _create_speed_ui():
 	speed_label.add_theme_font_size_override("font_size", 16)
 
 func _create_ally_state_ui():
-	# Only show a small panel with the label "Allies" at the top center
-	var screen_size = get_viewport_rect().size
-	var panel_width = 120
-	var panel_height = 40
+	# Panel below unit panel
+	var panel = _create_panel(Vector2(20, 330), Vector2(200, 50), Color.DARK_GRAY)
+	ally_state_label = _create_label("Allies: Following", panel)
+	ally_state_label.add_theme_font_size_override("font_size", 16)
+	ally_state_label.add_theme_color_override("font_color", Color.GREEN)
 
-	var panel = _create_panel(
-		Vector2(screen_size.x/2.0 - panel_width/2.0, 20),
-		Vector2(panel_width, panel_height),
-		Color.CYAN
-	)
-	panel.anchor_left = 0
-	panel.anchor_right = 0
-	panel.anchor_top = 0
-	panel.anchor_bottom = 0
-
-	# Plain label: no BBCode, just text
-	var allies_label = Label.new()
-	allies_label.text = "Allies"
-	allies_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	allies_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	allies_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	allies_label.add_theme_font_size_override("font_size", 16)
-	allies_label.add_theme_color_override("font_color", Color.WHITE)
-	panel.add_child(allies_label)
-
-	ally_state_labels.clear()
-	ally_state_labels.append(allies_label)
-
-	# No instructions or extra boxes
-
-func _update_ally_state_ui_visibility():
+func _update_ally_state():
 	var allies = get_tree().get_nodes_in_group("allies")
-	var should_show = allies.size() > 0
-	for label in ally_state_labels:
-		if label.get_parent():
-			label.get_parent().visible = should_show
+	if allies.is_empty():
+		ally_state_label.text = "Allies: None"
+		ally_state_label.add_theme_color_override("font_color", Color.GRAY)
+		return
 
-@warning_ignore("shadowed_variable_base_class")
-func _create_panel(pos: Vector2, size: Vector2, border_color: Color) -> Panel:
-	var panel = Panel.new()
-	panel.position = pos
-	panel.size = size
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0.8)
-	style.border_color = border_color
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
-	return panel
+	var any_attacking = false
+	var any_patrolling = false
+	var all_passive = true
+	var all_patrol_mode = true
+	
+	for ally in allies:
+		if not is_instance_valid(ally):
+			continue
+			
+		# Get AI component
+		var ai_component = null
+		if ally.has_node("AIComponent"):
+			ai_component = ally.get_node("AIComponent")
+		
+		if not ai_component:
+			continue
+			
+		# Check current state
+		if ai_component.has_method("get_current_state"):
+			var state = ai_component.get_current_state()
+			# Check if state enum exists and compare
+			if ai_component.has_method("get_state_enum"):
+				var State = ai_component.get_state_enum()
+				if state == State.ATTACKING:
+					any_attacking = true
+				elif state == State.PATROLLING:
+					any_patrolling = true
+		elif "current_state" in ai_component:
+			var state = ai_component.current_state
+			# Check for attacking state (value 2 based on the enum in the code)
+			if state == 2:  # State.ATTACKING
+				any_attacking = true
+			elif state == 4:  # State.PATROLLING
+				any_patrolling = true
+		
+		# Check mode
+		if "mode" in ai_component:
+			var mode = ai_component.mode
+			if mode != 2:  # Not PASSIVE mode
+				all_passive = false
+			if mode != 3:  # Not PATROL mode
+				all_patrol_mode = false
+		else:
+			all_passive = false
+			all_patrol_mode = false
 
-func _create_label(text: String, parent: Panel) -> Label:
-	var label = Label.new()
-	label.text = text
-	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	parent.add_child(label)
-	return label
+	# Determine display state with priority: Attacking > Patrolling > Patrol Mode > Passive > Following
+	if any_attacking:
+		ally_state_label.text = "Allies: Attacking"
+		ally_state_label.add_theme_color_override("font_color", Color.RED)
+	elif any_patrolling:
+		ally_state_label.text = "Allies: Patrol"
+		ally_state_label.add_theme_color_override("font_color", Color.YELLOW)
+	elif all_patrol_mode:
+		ally_state_label.text = "Allies: Patrol"
+		ally_state_label.add_theme_color_override("font_color", Color.YELLOW)
+	elif all_passive:
+		ally_state_label.text = "Allies: Passive"
+		ally_state_label.add_theme_color_override("font_color", Color.BLUE)
+	else:
+		ally_state_label.text = "Allies: Following"
+		ally_state_label.add_theme_color_override("font_color", Color.GREEN)
 
 func _find_references():
 	player = get_tree().get_first_node_in_group("player")
@@ -190,10 +198,11 @@ func _connect_ally_signals(ally):
 		ally.connect("ally_removed", Callable(self, "_on_ally_removed"))
 	if ally.has_signal("ally_died") and not ally.is_connected("ally_died", Callable(self, "_on_ally_died")):
 		ally.connect("ally_died", Callable(self, "_on_ally_died"))
-	# Connect mode_changed signal for UI updates
-	if ally.has_signal("mode_changed") and not ally.is_connected("mode_changed", Callable(self, "_on_ally_mode_changed").bind(ally)):
-		ally.connect("mode_changed", Callable(self, "_on_ally_mode_changed").bind(ally))
-
+	
+	# Connect mode_changed signal if it exists (after adding it to ally.gd)
+	if ally.has_signal("mode_changed") and not ally.is_connected("mode_changed", Callable(self, "_on_ally_mode_changed")):
+		ally.connect("mode_changed", Callable(self, "_on_ally_mode_changed"))
+	
 	# Optionally, handle ally removal from scene
 	if not ally.is_connected("tree_exited", Callable(self, "_on_ally_removed")):
 		ally.connect("tree_exited", Callable(self, "_on_ally_removed"))
@@ -253,6 +262,7 @@ func _process(_delta):
 	_update_wave()
 	_update_dash()
 	_update_speed()
+	_update_ally_state()  # Update ally state every frame
 
 func _update_coins():
 	if player and coin_label and player.has_method("get_currency"):
@@ -325,9 +335,49 @@ func _on_ally_died():
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 	_update_ally_state_ui_visibility()
 
-func _on_ally_mode_changed(_new_mode: int, _ally):
-	pass
+func _on_ally_mode_changed(_new_mode: int, _ally = null):
+	# Called when an ally's mode changes
+	pass  # The _update_ally_state() in _process will handle the update
 
 func _update_units(current_units: int):
 	if unit_label:
 		unit_label.text = "🤝 Units: %d/%d" % [current_units, max_units]
+
+# ===== ALLY STATE UI VISIBILITY =====
+func _update_ally_state_ui_visibility():
+	var allies = get_tree().get_nodes_in_group("allies")
+	var should_show = allies.size() > 0
+	if ally_state_label and ally_state_label.get_parent():
+		ally_state_label.get_parent().visible = should_show
+
+# Utility function to create a styled panel
+func _create_panel(pos: Vector2, panel_size: Vector2, border_color: Color) -> Panel:
+	var panel = Panel.new()
+	panel.position = pos
+	panel.size = panel_size
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0.8)
+	style.border_color = border_color
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	return panel
+
+# Utility function to create a styled label
+func _create_label(text: String, parent: Panel) -> Label:
+	var label = Label.new()
+	label.text = text
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	parent.add_child(label)
+	return label
