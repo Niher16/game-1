@@ -28,6 +28,7 @@ func _find_references():
 	if boss:
 		# Position debug label above boss
 		global_position = boss.global_position + Vector3(0, 4, 0)
+		print("🔍 DEBUG: Found boss, starting visualization")
 	else:
 		print("🔍 DEBUG: No boss found in scene")
 
@@ -109,5 +110,3 @@ func _draw():
 	
 	# This would require a custom draw method or debug shapes
 	# For now, we'll use the console output from the boss script
-
-# This script was removed as part of project cleanup (debug/test/print code, unused systems, and redundant comments).

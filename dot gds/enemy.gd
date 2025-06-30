@@ -88,6 +88,11 @@ func _connect_to_scene_nodes():
 		base_scale = original_mesh_scale
 		slime_scale = original_mesh_scale
 		mesh_instance.visible = true
+		# Ensure the mesh casts shadows
+		mesh_instance.cast_shadow = MeshInstance3D.SHADOW_CASTING_SETTING_ON
+		# Try double sided shadow if mesh is single sided
+		if mesh_instance.has_method("set_cast_shadows_setting"):
+			mesh_instance.set_cast_shadows_setting(MeshInstance3D.SHADOW_CASTING_SETTING_ON)
 	else:
 		base_scale = Vector3.ONE
 		slime_scale = Vector3.ONE
@@ -98,12 +103,13 @@ func _connect_to_scene_nodes():
 func _setup_slime_material():
 	if not mesh_instance or not is_instance_valid(mesh_instance):
 		return
-		
+	
 	slime_material = StandardMaterial3D.new()
 	slime_material.albedo_color = DEFAULT_SLIME_COLOR
 	slime_material.metallic = 0.0
 	slime_material.roughness = 0.3
-	slime_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Disable transparency for shadow casting
+	slime_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	mesh_instance.material_override = slime_material
 
 func _setup_physics():

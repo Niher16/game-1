@@ -18,6 +18,22 @@ signal new_room_generated(room_rect: Rect2)
 @export var boundary_thickness = 2
 @export var safe_zone_margin = 4
 
+@export_group("Torch Settings")
+@export var torch_spacing_in_corridors: float = 8.0
+@export var torch_height_offset: float = 1.5
+@export var corridor_torch_side_offset: float = 0.8
+@export var max_torches_per_corridor: int = 4
+
+@export_group("Enhanced Lighting Settings")
+#@export var chandelier_spawn_chance: float = 0.3  # 30% chance in large rooms
+#@export var brazier_spawn_chance: float = 0.4     # 40% chance in room centers
+@export var mushroom_spawn_chance: float = 0.2    # 20% chance in corners
+@export var large_room_threshold: float = 64.0    # Room area for chandelier eligibility
+
+enum TileType { WALL, FLOOR, CORRIDOR }
+enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
+enum RoomType { NORMAL, WEAPON, STARTING }
+
 var terrain_grid: Array = []
 var rooms: Array = []
 var room_shapes: Array = []
@@ -39,8 +55,10 @@ var weapon_pickup_scene: PackedScene
 @export var barrel_scene: PackedScene
 @export var altar_scene: PackedScene
 
-# Reference to LightingManager
-@export var lighting_manager: Node
+# Enhanced lighting scene references
+var chandelier_scene: PackedScene
+var brazier_scene: PackedScene
+var mushroom_scene: PackedScene
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -52,11 +70,6 @@ var _spawner_retry_count := 0
 const _SPAWNER_MAX_RETRIES := 10
 const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
-
-# --- ENUM DEFINITIONS (restored for script functionality) ---
-enum TileType { WALL, FLOOR, CORRIDOR }
-enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
-enum RoomType { NORMAL, WEAPON, STARTING }
 
 func _ready():
 	add_to_group("terrain")
@@ -70,9 +83,8 @@ func _ready():
 	_find_references()
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
-	# LightingManager reference (autoload or child)
-	if not lighting_manager:
-		lighting_manager = get_node_or_null("../LightingManager")
+	# Load new lighting scenes
+	_load_lighting_scenes()
 	if auto_generate_on_start:
 		_pending_generate_starting_room = true
 		_try_generate_starting_room_when_spawner_ready()
@@ -118,34 +130,6 @@ func _find_references():
 		if not enemy_spawner.wave_completed.is_connected(_on_wave_completed):
 			enemy_spawner.wave_completed.connect(_on_wave_completed)
 
-	# --- LightingManager robust reference ---
-	if not lighting_manager:
-		# Try autoload (singleton)
-		if Engine.has_singleton("LightingManager"):
-			lighting_manager = Engine.get_singleton("LightingManager")
-		# Try by group
-		if not lighting_manager:
-			var lm_group = get_tree().get_nodes_in_group("LightingManager")
-			if lm_group.size() > 0:
-				lighting_manager = lm_group[0]
-		# Try by name in parent
-		if not lighting_manager:
-			lighting_manager = get_node_or_null("../LightingManager")
-		# Final fallback: recursive search for node named 'LightingManager'
-		if not lighting_manager:
-			lighting_manager = _find_node_by_name_recursive(get_tree().get_root(), "LightingManager")
-
-# Helper: Recursively search for a node by name
-func _find_node_by_name_recursive(node: Node, target_name: String) -> Node:
-	if node.name == target_name:
-		return node
-	for child in node.get_children():
-		if child is Node:
-			var found = _find_node_by_name_recursive(child, target_name)
-			if found:
-				return found
-	return null
-
 func _create_simple_corridor_protected(room_a: Rect2, room_b: Rect2):
 	var start = room_a.get_center()
 	var end = room_b.get_center()
@@ -182,6 +166,92 @@ func _create_simple_corridor_protected(room_a: Rect2, room_b: Rect2):
 		"corridor_path": corridor_path
 	})
 
+func spawn_torch_at_position(pos: Vector3):
+	var torch_scene = preload("res://Scenes/EnhancedTorch.tscn")
+	var torch = torch_scene.instantiate()
+	add_child(torch)
+	torch.global_position = pos
+	generated_objects.append(torch)
+
+# --- TORCH SPAWNING: DUNGEON STYLE ---
+
+func _spawn_torches_in_corridor(corridor_connection: Dictionary):
+	# Place torches at regular intervals on corridor walls, alternating sides
+	var path = corridor_connection.corridor_path
+	if path.size() < 2:
+		return
+	var interval = int(torch_spacing_in_corridors)
+	if interval < 2:
+		interval = 2
+	var side = 1
+	var placed_positions = {}
+	for i in range(0, path.size(), interval):
+		var pos = path[i]
+		# Find wall tile adjacent to corridor tile
+		var wall_pos = _find_adjacent_wall(pos, side)
+		if wall_pos != null and not placed_positions.has(wall_pos):
+			_spawn_torch_on_wall(wall_pos)
+			placed_positions[wall_pos] = true
+			side *= -1  # Alternate sides
+
+func _find_adjacent_wall(pos: Vector2, side: int) -> Vector2:
+	# Check 4 directions, prefer left/right for horizontal, up/down for vertical
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var check = pos + dir * side
+		var x = int(check.x)
+		var y = int(check.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL:
+				return Vector2(x, y)
+	return Vector2()
+
+func _spawn_torch_on_wall(wall_grid_pos: Vector2):
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var world_pos = Vector3(
+		(wall_grid_pos.x - half_map_x) * 2.0,
+		torch_height_offset,
+		(wall_grid_pos.y - half_map_y) * 2.0
+	)
+	# Offset torch away from wall into room/corridor
+	var offset_amount = 1.4  # Increased offset for more pronounced placement
+	# Determine wall normal by checking adjacent floor/corridor tile
+	var normal = Vector3.ZERO
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var x = int(wall_grid_pos.x + dir.x)
+		var y = int(wall_grid_pos.y + dir.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.FLOOR or terrain_grid[x][y] == TileType.CORRIDOR:
+				normal = Vector3(dir.x, 0, dir.y)
+				break
+	if normal != Vector3.ZERO:
+		world_pos += normal * offset_amount
+	spawn_torch_at_position(world_pos)
+
+func _spawn_torches_in_room(room: Rect2):
+	# Place torches near entrances/exits and at intervals along the room's walls
+	var wall_points = []
+	var interval = max(2, int(room.size.x / 2))
+	# Top and bottom walls
+	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
+		wall_points.append(Vector2(x, room.position.y))
+		wall_points.append(Vector2(x, room.position.y + room.size.y - 1))
+	# Left and right walls
+	for y in range(int(room.position.y), int(room.position.y + room.size.y), interval):
+		wall_points.append(Vector2(room.position.x, y))
+		wall_points.append(Vector2(room.position.x + room.size.x - 1, y))
+	# Place torches only if wall is present
+	var placed = {}
+	for pt in wall_points:
+		var x = int(pt.x)
+		var y = int(pt.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL and not placed.has(pt):
+				_spawn_torch_on_wall(pt)
+				placed[pt] = true
+
 func generate_starting_room():
 	_clear_everything()
 	_fill_with_walls()
@@ -200,6 +270,22 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
+	_spawn_torches_in_room(starting_room)
+
+	# Ensure at least one torch in starter room
+	var torch_found := false
+	var torch_script = preload("res://dot gds/enhanced_torch.gd")
+	for obj in generated_objects:
+		if obj.get_script() == torch_script:
+			torch_found = true
+			break
+	if not torch_found:
+		# Spawn a torch at the center of the room
+		var center_torch = starting_room.position + starting_room.size / 2
+		var half_map_x_torch = map_size.x / 2
+		var half_map_y_torch = map_size.y / 2
+		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
+		spawn_torch_at_position(center_pos)
 
 	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
 	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
@@ -226,8 +312,10 @@ func generate_starting_room():
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:
 			enemy_spawner.set_newest_spawning_room(first_wave_room)
+			_spawn_torches_in_room(first_wave_room)
 			if corridor_connections.size() > 0:
-				var _latest_corridor = corridor_connections[corridor_connections.size() - 1]
+				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+				_spawn_torches_in_corridor(latest_corridor)
 
 func create_connected_room():
 	if rooms.is_empty():
@@ -247,8 +335,10 @@ func create_connected_room():
 	current_room_count += 1
 	new_room_generated.emit(new_room)
 	_spawn_destructible_objects_in_room(new_room)
+	_spawn_torches_in_room(new_room)
 	if corridor_connections.size() > 0:
-		var _latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		_spawn_torches_in_corridor(latest_corridor)
 	return new_room
 
 func _clear_everything():
@@ -256,6 +346,7 @@ func _clear_everything():
 		if obj and is_instance_valid(obj):
 			if obj.is_in_group("enhanced_lighting"):
 				obj.queue_free()
+	# ...rest of existing clear code...
 	for obj in generated_objects:
 		if is_instance_valid(obj):
 			obj.queue_free()
@@ -328,6 +419,19 @@ func _is_valid_carve_position(x: int, y: int) -> bool:
 	if boundary_walls.has(grid_key):
 		return false
 	return true
+
+func _is_valid_torch_position(grid_pos: Vector2, room: Rect2) -> bool:
+	var grid_x = int(grid_pos.x)
+	var grid_y = int(grid_pos.y)
+	if grid_x < 0 or grid_x >= terrain_grid.size():
+		return false
+	if grid_y < 0 or grid_y >= terrain_grid[grid_x].size():
+		return false
+	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+		return false
+	if not room.has_point(Vector2(grid_x, grid_y)):
+		return false
+	return terrain_grid[grid_x][grid_y] == TileType.FLOOR
 
 func _carve_room_shape(room: Rect2, shape: RoomShape):
 	match shape:
@@ -413,6 +517,20 @@ func _is_room_position_safe(room: Rect2, min_pos: float, max_pos_x: float, max_p
 		if room.intersects(existing_room):
 			return false
 	return true
+
+func _move_player_to_room(room: Rect2):
+	if not player:
+		player = get_tree().get_first_node_in_group("player")
+		if not player:
+			return
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var room_center_world = Vector3(
+		(room.get_center().x - half_map_x) * 2.0,
+		PLAYER_HEIGHT,
+		(room.get_center().y - half_map_y) * 2.0
+	)
+	player.global_position = room_center_world
 
 func _remove_walls_by_grid_lookup():
 	var to_remove_keys = []
@@ -565,6 +683,8 @@ func _spawn_weapon_room_content(room: Rect2):
 		altar.global_position = altar_pos
 		generated_objects.append(altar)
 	_spawn_weapon_pickup(weapon_world_pos)
+	# Spawn torches in weapon room just like other rooms
+	_spawn_torches_in_room(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:
@@ -573,6 +693,22 @@ func _spawn_weapon_pickup(spawn_pos: Vector3):
 	add_child(weapon_pickup)
 	weapon_pickup.global_position = spawn_pos
 	generated_objects.append(weapon_pickup)
+
+func _spawn_torch_circle_around_weapon(center_pos: Vector3, room: Rect2):
+	var torch_count = 6
+	var angle_step = TAU / torch_count
+	for i in range(torch_count):
+		var angle = i * angle_step
+		var torch_offset = Vector3(
+			cos(angle) * 3.0,
+			0,
+			sin(angle) * 3.0
+		)
+		var torch_pos = center_pos + torch_offset
+		torch_pos.y = torch_height_offset
+		var grid_pos = _world_to_grid_position(torch_pos)
+		if _is_valid_torch_position(grid_pos, room):
+			spawn_torch_at_position(torch_pos)
 
 func _world_to_grid_position(world_pos: Vector3) -> Vector2:
 	var half_map_x = map_size.x / 2
@@ -589,16 +725,119 @@ func get_rooms(include_weapon_rooms := true) -> Array:
 			result.append(rooms[i])
 	return result
 
+func _load_lighting_scenes():
+	"""Load the new lighting scene files"""
+	if ResourceLoader.exists("res://Scenes/EnhancedChandelier.tscn"):
+		chandelier_scene = load("res://Scenes/EnhancedChandelier.tscn")
+	if ResourceLoader.exists("res://Scenes/EnhancedBrazier.tscn"):
+		brazier_scene = load("res://Scenes/EnhancedBrazier.tscn")
+	if ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
+		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
+
 # --- ENHANCED LIGHTING SPAWNING ---
 func _spawn_enhanced_lighting_in_room(room: Rect2, room_type: RoomType):
-	# Use LightingManager for theme-based lighting
-	if not lighting_manager:
-		push_error("LightingManager not set or found!")
+	"""Spawn enhanced lighting based on room type and size"""
+	# Removed unused variables after chandelier/brazier removal
+	# var room_area = room.size.x * room.size.y
+	# var room_center = room.get_center()
+	# var half_map_x = map_size.x / 2
+	# var half_map_y = map_size.y / 2
+	# var world_center = Vector3(
+	# 	(room_center.x - half_map_x) * 2.0,
+	# 	0,
+	# 	(room_center.y - half_map_y) * 2.0
+	# )
+	match room_type:
+		RoomType.STARTING:
+			#_spawn_brazier_at_position(world_center + Vector3(0, 0, 2.0))
+			pass
+		RoomType.WEAPON:
+			#_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
+			_spawn_mushrooms_in_room_corners(room)
+		RoomType.NORMAL:
+			# if room_area >= large_room_threshold and randf() < chandelier_spawn_chance:
+			# 	_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
+			# elif randf() < brazier_spawn_chance:
+			# 	_spawn_brazier_at_position(world_center)
+			if randf() < mushroom_spawn_chance:
+				_spawn_mushrooms_in_room_corners(room)
+
+func _spawn_chandelier_at_position(pos: Vector3):
+	if not chandelier_scene:
+		push_error("Chandelier scene not loaded!")
 		return
-	var idx = rooms.find(room)
-	var shape = RoomShape.SQUARE
-	if idx != -1 and idx < room_shapes.size():
-		shape = room_shapes[idx]
-	var is_weapon_room = (room_type == RoomType.WEAPON)
-	var theme = lighting_manager.assign_lighting_theme(room, str(shape), is_weapon_room)
-	lighting_manager.apply_lighting_theme(room, theme, str(shape))
+	var chandelier = chandelier_scene.instantiate()
+	if not chandelier:
+		push_error("Failed to instantiate chandelier")
+		return
+	add_child(chandelier)
+	chandelier.global_position = pos
+	generated_objects.append(chandelier)
+	print("💡 Spawned chandelier at: ", pos)
+
+func _spawn_brazier_at_position(pos: Vector3):
+	if not brazier_scene:
+		push_error("Brazier scene not loaded!")
+		return
+	var brazier = brazier_scene.instantiate()
+	if not brazier:
+		push_error("Failed to instantiate brazier")
+		return
+	add_child(brazier)
+	brazier.global_position = pos
+	generated_objects.append(brazier)
+	print("🔥 Spawned brazier at: ", pos)
+
+func _spawn_mushrooms_in_room_corners(room: Rect2):
+	if not mushroom_scene:
+		return
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var corner_positions = [
+		Vector2(room.position.x + 1, room.position.y + 1),
+		Vector2(room.position.x + room.size.x - 2, room.position.y + 1),
+		Vector2(room.position.x + 1, room.position.y + room.size.y - 2),
+		Vector2(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
+	]
+	corner_positions.shuffle()
+	var mushroom_count = randi_range(1, 2)
+	for i in range(min(mushroom_count, corner_positions.size())):
+		var corner_grid_pos = corner_positions[i]
+		var x = int(corner_grid_pos.x)
+		var y = int(corner_grid_pos.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.FLOOR:
+				var world_pos = Vector3(
+					(corner_grid_pos.x - half_map_x) * 2.0,
+					0.1,
+					(corner_grid_pos.y - half_map_y) * 2.0
+				)
+				_spawn_mushrooms_at_position(world_pos)
+
+func _spawn_mushrooms_at_position(pos: Vector3):
+	if not mushroom_scene:
+		return
+	var mushrooms = mushroom_scene.instantiate()
+	if not mushrooms:
+		push_error("Failed to instantiate mushrooms")
+		return
+	add_child(mushrooms)
+	mushrooms.global_position = pos
+	generated_objects.append(mushrooms)
+	print("🍄 Spawned mushrooms at: ", pos)
+
+func _spawn_enhanced_corridor_lighting(_corridor_connection: Dictionary):
+	# Removed unused variable after brazier removal
+	# var corridor_rect = corridor_connection.corridor_rect
+	# var corridor_length = max(corridor_rect.size.x, corridor_rect.size.y)
+	# if corridor_length > 12 and randf() < 0.3:
+	# 	var corridor_center = corridor_rect.get_center()
+	# 	var half_map_x = map_size.x / 2
+	# 	var half_map_y = map_size.y / 2
+	# 	var world_center = Vector3(
+	# 		(corridor_center.x - half_map_x) * 2.0,
+	# 		0,
+	# 		(corridor_center.y - half_map_y) * 2.0
+	# 	)
+	# 	_spawn_brazier_at_position(world_center)
+	pass

@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://dioilysjxebvh"]
+[gd_scene load_steps=9 format=3 uid="uid://dioilysjxebvh"]
 
 [ext_resource type="Script" uid="uid://b5i856ttopent" path="res://dot gds/main_scene_setup.gd" id="1_mkato"]
 [ext_resource type="Script" uid="uid://34pvx714vsnb" path="res://dot gds/UI.gd" id="2_b0obt"]
@@ -6,11 +6,6 @@
 [ext_resource type="PackedScene" uid="uid://davx6xri0n0vt" path="res://Scenes/player.tscn" id="4_00g5k"]
 [ext_resource type="Script" uid="uid://dmhde8iqvqhla" path="res://dot gds/camera_3d.gd" id="6_cbln3"]
 [ext_resource type="Script" uid="uid://bw601j24wdlu8" path="res://dot gds/debug.gd" id="7_6bp64"]
-[ext_resource type="Script" uid="uid://bkashgnseygu0" path="res://dot gds/LightingManager.gd" id="7_d1ilt"]
-[ext_resource type="PackedScene" uid="uid://doetfya60q7on" path="res://Scenes/EnhancedChandelier.tscn" id="8_6iyac"]
-[ext_resource type="PackedScene" uid="uid://df1vew1bko5gi" path="res://Scenes/EnhancedBrazier.tscn" id="9_fdnlq"]
-[ext_resource type="PackedScene" uid="uid://l1hw5clfg7i0" path="res://Scenes/EnhancedMushrooms.tscn" id="10_jkdf5"]
-[ext_resource type="PackedScene" uid="uid://b6dkttqp1nkpa" path="res://Scenes/EnhancedTorch.tscn" id="11_wsu2k"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
 size = Vector3(20000, 0.5, 20000)
@@ -66,12 +61,10 @@ script = ExtResource("6_cbln3")
 follow_speed = 32.0
 zoom_speed = 0.5
 
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.994303, 0.106594, -3.78621e-08, 0.0516436, -0.481729, 0.874797, 0.0932479, -0.869813, -0.484489, 0, 340.652, 0)
+visible = false
+light_energy = 0.001
+
 [node name="debug" type="Node" parent="."]
 script = ExtResource("7_6bp64")
-
-[node name="Node3D" type="Node3D" parent="."]
-script = ExtResource("7_d1ilt")
-chandelier_scene = ExtResource("8_6iyac")
-brazier_scene = ExtResource("9_fdnlq")
-mushroom_scene = ExtResource("10_jkdf5")
-torch_scene = ExtResource("11_wsu2k")
