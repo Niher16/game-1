@@ -23,6 +23,19 @@ var base_attack_range: float = 2.0
 var base_attack_cooldown: float = 1.0
 var base_attack_cone_angle: float = 90.0
 
+# Equipment slots for armor
+var equipped_armor: Dictionary = {
+	0: null, # ArmorItem.ArmorType.HELM
+	1: null, # CHEST
+	2: null, # LEGS
+	3: null, # BOOTS
+	4: null  # GLOVES
+}
+
+# Armor attach points
+@export var helm_attach_point: Node3D = null
+# Add more attach points for other armor types as needed
+
 func _ready():
 	if player_ref == null:
 		player_ref = get_parent()
@@ -78,6 +91,47 @@ func _try_auto_equip(item):
 		weapon_attach_point.add_child(item.mesh)
 		# Optionally set equipped_weapon_mesh
 		# equipped_weapon_mesh = item.mesh
+
+# Armor equipment functions
+func equip_armor(armor_item) -> bool:
+	if armor_item == null:
+		push_warning("Tried to equip null armor item.")
+		return false
+	var slot = int(armor_item.armor_type)
+	# Unequip current armor in slot if any
+	if equipped_armor[slot]:
+		unequip_armor(slot)
+	# Attach mesh to correct point
+	var mesh_instance = null
+	if armor_item.mesh_scene:
+		mesh_instance = armor_item.mesh_scene.instantiate()
+		match slot:
+			0:
+				if helm_attach_point:
+					helm_attach_point.add_child(mesh_instance)
+			# Add cases for other armor types
+	equipped_armor[slot] = {
+		"item": armor_item,
+		"mesh": mesh_instance
+	}
+	# Optionally emit signal for UI update
+	return true
+
+func unequip_armor(armor_type: int) -> bool:
+	var slot = int(armor_type)
+	var equipped = equipped_armor[slot]
+	if equipped and equipped.mesh:
+		equipped.mesh.queue_free()
+	equipped_armor[slot] = null
+	# Optionally emit signal for UI update
+	return true
+
+func get_total_defense() -> int:
+	var total = 0
+	for slot in equipped_armor.values():
+		if slot and slot.item:
+			total += slot.item.defense_value
+	return total
 
 # Example signal connection usage
 func connect_signals(target: Object):

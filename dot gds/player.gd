@@ -525,3 +525,15 @@ func _command_all_allies_patrol_at(patrol_position: Vector3):
 			ally.command_patrol_at_point(patrol_position)
 		else:
 			push_warning("Ally does not support patrol command: %s" % [ally.name])
+
+func pickup_armor(armor_data):
+	if inventory_component:
+		if inventory_component.add_item(armor_data):
+			inventory_component.equip_armor(armor_data)
+			# Optionally: Show UI feedback for pickup
+			return true
+		else:
+			push_warning("Inventory full or failed to add armor.")
+	else:
+		push_warning("No inventory_component found on player.")
+	return false
