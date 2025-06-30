@@ -18,7 +18,6 @@ var speed_label: Label
 
 # Ally state UI
 var ally_state_labels := []
-var selected_ally_mode: int = -1 # 0,1,2 for [1],[2],[3]
 
 func _ready():
 	add_to_group("UI")
@@ -100,11 +99,11 @@ func _create_speed_ui():
 	speed_label.add_theme_font_size_override("font_size", 16)
 
 func _create_ally_state_ui():
+	# Only show a small panel with the label "Allies" at the top center
 	var screen_size = get_viewport_rect().size
-	var panel_width = 300
-	var panel_height = 80
-	
-	# Create main panel for ally controls
+	var panel_width = 120
+	var panel_height = 40
+
 	var panel = _create_panel(
 		Vector2(screen_size.x/2.0 - panel_width/2.0, 20),
 		Vector2(panel_width, panel_height),
@@ -114,72 +113,21 @@ func _create_ally_state_ui():
 	panel.anchor_right = 0
 	panel.anchor_top = 0
 	panel.anchor_bottom = 0
-	
-	# Create control instructions label
-	var instructions_label = RichTextLabel.new()
-	instructions_label.text = "[center][color=white]ALLY CONTROLS[/color]\n[color=yellow][1] = ATTACK MODE    [2] = PASSIVE MODE    [3] = PATROL MODE[/color][/center]"
-	instructions_label.bbcode_enabled = true
-	instructions_label.fit_content = true
-	instructions_label.scroll_active = false
-	instructions_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	instructions_label.add_theme_font_size_override("normal_font_size", 14)
-	panel.add_child(instructions_label)
 
-	# Create current mode display panel
-	var mode_panel = _create_panel(
-		Vector2(screen_size.x/2 - 100, 110),
-		Vector2(200, 40),
-		Color.GREEN
-	)
-	mode_panel.anchor_left = 0
-	mode_panel.anchor_right = 0
-	mode_panel.anchor_top = 0
-	mode_panel.anchor_bottom = 0
-
-	# Current mode label
-	var mode_label = RichTextLabel.new()
-	mode_label.text = "[center][color=white]Current Mode: [color=red]ATTACK[/color][/center]"
-	mode_label.bbcode_enabled = true
-	mode_label.fit_content = true
-	mode_label.scroll_active = false
-	mode_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mode_label.add_theme_font_size_override("normal_font_size", 16)
-	mode_panel.add_child(mode_label)
+	# Plain label: no BBCode, just text
+	var allies_label = Label.new()
+	allies_label.text = "Allies"
+	allies_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	allies_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	allies_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	allies_label.add_theme_font_size_override("font_size", 16)
+	allies_label.add_theme_color_override("font_color", Color.WHITE)
+	panel.add_child(allies_label)
 
 	ally_state_labels.clear()
-	ally_state_labels.append(mode_label)
+	ally_state_labels.append(allies_label)
 
-	# Reduce font size, padding, and box size for ally controls and current mode
-	if instructions_label:
-		instructions_label.add_theme_font_size_override("font_size", 18)  # Smaller font
-		instructions_label.add_theme_constant_override("margin_top", 6)
-		instructions_label.add_theme_constant_override("margin_bottom", 6)
-		instructions_label.add_theme_constant_override("margin_left", 12)
-		instructions_label.add_theme_constant_override("margin_right", 12)
-		instructions_label.set_custom_minimum_size(Vector2(0, 36))
-		if instructions_label is RichTextLabel:
-			instructions_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		instructions_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		instructions_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	if mode_label:
-		mode_label.add_theme_font_size_override("font_size", 18)
-		mode_label.add_theme_constant_override("margin_top", 4)
-		mode_label.add_theme_constant_override("margin_bottom", 4)
-		mode_label.add_theme_constant_override("margin_left", 10)
-		mode_label.add_theme_constant_override("margin_right", 10)
-		mode_label.set_custom_minimum_size(Vector2(0, 28))
-		if mode_label is RichTextLabel:
-			mode_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		mode_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-func update_ally_mode_display(mode: int):
-	if ally_state_labels.size() > 0 and ally_state_labels[0]:
-		var mode_text = "ATTACK" if mode == 1 else ("PASSIVE" if mode == 2 else ("PATROL" if mode == 3 else "UNKNOWN"))
-		var mode_color = "red" if mode == 1 else ("blue" if mode == 2 else ("orange" if mode == 3 else "gray"))
-		ally_state_labels[0].text = "[color=white]Current Mode: [color=%s]%s[/color]" % [mode_color, mode_text]
-		ally_state_labels[0].bbcode_enabled = true
+	# No instructions or extra boxes
 
 func _update_ally_state_ui_visibility():
 	var allies = get_tree().get_nodes_in_group("allies")
@@ -377,36 +325,9 @@ func _on_ally_died():
 	_update_units(get_tree().get_nodes_in_group("allies").size())
 	_update_ally_state_ui_visibility()
 
-func _on_ally_mode_changed(new_mode: int, _ally):
-	# Show current mode in the single label, with color
-	var mode_str = "[1]=[color]Attack[/color]   [2]=[color]Follow[/color]"
-	if new_mode == 0:
-		mode_str = "[1]=[color=red]Attack[/color]   [2]=[color]Follow[/color]   (Attack)"
-	elif new_mode == 1:
-		mode_str = "[1]=[color]Attack[/color]   [2]=[color=red]Follow[/color]   (Follow)"
-	set_ally_state(0, mode_str)
+func _on_ally_mode_changed(_new_mode: int, _ally):
+	pass
 
 func _update_units(current_units: int):
 	if unit_label:
 		unit_label.text = "🤝 Units: %d/%d" % [current_units, max_units]
-
-func set_ally_state(_index: int, state: String):
-	# Only one label, just update its text to show current mode
-	if ally_state_labels.size() > 0:
-		ally_state_labels[0].text = state
-
-func set_selected_ally_mode(index: int):
-	selected_ally_mode = index
-	_update_ally_state_highlight()
-
-func _update_ally_state_highlight():
-	for i in range(ally_state_labels.size()):
-		var label = ally_state_labels[i]
-		if i == selected_ally_mode:
-			label.add_theme_color_override("font_color", Color.YELLOW)
-			label.add_theme_color_override("font_outline_color", Color.DARK_BLUE)
-			label.add_theme_font_size_override("font_size", 14)
-		else:
-			label.add_theme_color_override("font_color", Color.WHITE)
-			label.add_theme_color_override("font_outline_color", Color.BLACK)
-			label.add_theme_font_size_override("font_size", 12)
