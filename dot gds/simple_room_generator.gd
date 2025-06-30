@@ -18,22 +18,6 @@ signal new_room_generated(room_rect: Rect2)
 @export var boundary_thickness = 2
 @export var safe_zone_margin = 4
 
-@export_group("Torch Settings")
-@export var torch_spacing_in_corridors: float = 8.0
-@export var torch_height_offset: float = 1.5
-@export var corridor_torch_side_offset: float = 0.8
-@export var max_torches_per_corridor: int = 4
-
-@export_group("Enhanced Lighting Settings")
-@export var chandelier_spawn_chance: float = 0.3
-@export var brazier_spawn_chance: float = 0.4
-@export var mushroom_spawn_chance: float = 0.2
-@export var large_room_threshold: float = 64.0
-
-enum TileType { WALL, FLOOR, CORRIDOR }
-enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
-enum RoomType { NORMAL, WEAPON, STARTING }
-
 var terrain_grid: Array = []
 var rooms: Array = []
 var room_shapes: Array = []
@@ -55,10 +39,8 @@ var weapon_pickup_scene: PackedScene
 @export var barrel_scene: PackedScene
 @export var altar_scene: PackedScene
 
-# Enhanced lighting scene references
-var chandelier_scene: PackedScene
-var brazier_scene: PackedScene
-var mushroom_scene: PackedScene
+# Reference to LightingManager
+@export var lighting_manager: Node
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -71,8 +53,10 @@ const _SPAWNER_MAX_RETRIES := 10
 const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
 
-# Reference to LightingManager
-@export var lighting_manager: Node
+# --- ENUM DEFINITIONS (restored for script functionality) ---
+enum TileType { WALL, FLOOR, CORRIDOR }
+enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
+enum RoomType { NORMAL, WEAPON, STARTING }
 
 func _ready():
 	add_to_group("terrain")
@@ -133,6 +117,34 @@ func _find_references():
 	if enemy_spawner and enemy_spawner.has_signal("wave_completed"):
 		if not enemy_spawner.wave_completed.is_connected(_on_wave_completed):
 			enemy_spawner.wave_completed.connect(_on_wave_completed)
+
+	# --- LightingManager robust reference ---
+	if not lighting_manager:
+		# Try autoload (singleton)
+		if Engine.has_singleton("LightingManager"):
+			lighting_manager = Engine.get_singleton("LightingManager")
+		# Try by group
+		if not lighting_manager:
+			var lm_group = get_tree().get_nodes_in_group("LightingManager")
+			if lm_group.size() > 0:
+				lighting_manager = lm_group[0]
+		# Try by name in parent
+		if not lighting_manager:
+			lighting_manager = get_node_or_null("../LightingManager")
+		# Final fallback: recursive search for node named 'LightingManager'
+		if not lighting_manager:
+			lighting_manager = _find_node_by_name_recursive(get_tree().get_root(), "LightingManager")
+
+# Helper: Recursively search for a node by name
+func _find_node_by_name_recursive(node: Node, target_name: String) -> Node:
+	if node.name == target_name:
+		return node
+	for child in node.get_children():
+		if child is Node:
+			var found = _find_node_by_name_recursive(child, target_name)
+			if found:
+				return found
+	return null
 
 func _create_simple_corridor_protected(room_a: Rect2, room_b: Rect2):
 	var start = room_a.get_center()
@@ -317,19 +329,6 @@ func _is_valid_carve_position(x: int, y: int) -> bool:
 		return false
 	return true
 
-func _is_valid_torch_position(grid_pos: Vector2, room: Rect2) -> bool:
-	var grid_x = int(grid_pos.x)
-	var grid_y = int(grid_pos.y)
-	if grid_x < 0 or grid_x >= terrain_grid.size():
-		return false
-	if grid_y < 0 or grid_y >= terrain_grid[grid_x].size():
-		return false
-	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-		return false
-	if not room.has_point(Vector2(grid_x, grid_y)):
-		return false
-	return terrain_grid[grid_x][grid_y] == TileType.FLOOR
-
 func _carve_room_shape(room: Rect2, shape: RoomShape):
 	match shape:
 		RoomShape.SQUARE, RoomShape.RECTANGLE, RoomShape.SMALL_SQUARE:
@@ -414,20 +413,6 @@ func _is_room_position_safe(room: Rect2, min_pos: float, max_pos_x: float, max_p
 		if room.intersects(existing_room):
 			return false
 	return true
-
-func _move_player_to_room(room: Rect2):
-	if not player:
-		player = get_tree().get_first_node_in_group("player")
-		if not player:
-			return
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	var room_center_world = Vector3(
-		(room.get_center().x - half_map_x) * 2.0,
-		PLAYER_HEIGHT,
-		(room.get_center().y - half_map_y) * 2.0
-	)
-	player.global_position = room_center_world
 
 func _remove_walls_by_grid_lookup():
 	var to_remove_keys = []
@@ -603,15 +588,6 @@ func get_rooms(include_weapon_rooms := true) -> Array:
 		if include_weapon_rooms or room_types[i] == RoomType.NORMAL:
 			result.append(rooms[i])
 	return result
-
-func _load_lighting_scenes():
-	"""Load the new lighting scene files"""
-	if ResourceLoader.exists("res://Scenes/EnhancedChandelier.tscn"):
-		chandelier_scene = load("res://Scenes/EnhancedChandelier.tscn")
-	if ResourceLoader.exists("res://Scenes/EnhancedBrazier.tscn"):
-		brazier_scene = load("res://Scenes/EnhancedBrazier.tscn")
-	if ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
-		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
 
 # --- ENHANCED LIGHTING SPAWNING ---
 func _spawn_enhanced_lighting_in_room(room: Rect2, room_type: RoomType):
