@@ -96,6 +96,21 @@ func move_towards_target(target_pos: Vector3, delta: float):
 	# Call body animation update after velocity is set
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
+	# 🔧 FIX: Add missing foot animation call (matching combat behavior)
+	if ally_ref.has_method("animate_feet_if_possible"):
+		ally_ref.animate_feet_if_possible(delta)
+
+func move_toward_target(target_pos: Vector3, delta: float):
+	# Move directly toward the target position (used for ranged AI)
+	var direction = (target_pos - ally_ref.global_position)
+	direction.y = 0
+	if direction.length() > 0.1:
+		direction = direction.normalized()
+		ally_ref.velocity.x = direction.x * speed
+		ally_ref.velocity.z = direction.z * speed
+		_face_direction(direction)
+		if body_node:
+			_update_ally_body_animation(delta, ally_ref.velocity)
 
 func _update_ally_body_animation(delta: float, velocity: Vector3):
 	if not body_node:
@@ -235,6 +250,9 @@ func move_away_from_target(target_pos: Vector3, delta: float):
 		_face_direction(-direction)
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
+	# 🔧 FIX: Add missing foot animation call here too
+	if ally_ref.has_method("animate_feet_if_possible"):
+		ally_ref.animate_feet_if_possible(delta)
 
 # Always check if personality is not null before using its properties
 func move_with_formation(player: Node3D):
@@ -245,3 +263,8 @@ func move_with_formation(player: Node3D):
 		offset = Vector3.ZERO
 	var target_pos = player.global_position + offset
 	move_with_navigation(target_pos)
+
+func _exit_tree():
+	# Safely disconnect signal to avoid calling on freed object
+	if navigation_agent and navigation_agent.velocity_computed.is_connected(_on_velocity_computed):
+		navigation_agent.velocity_computed.disconnect(_on_velocity_computed)

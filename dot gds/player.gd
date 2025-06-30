@@ -345,7 +345,7 @@ func add_controller_feedback(strength: float = 0.5, duration: float = 0.2):
 	for controller_id in connected_controllers:
 		Input.start_joy_vibration(controller_id, strength, strength, duration)
 
-func _input(_event):
+func _input(event):
 	if Input.is_action_just_pressed("attack"):
 		if combat_component and combat_component.has_method("perform_attack"):
 			combat_component.perform_attack()
@@ -355,6 +355,34 @@ func _input(_event):
 	if Input.is_action_just_pressed("interaction"):
 		if has_method("interact_with_nearest"):
 			interact_with_nearest()
+	# Centralized Ally mode switching for all allies
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_1:
+				_set_all_allies_mode(1) # ATTACK
+				_update_ui_ally_mode_display(1)
+			KEY_2:
+				_set_all_allies_mode(2) # PASSIVE
+				_update_ui_ally_mode_display(2)
+			KEY_3:
+				_set_all_allies_mode(3) # PATROL
+				_update_ui_ally_mode_display(3)
+
+func _set_all_allies_mode(mode: int):
+	var allies = get_tree().get_nodes_in_group("allies")
+	for ally in allies:
+		if ally.has_method("set_mode"):
+			ally.set_mode(mode)
+		elif ally.has_property("mode"):
+			ally.mode = mode
+			if ally.has("ai_component") and ally.ai_component:
+				ally.ai_component.set_mode(mode)
+
+func _update_ui_ally_mode_display(mode: int):
+	var ui_nodes = get_tree().get_nodes_in_group("UI")
+	for ui_node in ui_nodes:
+		if ui_node.has_method("update_ally_mode_display"):
+			ui_node.update_ally_mode_display(mode)
 
 func _physics_process(delta):
 	if is_dead:

@@ -148,9 +148,10 @@ func _spawn_ally_arrow(target: Node3D):
 	arrow.global_position = start_pos # Ensure correct global position
 	if not start_pos.is_equal_approx(target_point):
 		arrow.look_at(target_point, Vector3.UP)
+		# Rotate so the arrow's tip (+Y) points toward the target after look_at (fix backwards issue)
+		arrow.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
 	else:
 		print("[ALLY ARROW DEBUG] Arrow start and target positions are the same. Skipping look_at.")
-	# Removed rotate_object_local to prevent sideways arrows
 	# Calculate movement
 	var direction = (target.global_position - start_pos).normalized()
 	var arrow_speed = 15.0

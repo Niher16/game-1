@@ -169,12 +169,32 @@ func _handle_attacking(delta: float):
 	if not enemy_target:
 		current_state = State.FOLLOWING
 		return
+	# Check if using a bow
+	var is_bow = false
+	if ally_ref.current_weapon and ally_ref.current_weapon.weapon_type == WeaponResource.WeaponType.BOW:
+		is_bow = true
 	# Ensure ally faces the enemy before attacking
 	var ally_pos = ally_ref.global_position
 	var enemy_pos = enemy_target.global_position
-	# Only rotate on the Y axis (assuming Y is up)
 	ally_ref.look_at(Vector3(enemy_pos.x, ally_pos.y, enemy_pos.z), Vector3.UP)
-	# --- Move while attacking: strafe around the enemy ---
+	if is_bow:
+		# Stand still and shoot if in range
+		var dist = ally_pos.distance_to(enemy_pos)
+		if dist > ally_ref.combat_component.detection_range:
+			# Move closer if too far
+			ally_ref.movement_component.move_toward_target(enemy_target.global_position, delta)
+		else:
+			ally_ref.velocity = Vector3.ZERO
+			if attack_delay_timer > 0:
+				attack_delay_timer -= delta
+				return
+			if randf() < 0.1:
+				attack_delay = 0.1 + randf() * 0.3
+				attack_delay_timer = attack_delay
+				return
+			ally_ref.combat_component.attack_target(enemy_target)
+		return
+	# --- Move while attacking: strafe around the enemy (melee only) ---
 	ally_ref.movement_component.strafe_around_target(enemy_target, delta)
 	ally_ref.movement_component.apply_separation(delta)
 	if attack_delay_timer > 0:
@@ -270,3 +290,12 @@ func _handle_investigating(delta: float):
 
 func command_move_to_position(position: Vector3):
 	ally_ref.movement_component.move_towards_target(position, 0.1)
+
+func get_mode_description() -> String:
+	match mode:
+		1:
+			return "ATTACK"
+		2:
+			return "PASSIVE"
+		_:
+			return "UNKNOWN"

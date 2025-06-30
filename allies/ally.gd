@@ -1,6 +1,7 @@
 extends CharacterBody3D
 class_name Ally
 signal ally_died
+signal mode_changed(new_mode: int, ally_instance)
 
 # Main ally controller that coordinates all components
 # Export stats for easy tweaking in editor
@@ -49,7 +50,7 @@ const DEFAULT_ALLY_COLOR = Color(0.9, 0.7, 0.6)  # Default skin tone
 var last_valid_position: Vector3
 
 # Ally modes
-enum Mode { ATTACK = 1, PASSIVE }
+enum Mode { ATTACK = 1, PASSIVE, PATROL }
 var mode: Mode = Mode.ATTACK
 
 var current_weapon: WeaponResource = null
@@ -104,20 +105,6 @@ func _ready():
 		navigation_agent.path_desired_distance = 0.5
 		navigation_agent.target_desired_distance = 0.3
 		navigation_agent.max_speed = speed
-
-func _input(event):
-	if event is InputEventKey and event.pressed:
-		match event.keycode:
-			KEY_1:
-				mode = Mode.ATTACK
-				if ai_component:
-					ai_component.set_mode(mode)
-				print("Ally mode: ATTACK")
-			KEY_2:
-				mode = Mode.PASSIVE
-				if ai_component:
-					ai_component.set_mode(mode)
-				print("Ally mode: PASSIVE")
 
 func _setup_components() -> void:
 	# Initialize each component with needed references
@@ -569,3 +556,12 @@ func animate_feet_if_possible(delta):
 			if right_foot and right_foot is MeshInstance3D:
 				right_foot_original_pos = right_foot.position
 				print("🦶 Found RightFoot late!")
+
+func set_mode(new_mode: int):
+	# Convert int to enum using values array (enum starts at 1)
+	mode = Ally.Mode.values()[new_mode - 1]
+	if ai_component:
+		ai_component.set_mode(mode)
+	# Emit signal for UI updates
+	mode_changed.emit(mode, self)
+	print("Ally %s mode changed to: %s" % [name, "ATTACK" if mode == 1 else ("PASSIVE" if mode == 2 else ("PATROL" if mode == 3 else "UNKNOWN"))])

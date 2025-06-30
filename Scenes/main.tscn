@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://34pvx714vsnb" path="res://dot gds/UI.gd" id="2_b0obt"]
 [ext_resource type="Script" uid="uid://cyproohbywftk" path="res://dot gds/loading_screen.gd" id="3_dnx86"]
 [ext_resource type="PackedScene" uid="uid://davx6xri0n0vt" path="res://Scenes/player.tscn" id="4_00g5k"]
-[ext_resource type="Script" path="res://dot gds/Light.gd" id="6_21xkr"]
+[ext_resource type="Script" uid="uid://cb7skpumhkcp1" path="res://dot gds/Light.gd" id="6_21xkr"]
 [ext_resource type="Script" uid="uid://dmhde8iqvqhla" path="res://dot gds/camera_3d.gd" id="6_cbln3"]
 [ext_resource type="Script" uid="uid://bw601j24wdlu8" path="res://dot gds/debug.gd" id="7_6bp64"]
 

@@ -16,11 +16,16 @@ var xp_label: Label
 var unit_label: Label
 var speed_label: Label
 
+# Ally state UI
+var ally_state_labels := []
+var selected_ally_mode: int = -1 # 0,1,2 for [1],[2],[3]
+
 func _ready():
 	add_to_group("UI")
 	_setup_ui()
 	_find_references()
 	_find_spawner_with_retry()
+	_update_ally_state_ui_visibility()
 
 func _setup_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -33,6 +38,7 @@ func _setup_ui():
 	_create_xp_ui()
 	_create_unit_ui()
 	_create_speed_ui()
+	_create_ally_state_ui()
 
 func _create_health_ui():
 	var panel = _create_panel(Vector2(20, 20), Vector2(180, 50), Color.RED)
@@ -93,6 +99,95 @@ func _create_speed_ui():
 	speed_label = _create_label("⚡ Speed: 0.0", panel)
 	speed_label.add_theme_font_size_override("font_size", 16)
 
+func _create_ally_state_ui():
+	var screen_size = get_viewport_rect().size
+	var panel_width = 300
+	var panel_height = 80
+	
+	# Create main panel for ally controls
+	var panel = _create_panel(
+		Vector2(screen_size.x/2.0 - panel_width/2.0, 20),
+		Vector2(panel_width, panel_height),
+		Color.CYAN
+	)
+	panel.anchor_left = 0
+	panel.anchor_right = 0
+	panel.anchor_top = 0
+	panel.anchor_bottom = 0
+	
+	# Create control instructions label
+	var instructions_label = RichTextLabel.new()
+	instructions_label.text = "[center][color=white]ALLY CONTROLS[/color]\n[color=yellow][1] = ATTACK MODE    [2] = PASSIVE MODE    [3] = PATROL MODE[/color][/center]"
+	instructions_label.bbcode_enabled = true
+	instructions_label.fit_content = true
+	instructions_label.scroll_active = false
+	instructions_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	instructions_label.add_theme_font_size_override("normal_font_size", 14)
+	panel.add_child(instructions_label)
+
+	# Create current mode display panel
+	var mode_panel = _create_panel(
+		Vector2(screen_size.x/2 - 100, 110),
+		Vector2(200, 40),
+		Color.GREEN
+	)
+	mode_panel.anchor_left = 0
+	mode_panel.anchor_right = 0
+	mode_panel.anchor_top = 0
+	mode_panel.anchor_bottom = 0
+
+	# Current mode label
+	var mode_label = RichTextLabel.new()
+	mode_label.text = "[center][color=white]Current Mode: [color=red]ATTACK[/color][/center]"
+	mode_label.bbcode_enabled = true
+	mode_label.fit_content = true
+	mode_label.scroll_active = false
+	mode_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mode_label.add_theme_font_size_override("normal_font_size", 16)
+	mode_panel.add_child(mode_label)
+
+	ally_state_labels.clear()
+	ally_state_labels.append(mode_label)
+
+	# Reduce font size, padding, and box size for ally controls and current mode
+	if instructions_label:
+		instructions_label.add_theme_font_size_override("font_size", 18)  # Smaller font
+		instructions_label.add_theme_constant_override("margin_top", 6)
+		instructions_label.add_theme_constant_override("margin_bottom", 6)
+		instructions_label.add_theme_constant_override("margin_left", 12)
+		instructions_label.add_theme_constant_override("margin_right", 12)
+		instructions_label.set_custom_minimum_size(Vector2(0, 36))
+		if instructions_label is RichTextLabel:
+			instructions_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		instructions_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		instructions_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	if mode_label:
+		mode_label.add_theme_font_size_override("font_size", 18)
+		mode_label.add_theme_constant_override("margin_top", 4)
+		mode_label.add_theme_constant_override("margin_bottom", 4)
+		mode_label.add_theme_constant_override("margin_left", 10)
+		mode_label.add_theme_constant_override("margin_right", 10)
+		mode_label.set_custom_minimum_size(Vector2(0, 28))
+		if mode_label is RichTextLabel:
+			mode_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mode_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+func update_ally_mode_display(mode: int):
+	if ally_state_labels.size() > 0 and ally_state_labels[0]:
+		var mode_text = "ATTACK" if mode == 1 else ("PASSIVE" if mode == 2 else ("PATROL" if mode == 3 else "UNKNOWN"))
+		var mode_color = "red" if mode == 1 else ("blue" if mode == 2 else ("orange" if mode == 3 else "gray"))
+		ally_state_labels[0].text = "[color=white]Current Mode: [color=%s]%s[/color]" % [mode_color, mode_text]
+		ally_state_labels[0].bbcode_enabled = true
+
+func _update_ally_state_ui_visibility():
+	var allies = get_tree().get_nodes_in_group("allies")
+	var should_show = allies.size() > 0
+	for label in ally_state_labels:
+		if label.get_parent():
+			label.get_parent().visible = should_show
+
 @warning_ignore("shadowed_variable_base_class")
 func _create_panel(pos: Vector2, size: Vector2, border_color: Color) -> Panel:
 	var panel = Panel.new()
@@ -147,6 +242,10 @@ func _connect_ally_signals(ally):
 		ally.connect("ally_removed", Callable(self, "_on_ally_removed"))
 	if ally.has_signal("ally_died") and not ally.is_connected("ally_died", Callable(self, "_on_ally_died")):
 		ally.connect("ally_died", Callable(self, "_on_ally_died"))
+	# Connect mode_changed signal for UI updates
+	if ally.has_signal("mode_changed") and not ally.is_connected("mode_changed", Callable(self, "_on_ally_mode_changed").bind(ally)):
+		ally.connect("mode_changed", Callable(self, "_on_ally_mode_changed").bind(ally))
+
 	# Optionally, handle ally removal from scene
 	if not ally.is_connected("tree_exited", Callable(self, "_on_ally_removed")):
 		ally.connect("tree_exited", Callable(self, "_on_ally_removed"))
@@ -159,6 +258,7 @@ func _on_node_added(node):
 	if node.is_in_group("allies"):
 		_connect_ally_signals(node)
 		_update_units(get_tree().get_nodes_in_group("allies").size())
+		_update_ally_state_ui_visibility()
 
 func _find_spawner_with_retry():
 	spawner = get_tree().get_first_node_in_group("spawner")
@@ -264,16 +364,49 @@ func _update_speed():
 # ===== ALLY SIGNAL HANDLERS =====
 func _on_ally_added():
 	_update_units(get_tree().get_nodes_in_group("allies").size())
+	_update_ally_state_ui_visibility()
 
 func _on_ally_removed():
 	# Safety: Only update if the scene tree is valid
 	if not is_inside_tree():
 		return
 	_update_units(get_tree().get_nodes_in_group("allies").size())
+	_update_ally_state_ui_visibility()
 
 func _on_ally_died():
 	_update_units(get_tree().get_nodes_in_group("allies").size())
+	_update_ally_state_ui_visibility()
+
+func _on_ally_mode_changed(new_mode: int, _ally):
+	# Show current mode in the single label, with color
+	var mode_str = "[1]=[color]Attack[/color]   [2]=[color]Follow[/color]"
+	if new_mode == 0:
+		mode_str = "[1]=[color=red]Attack[/color]   [2]=[color]Follow[/color]   (Attack)"
+	elif new_mode == 1:
+		mode_str = "[1]=[color]Attack[/color]   [2]=[color=red]Follow[/color]   (Follow)"
+	set_ally_state(0, mode_str)
 
 func _update_units(current_units: int):
 	if unit_label:
 		unit_label.text = "🤝 Units: %d/%d" % [current_units, max_units]
+
+func set_ally_state(_index: int, state: String):
+	# Only one label, just update its text to show current mode
+	if ally_state_labels.size() > 0:
+		ally_state_labels[0].text = state
+
+func set_selected_ally_mode(index: int):
+	selected_ally_mode = index
+	_update_ally_state_highlight()
+
+func _update_ally_state_highlight():
+	for i in range(ally_state_labels.size()):
+		var label = ally_state_labels[i]
+		if i == selected_ally_mode:
+			label.add_theme_color_override("font_color", Color.YELLOW)
+			label.add_theme_color_override("font_outline_color", Color.DARK_BLUE)
+			label.add_theme_font_size_override("font_size", 14)
+		else:
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_font_size_override("font_size", 12)
