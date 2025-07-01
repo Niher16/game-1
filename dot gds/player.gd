@@ -299,7 +299,9 @@ func _do_single_blink():
 func _do_double_blink():
 	CharacterAppearanceManager.blink_eyes(self, 0.1)
 	get_tree().create_timer(0.2).timeout.connect(
-		func(): CharacterAppearanceManager.blink_eyes(self, 0.1)
+		func():
+			if is_instance_valid(self):
+				CharacterAppearanceManager.blink_eyes(self, 0.1)
 	)
 	_reset_blink_timer()
 
@@ -308,7 +310,9 @@ func _reset_blink_timer():
 	blink_timer = 0.0
 	next_blink_time = randf_range(2.0, 7.0)
 	get_tree().create_timer(0.3).timeout.connect(
-		func(): is_blinking = false
+		func():
+			if is_instance_valid(self):
+				is_blinking = false
 	)
 
 # --- Controller/Keyboard Movement Input ---
