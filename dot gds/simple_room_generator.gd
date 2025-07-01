@@ -19,7 +19,7 @@ signal new_room_generated(room_rect: Rect2)
 @export var safe_zone_margin = 4
 
 @export_group("Torch Settings")
-@export var torch_spacing_in_corridors: float = 8.0
+@export var torch_spacing_in_corridors: float = 4.0 # was 8.0, denser torches
 @export var torch_height_offset: float = 1.5
 @export var corridor_torch_side_offset: float = 0.8
 @export var max_torches_per_corridor: int = 4
@@ -174,8 +174,8 @@ func _spawn_torches_in_corridor(corridor_connection: Dictionary):
 	if path.size() < 2:
 		return
 	var interval = int(torch_spacing_in_corridors)
-	if interval < 2:
-		interval = 2
+	if interval < 1:
+		interval = 1
 	var side = 1
 	var placed_positions = {}
 	for i in range(0, path.size(), interval):
@@ -221,12 +221,21 @@ func _spawn_torch_on_wall(wall_grid_pos: Vector2):
 				break
 	if normal != Vector3.ZERO:
 		world_pos += normal * offset_amount
+
+	# --- Prevent torch from spawning in wall or invalid position ---
+	var grid_x = int((world_pos.x / 2.0) + half_map_x)
+	var grid_y = int((world_pos.z / 2.0) + half_map_y)
+	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+		return # Out of bounds
+	if terrain_grid[grid_x][grid_y] != TileType.FLOOR and terrain_grid[grid_x][grid_y] != TileType.CORRIDOR:
+		return # Don't spawn torch in wall or invalid tile
+
 	spawn_torch_at_position(world_pos)
 
 func _spawn_torches_in_room(room: Rect2):
 	# Place torches near entrances/exits and at intervals along the room's walls
 	var wall_points = []
-	var interval = max(2, int(room.size.x / 2))
+	var interval = max(1, int(room.size.x / 3)) # was /2, now denser
 	# Top and bottom walls
 	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
 		wall_points.append(Vector2(x, room.position.y))
@@ -244,6 +253,64 @@ func _spawn_torches_in_room(room: Rect2):
 			if terrain_grid[x][y] == TileType.WALL and not placed.has(pt):
 				_spawn_torch_on_wall(pt)
 				placed[pt] = true
+	# Ensure at least one torch in every room
+	var torch_found := false
+	var torch_script = preload("res://dot gds/enhanced_torch.gd")
+	for obj in generated_objects:
+		if is_instance_valid(obj) and obj.get_script() == torch_script and room.has_point(_world_to_grid_position(obj.global_position)):
+			torch_found = true
+			break
+	if not torch_found:
+		# Spawn a torch at the center of the room
+		var center_torch = room.position + room.size / 2
+		var half_map_x_torch = map_size.x / 2
+		var half_map_y_torch = map_size.y / 2
+		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
+		spawn_torch_at_position(center_pos)
+
+func _spawn_mushrooms_in_room(room: Rect2):
+	if not mushroom_scene:
+		return
+	var mushrooms_to_spawn = randi_range(2, 5)
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	for i in range(mushrooms_to_spawn):
+		var mushroom_instance = mushroom_scene.instantiate()
+		add_child(mushroom_instance)
+		var random_pos = Vector2(
+			room.position.x + randf() * room.size.x,
+			room.position.y + randf() * room.size.y
+		)
+		var world_pos = Vector3(
+			(random_pos.x - half_map_x) * 2.0,
+			DEFAULT_OBJECT_HEIGHT,
+			(random_pos.y - half_map_y) * 2.0
+		)
+		mushroom_instance.global_position = world_pos
+		generated_objects.append(mushroom_instance)
+
+func _spawn_lights_in_room(room: Rect2):
+	# Randomly decide to use mushrooms or torches for this room
+	if randi() % 3 == 0:
+		_spawn_mushrooms_in_room(room)
+		# Ensure at least one mushroom in the center if none spawned
+		var mushroom_found := false
+		if mushroom_scene:
+			for obj in generated_objects:
+				if is_instance_valid(obj) and obj.get_scene_instance_id() == mushroom_scene.get_instance_id() and room.has_point(_world_to_grid_position(obj.global_position)):
+					mushroom_found = true
+					break
+			if not mushroom_found:
+				var center = room.position + room.size / 2
+				var half_map_x = map_size.x / 2
+				var half_map_y = map_size.y / 2
+				var center_pos = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
+				var mushroom_instance = mushroom_scene.instantiate()
+				add_child(mushroom_instance)
+				mushroom_instance.global_position = center_pos
+				generated_objects.append(mushroom_instance)
+	else:
+		_spawn_torches_in_room(room)
 
 func generate_starting_room():
 	_clear_everything()
@@ -263,8 +330,7 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
-	_spawn_mushrooms_in_room(starting_room)
-	_spawn_torches_in_room(starting_room)
+	_spawn_lights_in_room(starting_room)
 
 	# Ensure at least one torch in starter room
 	var torch_found := false
@@ -372,8 +438,7 @@ func create_connected_room():
 	current_room_count += 1
 	new_room_generated.emit(new_room)
 	_spawn_destructible_objects_in_room(new_room)
-	_spawn_mushrooms_in_room(new_room)
-	_spawn_torches_in_room(new_room)
+	_spawn_lights_in_room(new_room)
 	if corridor_connections.size() > 0:
 		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
 		_spawn_torches_in_corridor(latest_corridor)
@@ -427,11 +492,29 @@ func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = fals
 	wall.collision_mask = WALL_COLLISION_MASK
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = BoxMesh.new()
-	mesh_instance.mesh.size = Vector3(2, wall_height, 2)
-	mesh_instance.material_override = boundary_wall_material if is_boundary else wall_material
+	# Randomize wall height and color for dungeon feel
+	var min_height = 2.0
+	var max_height = 5.0
+	var random_height = randf_range(min_height, max_height)
+	mesh_instance.mesh.size = Vector3(2, random_height, 2)
+	# Dungeon color palette: muted, earthy, mossy, stone, etc.
+	var dungeon_colors = [
+		Color(0.35, 0.32, 0.28), # brown/earth
+		Color(0.25, 0.25, 0.3),  # dark stone
+		Color(0.18, 0.22, 0.18), # mossy
+		Color(0.4, 0.4, 0.45),   # default
+		Color(0.2, 0.2, 0.3),    # boundary
+		Color(0.3, 0.35, 0.25),  # olive
+		Color(0.22, 0.18, 0.15)  # deep brown
+	]
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = dungeon_colors[randi() % dungeon_colors.size()]
+	mat.roughness = 0.8 + randf() * 0.2
+	mat.metallic = 0.05 + randf() * 0.1
+	mesh_instance.material_override = mat if not is_boundary else boundary_wall_material
 	var collision_shape = CollisionShape3D.new()
 	collision_shape.shape = BoxShape3D.new()
-	collision_shape.shape.size = Vector3(2, wall_height, 2)
+	collision_shape.shape.size = Vector3(2, random_height, 2)
 	wall.add_child(mesh_instance)
 	wall.add_child(collision_shape)
 	add_child(wall)
@@ -439,7 +522,7 @@ func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = fals
 	var half_map_y = map_size.y / 2
 	wall.position = Vector3(
 		(grid_x - half_map_x) * 2.0,
-		wall_height / 2.0,
+		random_height / 2.0,
 		(grid_y - half_map_y) * 2.0
 	)
 	generated_objects.append(wall)
@@ -643,27 +726,6 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 		_spawn_object(object_scene, world_pos)
 		spawned += 1
 
-func _spawn_mushrooms_in_room(room: Rect2):
-	if not mushroom_scene:
-		return
-	var mushrooms_to_spawn = randi_range(2, 4)
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	for i in range(mushrooms_to_spawn):
-		var mushroom_instance = mushroom_scene.instantiate()
-		add_child(mushroom_instance)
-		var random_pos = Vector2(
-			room.position.x + randf() * room.size.x,
-			room.position.y + randf() * room.size.y
-		)
-		var world_pos = Vector3(
-			(random_pos.x - half_map_x) * 2.0,
-			DEFAULT_OBJECT_HEIGHT,
-			(random_pos.y - half_map_y) * 2.0
-		)
-		mushroom_instance.global_position = world_pos
-		generated_objects.append(mushroom_instance)
-
 func _on_wave_completed(wave_number: int):
 	if randf() < 0.5:
 		var weapon_room = _create_weapon_room()
@@ -774,6 +836,8 @@ func _spawn_weapon_room_content(room: Rect2):
 	_spawn_weapon_pickup(weapon_world_pos)
 	# Spawn torches in weapon room just like other rooms
 	_spawn_torches_in_room(room)
+	# Spawn mushrooms in weapon room
+	_spawn_mushrooms_in_room(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:

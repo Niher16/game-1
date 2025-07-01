@@ -22,6 +22,9 @@ func _ready():
 	# Set proper collision layers - Layer 5 for NPCs
 	collision_layer = 1 << 4  # Layer 5 (NPCs)
 	collision_mask = 0  # NPCs don't need to collide with anything
+	# Connect ally_recruited signal to self
+	if not is_connected("ally_recruited", Callable(self, "_on_ally_recruited")):
+		connect("ally_recruited", Callable(self, "_on_ally_recruited"))
 
 func _setup_enhanced_visual():
 	# Use the imported .scn scene for the recruiter mesh
@@ -195,4 +198,18 @@ func connect_recruit_signal():
 	pass
 
 func _on_ally_recruited():
+	# Flash the cage transparent 3 times over 1.5 seconds before removing the recruiter NPC (including cage)
+	var cage_mesh = null
+	for child in get_children():
+		if child is MeshInstance3D:
+			cage_mesh = child
+			break
+	if cage_mesh:
+		var flash_count = 3
+		var flash_time = 0.25
+		for i in range(flash_count):
+			cage_mesh.modulate.a = 0.2
+			await get_tree().create_timer(flash_time).timeout
+			cage_mesh.modulate.a = 1.0
+			await get_tree().create_timer(flash_time).timeout
 	queue_free()

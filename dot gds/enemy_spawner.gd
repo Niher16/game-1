@@ -178,18 +178,30 @@ func _spawn_single_enemy() -> Node3D:
 	return enemy
 
 func _find_spawn_position() -> Vector3:
-	var spawn_center = _get_spawn_center()
-	for attempt in range(spawn_attempts):
-		var angle = randf() * TAU
-		var distance = randf_range(spawn_distance_min, spawn_distance_max)
-		var test_position = spawn_center + Vector3(
-			cos(angle) * distance,
-			2.0,
-			sin(angle) * distance
-		)
-		if _is_valid_spawn_position(test_position):
-			return test_position
-	return spawn_center + Vector3(randf_range(-3, 3), 2.0, randf_range(-3, 3))
+	# Always use the most recent room as the spawn area
+	var spawn_room: Rect2 = current_spawning_room
+	var terrain = get_tree().get_first_node_in_group("terrain")
+	if spawn_room != Rect2() and terrain and typeof(terrain.terrain_grid) == TYPE_ARRAY:
+		var attempts = 0
+		while attempts < spawn_attempts:
+			attempts += 1
+			# Pick a random tile in the room
+			var rx = int(spawn_room.position.x) + randi() % int(spawn_room.size.x)
+			var ry = int(spawn_room.position.y) + randi() % int(spawn_room.size.y)
+			if rx >= 0 and rx < terrain.terrain_grid.size() and ry >= 0 and ry < terrain.terrain_grid[rx].size():
+				if terrain.terrain_grid[rx][ry] == terrain.TileType.FLOOR:
+					# Convert grid to world position
+					var wx = (rx - map_size.x / 2) * 2.0
+					var wz = (ry - map_size.y / 2) * 2.0
+					var pos = Vector3(wx, 2.0, wz)
+					if _is_valid_spawn_position(pos):
+						return pos
+	# Fallback: use center of room
+	if spawn_room != Rect2():
+		var center = spawn_room.get_center()
+		return Vector3((center.x - map_size.x / 2) * 2.0, 2.0, (center.y - map_size.y / 2) * 2.0)
+	# Fallback: use player position
+	return player.global_position
 
 func _get_spawn_center() -> Vector3:
 	if current_spawning_room != Rect2():
@@ -203,20 +215,29 @@ func _get_spawn_center() -> Vector3:
 		return player.global_position
 
 func _is_valid_spawn_position(pos: Vector3) -> bool:
-	var player_distance = pos.distance_to(player.global_position)
-	if player_distance < 20.0:
-		return false
-	if player_distance > spawn_distance_min:
-		return false
-	for enemy in enemies_alive:
-		if is_instance_valid(enemy) and pos.distance_to(enemy.global_position) < 2.0:
-			return false
+	# Use MCP: Only allow spawn if tile is FLOOR and inside a valid room, never on a wall
 	var terrain = get_tree().get_first_node_in_group("terrain")
+	var grid_x = int((pos.x / 2.0) + (map_size.x / 2))
+	var grid_y = int((pos.z / 2.0) + (map_size.y / 2))
 	if terrain and terrain.has_method("_is_valid_pos"):
-		var grid_x = int((pos.x / 2.0) + (map_size.x / 2))
-		var grid_y = int((pos.z / 2.0) + (map_size.y / 2))
 		if not terrain._is_valid_pos(grid_x, grid_y):
 			return false
+		# Use MCP: Check tile type is FLOOR
+		if typeof(terrain.terrain_grid) == TYPE_ARRAY and grid_x >= 0 and grid_x < terrain.terrain_grid.size() and grid_y >= 0 and grid_y < terrain.terrain_grid[grid_x].size():
+			if terrain.terrain_grid[grid_x][grid_y] != terrain.TileType.FLOOR:
+				return false
+	# Optionally, check if inside any room
+	var room_gen = get_node_or_null("../SimpleRoomGenerator")
+	if room_gen and room_gen.has_method("get_rooms"):
+		var in_room = false
+		var rooms = room_gen.get_rooms()
+		for room in rooms:
+			if room.has_point(Vector2(grid_x, grid_y)):
+				in_room = true
+				break
+		if not in_room:
+			return false
+	# Physics check: not inside wall collider
 	var space_state = get_world_3d().direct_space_state
 	var params = PhysicsPointQueryParameters3D.new()
 	params.position = pos
