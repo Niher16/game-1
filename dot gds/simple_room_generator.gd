@@ -71,6 +71,11 @@ func _ready():
 		terrain_grid.append(col)
 	_create_materials()
 	_find_references()
+	# Set default crate and barrel scenes if not assigned in the editor
+	if not crate_scene and ResourceLoader.exists("res://Scenes/DestructibleCrate.tscn"):
+		crate_scene = load("res://Scenes/DestructibleCrate.tscn")
+	if not barrel_scene and ResourceLoader.exists("res://Scenes/destructible_barrel.tscn"):
+		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
 	if auto_generate_on_start:
@@ -287,15 +292,58 @@ func generate_starting_room():
 	var spawn_pos = center + offset
 	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
 
-	# --- Spawn a few weapons in the starter room ---
+	# --- Spawn 4 weapons in the starter room, each with an altar below ---
 	var center_vec = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
 	var weapon_offsets = [
 		Vector3(2.5, 0, 0),
 		Vector3(-1.5, 0, 2.2),
-		Vector3(-1.5, 0, -2.2)
+		Vector3(-1.5, 0, -2.2),
+		Vector3(0, 0, 2.8) # New weapon offset
 	]
 	for weapon_offset in weapon_offsets:
-		_spawn_weapon_pickup(center_vec + weapon_offset)
+		var weapon_pos = center_vec + weapon_offset
+		# Spawn altar under weapon
+		if altar_scene:
+			var altar = altar_scene.instantiate()
+			add_child(altar)
+			var altar_pos = weapon_pos
+			altar_pos.y -= 0.6
+			altar.global_position = altar_pos
+			generated_objects.append(altar)
+		_spawn_weapon_pickup(weapon_pos)
+
+	# --- Spawn 2 cages in the starter room at random valid positions ---
+	if preload("res://Scenes/recruiter_npc.tscn"):
+		var cage_scene = preload("res://Scenes/recruiter_npc.tscn")
+		var cages_spawned = 0
+		var attempts = 0
+		var max_attempts = 20
+		while cages_spawned < 2 and attempts < max_attempts:
+			attempts += 1
+			var random_pos = Vector2(
+				starting_room.position.x + randf() * starting_room.size.x,
+				starting_room.position.y + randf() * starting_room.size.y
+			)
+			var grid_x = int(random_pos.x)
+			var grid_y = int(random_pos.y)
+			if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+				continue
+			if terrain_grid[grid_x][grid_y] != TileType.FLOOR:
+				continue
+			var world_pos = Vector3(
+				(random_pos.x - half_map_x) * 2.0,
+				DEFAULT_OBJECT_HEIGHT,
+				(random_pos.y - half_map_y) * 2.0
+			)
+			var too_close = false
+			for obj in generated_objects:
+				if obj and obj.global_position.distance_to(world_pos) < 2.0:
+					too_close = true
+					break
+			if too_close:
+				continue
+			_spawn_object(cage_scene, world_pos, "Cage")
+			cages_spawned += 1
 
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 		var first_wave_room = create_connected_room()
@@ -577,7 +625,7 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 		# Avoid overlapping with other objects
 		var world_pos = Vector3(
 			(random_pos.x - half_map_x) * 2.0,
-			DEFAULT_OBJECT_HEIGHT,
+			DEFAULT_OBJECT_HEIGHT, # Reverted to DEFAULT_OBJECT_HEIGHT for crate/barrel spawn height
 			(random_pos.y - half_map_y) * 2.0
 		)
 		var too_close = false
