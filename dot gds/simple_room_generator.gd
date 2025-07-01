@@ -24,12 +24,6 @@ signal new_room_generated(room_rect: Rect2)
 @export var corridor_torch_side_offset: float = 0.8
 @export var max_torches_per_corridor: int = 4
 
-@export_group("Enhanced Lighting Settings")
-#@export var chandelier_spawn_chance: float = 0.3  # 30% chance in large rooms
-#@export var brazier_spawn_chance: float = 0.4     # 40% chance in room centers
-@export var mushroom_spawn_chance: float = 0.2    # 20% chance in corners
-@export var large_room_threshold: float = 64.0    # Room area for chandelier eligibility
-
 enum TileType { WALL, FLOOR, CORRIDOR }
 enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
 enum RoomType { NORMAL, WEAPON, STARTING }
@@ -54,11 +48,7 @@ var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
 @export var altar_scene: PackedScene
-
-# Enhanced lighting scene references
-var chandelier_scene: PackedScene
-var brazier_scene: PackedScene
-var mushroom_scene: PackedScene
+@export var mushroom_scene: PackedScene
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -83,8 +73,6 @@ func _ready():
 	_find_references()
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
-	# Load new lighting scenes
-	_load_lighting_scenes()
 	if auto_generate_on_start:
 		_pending_generate_starting_room = true
 		_try_generate_starting_room_when_spawner_ready()
@@ -270,6 +258,7 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
+	_spawn_mushrooms_in_room(starting_room)
 	_spawn_torches_in_room(starting_room)
 
 	# Ensure at least one torch in starter room
@@ -335,6 +324,7 @@ func create_connected_room():
 	current_room_count += 1
 	new_room_generated.emit(new_room)
 	_spawn_destructible_objects_in_room(new_room)
+	_spawn_mushrooms_in_room(new_room)
 	_spawn_torches_in_room(new_room)
 	if corridor_connections.size() > 0:
 		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
@@ -342,11 +332,6 @@ func create_connected_room():
 	return new_room
 
 func _clear_everything():
-	for obj in generated_objects:
-		if obj and is_instance_valid(obj):
-			if obj.is_in_group("enhanced_lighting"):
-				obj.queue_free()
-	# ...rest of existing clear code...
 	for obj in generated_objects:
 		if is_instance_valid(obj):
 			obj.queue_free()
@@ -554,16 +539,66 @@ func _remove_walls_by_grid_lookup():
 				wall.queue_free()
 			wall_lookup.erase(grid_key)
 
+func _spawn_object(scene: PackedScene, world_pos: Vector3, object_name: String = "") -> Node3D:
+	if not scene:
+		push_warning("Missing scene for " + object_name)
+		return null
+	var instance = scene.instantiate()
+	add_child(instance)
+	instance.global_position = world_pos
+	if object_name:
+		instance.name = object_name
+	generated_objects.append(instance)
+	return instance
+
 func _spawn_destructible_objects_in_room(room: Rect2):
 	var objects_to_spawn = randi_range(2, 4)
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
-	for i in range(objects_to_spawn):
+	var attempts = 0
+	var max_attempts = 20
+	var spawned = 0
+	while spawned < objects_to_spawn and attempts < max_attempts:
+		attempts += 1
 		var object_scene = crate_scene if randf() < 0.6 else barrel_scene
 		if not object_scene:
+			push_warning("Missing crate or barrel scene")
 			continue
-		var object_instance = object_scene.instantiate()
-		add_child(object_instance)
+		var random_pos = Vector2(
+			room.position.x + randf() * room.size.x,
+			room.position.y + randf() * room.size.y
+		)
+		var grid_x = int(random_pos.x)
+		var grid_y = int(random_pos.y)
+		if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+			continue
+		if terrain_grid[grid_x][grid_y] != TileType.FLOOR:
+			continue
+		# Avoid overlapping with other objects
+		var world_pos = Vector3(
+			(random_pos.x - half_map_x) * 2.0,
+			DEFAULT_OBJECT_HEIGHT,
+			(random_pos.y - half_map_y) * 2.0
+		)
+		var too_close = false
+		for obj in generated_objects:
+			if obj and obj.global_position.distance_to(world_pos) < 2.0:
+				too_close = true
+				break
+		if too_close:
+			continue
+		_spawn_object(object_scene, world_pos)
+		spawned += 1
+
+func _spawn_mushrooms_in_room(room: Rect2):
+	if not mushroom_scene:
+		return
+	var mushrooms_to_spawn = randi_range(2, 4)
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	for i in range(mushrooms_to_spawn):
+		var mushroom_instance = mushroom_scene.instantiate()
+		add_child(mushroom_instance)
 		var random_pos = Vector2(
 			room.position.x + randf() * room.size.x,
 			room.position.y + randf() * room.size.y
@@ -573,8 +608,8 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 			DEFAULT_OBJECT_HEIGHT,
 			(random_pos.y - half_map_y) * 2.0
 		)
-		object_instance.global_position = world_pos
-		generated_objects.append(object_instance)
+		mushroom_instance.global_position = world_pos
+		generated_objects.append(mushroom_instance)
 
 func _on_wave_completed(wave_number: int):
 	if randf() < 0.5:
@@ -661,8 +696,9 @@ func _create_weapon_room() -> Rect2:
 	room_types.append(RoomType.WEAPON)
 	current_room_count += 1
 	_spawn_weapon_room_content(new_room)
-	# Add after weapon room content spawning
-	_spawn_enhanced_lighting_in_room(new_room, RoomType.WEAPON)
+	if corridor_connections.size() > 0:
+		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		_spawn_torches_in_corridor(latest_corridor)
 	return new_room
 
 func _spawn_weapon_room_content(room: Rect2):
@@ -724,120 +760,3 @@ func get_rooms(include_weapon_rooms := true) -> Array:
 		if include_weapon_rooms or room_types[i] == RoomType.NORMAL:
 			result.append(rooms[i])
 	return result
-
-func _load_lighting_scenes():
-	"""Load the new lighting scene files"""
-	if ResourceLoader.exists("res://Scenes/EnhancedChandelier.tscn"):
-		chandelier_scene = load("res://Scenes/EnhancedChandelier.tscn")
-	if ResourceLoader.exists("res://Scenes/EnhancedBrazier.tscn"):
-		brazier_scene = load("res://Scenes/EnhancedBrazier.tscn")
-	if ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
-		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
-
-# --- ENHANCED LIGHTING SPAWNING ---
-func _spawn_enhanced_lighting_in_room(room: Rect2, room_type: RoomType):
-	"""Spawn enhanced lighting based on room type and size"""
-	# Removed unused variables after chandelier/brazier removal
-	# var room_area = room.size.x * room.size.y
-	# var room_center = room.get_center()
-	# var half_map_x = map_size.x / 2
-	# var half_map_y = map_size.y / 2
-	# var world_center = Vector3(
-	# 	(room_center.x - half_map_x) * 2.0,
-	# 	0,
-	# 	(room_center.y - half_map_y) * 2.0
-	# )
-	match room_type:
-		RoomType.STARTING:
-			#_spawn_brazier_at_position(world_center + Vector3(0, 0, 2.0))
-			pass
-		RoomType.WEAPON:
-			#_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
-			_spawn_mushrooms_in_room_corners(room)
-		RoomType.NORMAL:
-			# if room_area >= large_room_threshold and randf() < chandelier_spawn_chance:
-			# 	_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
-			# elif randf() < brazier_spawn_chance:
-			# 	_spawn_brazier_at_position(world_center)
-			if randf() < mushroom_spawn_chance:
-				_spawn_mushrooms_in_room_corners(room)
-
-func _spawn_chandelier_at_position(pos: Vector3):
-	if not chandelier_scene:
-		push_error("Chandelier scene not loaded!")
-		return
-	var chandelier = chandelier_scene.instantiate()
-	if not chandelier:
-		push_error("Failed to instantiate chandelier")
-		return
-	add_child(chandelier)
-	chandelier.global_position = pos
-	generated_objects.append(chandelier)
-	print("💡 Spawned chandelier at: ", pos)
-
-func _spawn_brazier_at_position(pos: Vector3):
-	if not brazier_scene:
-		push_error("Brazier scene not loaded!")
-		return
-	var brazier = brazier_scene.instantiate()
-	if not brazier:
-		push_error("Failed to instantiate brazier")
-		return
-	add_child(brazier)
-	brazier.global_position = pos
-	generated_objects.append(brazier)
-	print("🔥 Spawned brazier at: ", pos)
-
-func _spawn_mushrooms_in_room_corners(room: Rect2):
-	if not mushroom_scene:
-		return
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	var corner_positions = [
-		Vector2(room.position.x + 1, room.position.y + 1),
-		Vector2(room.position.x + room.size.x - 2, room.position.y + 1),
-		Vector2(room.position.x + 1, room.position.y + room.size.y - 2),
-		Vector2(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
-	]
-	corner_positions.shuffle()
-	var mushroom_count = randi_range(1, 2)
-	for i in range(min(mushroom_count, corner_positions.size())):
-		var corner_grid_pos = corner_positions[i]
-		var x = int(corner_grid_pos.x)
-		var y = int(corner_grid_pos.y)
-		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
-			if terrain_grid[x][y] == TileType.FLOOR:
-				var world_pos = Vector3(
-					(corner_grid_pos.x - half_map_x) * 2.0,
-					0.1,
-					(corner_grid_pos.y - half_map_y) * 2.0
-				)
-				_spawn_mushrooms_at_position(world_pos)
-
-func _spawn_mushrooms_at_position(pos: Vector3):
-	if not mushroom_scene:
-		return
-	var mushrooms = mushroom_scene.instantiate()
-	if not mushrooms:
-		push_error("Failed to instantiate mushrooms")
-		return
-	add_child(mushrooms)
-	mushrooms.global_position = pos
-	generated_objects.append(mushrooms)
-	print("🍄 Spawned mushrooms at: ", pos)
-
-func _spawn_enhanced_corridor_lighting(_corridor_connection: Dictionary):
-	# Removed unused variable after brazier removal
-	# var corridor_rect = corridor_connection.corridor_rect
-	# var corridor_length = max(corridor_rect.size.x, corridor_rect.size.y)
-	# if corridor_length > 12 and randf() < 0.3:
-	# 	var corridor_center = corridor_rect.get_center()
-	# 	var half_map_x = map_size.x / 2
-	# 	var half_map_y = map_size.y / 2
-	# 	var world_center = Vector3(
-	# 		(corridor_center.x - half_map_x) * 2.0,
-	# 		0,
-	# 		(corridor_center.y - half_map_y) * 2.0
-	# 	)
-	# 	_spawn_brazier_at_position(world_center)
-	pass
