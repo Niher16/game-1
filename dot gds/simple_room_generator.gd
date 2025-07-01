@@ -600,6 +600,11 @@ func _spawn_object(scene: PackedScene, world_pos: Vector3, object_name: String =
 	return instance
 
 func _spawn_destructible_objects_in_room(room: Rect2):
+	# Ensure crate and barrel scenes are always loaded
+	if not crate_scene and ResourceLoader.exists("res://Scenes/DestructibleCrate.tscn"):
+		crate_scene = load("res://Scenes/DestructibleCrate.tscn")
+	if not barrel_scene and ResourceLoader.exists("res://Scenes/destructible_barrel.tscn"):
+		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	var objects_to_spawn = randi_range(2, 4)
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
