@@ -62,6 +62,7 @@ const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
 
 func _ready():
+	print("=== SIMPLE ROOM GENERATOR READY ===")
 	add_to_group("terrain")
 	terrain_grid = []
 	for x in range(map_size.x):
@@ -78,6 +79,9 @@ func _ready():
 		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
+	if not mushroom_scene and ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
+		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
+	print("[DEBUG] mushroom_scene at _ready:", mushroom_scene)
 	if auto_generate_on_start:
 		_pending_generate_starting_room = true
 		_try_generate_starting_room_when_spawner_ready()
@@ -173,9 +177,9 @@ func _spawn_torches_in_corridor(corridor_connection: Dictionary):
 	var path = corridor_connection.corridor_path
 	if path.size() < 2:
 		return
-	var interval = int(torch_spacing_in_corridors)
-	if interval < 1:
-		interval = 1
+	var interval = int(torch_spacing_in_corridors * 1.5) # less frequent torches
+	if interval < 2:
+		interval = 2
 	var side = 1
 	var placed_positions = {}
 	for i in range(0, path.size(), interval):
@@ -235,7 +239,7 @@ func _spawn_torch_on_wall(wall_grid_pos: Vector2):
 func _spawn_torches_in_room(room: Rect2):
 	# Place torches near entrances/exits and at intervals along the room's walls
 	var wall_points = []
-	var interval = max(1, int(room.size.x / 3)) # was /2, now denser
+	var interval = max(2, int(room.size.x / 1.5)) # less frequent torches
 	# Top and bottom walls
 	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
 		wall_points.append(Vector2(x, room.position.y))
@@ -290,27 +294,63 @@ func _spawn_mushrooms_in_room(room: Rect2):
 		generated_objects.append(mushroom_instance)
 
 func _spawn_lights_in_room(room: Rect2):
-	# Randomly decide to use mushrooms or torches for this room
-	if randi() % 3 == 0:
-		_spawn_mushrooms_in_room(room)
-		# Ensure at least one mushroom in the center if none spawned
-		var mushroom_found := false
+	print("=== _spawn_lights_in_room CALLED ===")
+	# Randomly decide lighting style: 0 = torches, 1 = mushrooms, 2 = both
+	var lighting_style := randi() % 3
+	if lighting_style == 0:
+		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have TORCHES only")
+		_spawn_torches_in_room(room)
+	elif lighting_style == 1 and mushroom_scene:
+		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have MUSHROOMS only")
+		var mushrooms_to_spawn = randi_range(4, 7)
+		var half_map_x = map_size.x / 2
+		var half_map_y = map_size.y / 2
+		for i in range(mushrooms_to_spawn):
+			var random_pos = Vector2(
+				room.position.x + randf() * room.size.x,
+				room.position.y + randf() * room.size.y
+			)
+			var world_pos = Vector3(
+				(random_pos.x - half_map_x) * 2.0,
+				DEFAULT_OBJECT_HEIGHT,
+				(random_pos.y - half_map_y) * 2.0
+			)
+			print("[DEBUG] Mushroom at world pos: ", world_pos)
+			var mushroom_instance = mushroom_scene.instantiate()
+			add_child(mushroom_instance)
+			mushroom_instance.global_position = world_pos
+			generated_objects.append(mushroom_instance)
+		# Always spawn one in the center
+		var center = room.position + room.size / 2
+		var center_pos = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
+		print("[DEBUG] Center mushroom at: ", center_pos)
+		var center_mushroom = mushroom_scene.instantiate()
+		add_child(center_mushroom)
+		center_mushroom.global_position = center_pos
+		generated_objects.append(center_mushroom)
+	else:
+		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have BOTH torches and mushrooms")
+		_spawn_torches_in_room(room)
+		# Spawn fewer mushrooms for mix
 		if mushroom_scene:
-			for obj in generated_objects:
-				if is_instance_valid(obj) and obj.get_scene_instance_id() == mushroom_scene.get_instance_id() and room.has_point(_world_to_grid_position(obj.global_position)):
-					mushroom_found = true
-					break
-			if not mushroom_found:
-				var center = room.position + room.size / 2
-				var half_map_x = map_size.x / 2
-				var half_map_y = map_size.y / 2
-				var center_pos = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
+			var mushrooms_to_spawn = randi_range(2, 4)
+			var half_map_x = map_size.x / 2
+			var half_map_y = map_size.y / 2
+			for i in range(mushrooms_to_spawn):
+				var random_pos = Vector2(
+					room.position.x + randf() * room.size.x,
+					room.position.y + randf() * room.size.y
+				)
+				var world_pos = Vector3(
+					(random_pos.x - half_map_x) * 2.0,
+					DEFAULT_OBJECT_HEIGHT,
+					(random_pos.y - half_map_y) * 2.0
+				)
+				print("[DEBUG] (Mix) Mushroom at world pos: ", world_pos)
 				var mushroom_instance = mushroom_scene.instantiate()
 				add_child(mushroom_instance)
-				mushroom_instance.global_position = center_pos
+				mushroom_instance.global_position = world_pos
 				generated_objects.append(mushroom_instance)
-	else:
-		_spawn_torches_in_room(room)
 
 func generate_starting_room():
 	_clear_everything()
