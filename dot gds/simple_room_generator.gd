@@ -1,4 +1,4 @@
-# simple_room_generator.gd - ENHANCED: Fixed torch spawning in corridors
+# simple_room_generator.gd
 extends Node3D
 
 signal new_room_generated(room_rect: Rect2)
@@ -17,12 +17,6 @@ signal new_room_generated(room_rect: Rect2)
 @export_group("Boundary Protection")
 @export var boundary_thickness = 2
 @export var safe_zone_margin = 4
-
-@export_group("Torch Settings")
-@export var torch_spacing_in_corridors: float = 4.0 # was 8.0, denser torches
-@export var torch_height_offset: float = 1.5
-@export var corridor_torch_side_offset: float = 0.8
-@export var max_torches_per_corridor: int = 4
 
 enum TileType { WALL, FLOOR, CORRIDOR }
 enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
@@ -48,7 +42,7 @@ var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
 @export var altar_scene: PackedScene
-@export var mushroom_scene: PackedScene
+@export var basic_light_scene: PackedScene
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -60,8 +54,7 @@ var _spawner_retry_count := 0
 const _SPAWNER_MAX_RETRIES := 10
 const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
-var rooms_with_lights_spawned: Array = []
-var current_wave: int = 1
+var room_light_manager: RoomLightManager
 
 func _ready():
 	print("=== SIMPLE ROOM GENERATOR READY ===")
@@ -81,9 +74,10 @@ func _ready():
 		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
-	if not mushroom_scene and ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
-		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
-	print("[DEBUG] mushroom_scene at _ready:", mushroom_scene)
+	if not basic_light_scene and ResourceLoader.exists("res://Scenes/BasicLight.tscn"):
+		basic_light_scene = load("res://Scenes/BasicLight.tscn")
+	room_light_manager = RoomLightManager.new()
+	add_child(room_light_manager)
 	if auto_generate_on_start:
 		_pending_generate_starting_room = true
 		_try_generate_starting_room_when_spawner_ready()
@@ -165,233 +159,8 @@ func _create_simple_corridor_protected(room_a: Rect2, room_b: Rect2):
 		"corridor_path": corridor_path
 	})
 
-func spawn_torch_at_position(pos: Vector3):
-	var torch_scene = preload("res://Scenes/EnhancedTorch.tscn")
-	var torch = torch_scene.instantiate()
-	add_child(torch)
-	torch.global_position = pos
-	generated_objects.append(torch)
-
-# --- TORCH SPAWNING: DUNGEON STYLE ---
-
-func _spawn_torches_in_corridor(corridor_connection: Dictionary):
-	# Place torches at regular intervals on corridor walls, alternating sides
-	var path = corridor_connection.corridor_path
-	if path.size() < 2:
-		return
-	var interval = int(torch_spacing_in_corridors * 1.5) # less frequent torches
-	if interval < 2:
-		interval = 2
-	var side = 1
-	var placed_positions = {}
-	for i in range(0, path.size(), interval):
-		var pos = path[i]
-		# Find wall tile adjacent to corridor tile
-		var wall_pos = _find_adjacent_wall(pos, side)
-		if wall_pos != null and not placed_positions.has(wall_pos):
-			_spawn_torch_on_wall(wall_pos)
-			placed_positions[wall_pos] = true
-			side *= -1  # Alternate sides
-
-func _find_adjacent_wall(pos: Vector2, side: int) -> Vector2:
-	# Check 4 directions, prefer left/right for horizontal, up/down for vertical
-	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
-	for dir in dirs:
-		var check = pos + dir * side
-		var x = int(check.x)
-		var y = int(check.y)
-		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
-			if terrain_grid[x][y] == TileType.WALL:
-				return Vector2(x, y)
-	return Vector2()
-
-func _spawn_torch_on_wall(wall_grid_pos: Vector2):
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	var world_pos = Vector3(
-		(wall_grid_pos.x - half_map_x) * 2.0,
-		torch_height_offset,
-		(wall_grid_pos.y - half_map_y) * 2.0
-	)
-	# Offset torch away from wall into room/corridor
-	var offset_amount = 1.4  # Increased offset for more pronounced placement
-	# Determine wall normal by checking adjacent floor/corridor tile
-	var normal = Vector3.ZERO
-	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
-	for dir in dirs:
-		var x = int(wall_grid_pos.x + dir.x)
-		var y = int(wall_grid_pos.y + dir.y)
-		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
-			if terrain_grid[x][y] == TileType.FLOOR or terrain_grid[x][y] == TileType.CORRIDOR:
-				normal = Vector3(dir.x, 0, dir.y)
-				break
-	if normal != Vector3.ZERO:
-		world_pos += normal * offset_amount
-
-	# --- Prevent torch from spawning in wall or invalid position ---
-	var grid_x = int((world_pos.x / 2.0) + half_map_x)
-	var grid_y = int((world_pos.z / 2.0) + half_map_y)
-	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-		return # Out of bounds
-	if terrain_grid[grid_x][grid_y] != TileType.FLOOR and terrain_grid[grid_x][grid_y] != TileType.CORRIDOR:
-		return # Don't spawn torch in wall or invalid tile
-
-	spawn_torch_at_position(world_pos)
-
-func _spawn_torches_in_room(room: Rect2):
-	# Place torches near entrances/exits and at intervals along the room's walls
-	var wall_points = []
-	var interval = max(2, int(room.size.x / 1.5)) # less frequent torches
-	# Top and bottom walls
-	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
-		wall_points.append(Vector2(x, room.position.y))
-		wall_points.append(Vector2(x, room.position.y + room.size.y - 1))
-	# Left and right walls
-	for y in range(int(room.position.y), int(room.position.y + room.size.y), interval):
-		wall_points.append(Vector2(room.position.x, y))
-		wall_points.append(Vector2(room.position.x + room.size.x - 1, y))
-	# Place torches only if wall is present
-	var placed = {}
-	for pt in wall_points:
-		var x = int(pt.x)
-		var y = int(pt.y)
-		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
-			if terrain_grid[x][y] == TileType.WALL and not placed.has(pt):
-				_spawn_torch_on_wall(pt)
-				placed[pt] = true
-	# Ensure at least one torch in every room
-	var torch_found := false
-	var torch_script = preload("res://dot gds/enhanced_torch.gd")
-	for obj in generated_objects:
-		if is_instance_valid(obj) and obj.get_script() == torch_script and room.has_point(_world_to_grid_position(obj.global_position)):
-			torch_found = true
-			break
-	if not torch_found:
-		# Spawn a torch at the center of the room
-		var center_torch = room.position + room.size / 2
-		var half_map_x_torch = map_size.x / 2
-		var half_map_y_torch = map_size.y / 2
-		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
-		spawn_torch_at_position(center_pos)
-
-func _spawn_mushrooms_in_room(room: Rect2):
-	if not mushroom_scene:
-		return
-	var mushrooms_to_spawn = randi_range(2, 5)
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
-	for i in range(mushrooms_to_spawn):
-		var mushroom_instance = mushroom_scene.instantiate()
-		add_child(mushroom_instance)
-		var random_pos = Vector2(
-			room.position.x + randf() * room.size.x,
-			room.position.y + randf() * room.size.y
-		)
-		var world_pos = Vector3(
-			(random_pos.x - half_map_x) * 2.0,
-			DEFAULT_OBJECT_HEIGHT,
-			(random_pos.y - half_map_y) * 2.0
-		)
-		mushroom_instance.global_position = world_pos
-		generated_objects.append(mushroom_instance)
-
-func _spawn_lights_in_room(room: Rect2):
-	# Prevent torches in starter room, and prevent any further mushrooms after first wave
-	if rooms_with_lights_spawned.has(room):
-		return
-	if room_types.size() > 0 and rooms.size() > 0 and room == rooms[0]:
-		# Always mark starter room as spawned, only allow mushrooms on first wave
-		rooms_with_lights_spawned.append(room)
-		if current_wave == 1:
-			_spawn_mushrooms_in_room(room)
-		return
-	rooms_with_lights_spawned.append(room)
-	print("=== _spawn_lights_in_room CALLED ===")
-	# Weighted lighting style based on wave
-	var torch_weight := 1
-	var mushroom_weight := 1
-	var both_weight := 1
-	if current_wave <= 5:
-		torch_weight = 1
-		mushroom_weight = 4
-		both_weight = 1
-	elif current_wave <= 10:
-		torch_weight = 1 + (current_wave - 5) * 2 # 3,5,7,9,11 for waves 6-10
-		mushroom_weight = 5 - (current_wave - 5) # 4,3,2,1,0 for waves 6-10
-		if mushroom_weight < 0:
-			mushroom_weight = 0
-		both_weight = 2
-	else:
-		torch_weight = 10
-		mushroom_weight = 0
-		both_weight = 2
-	var total_weight = torch_weight + mushroom_weight + both_weight
-	var pick = randi_range(1, total_weight)
-	var lighting_style = 0 # 0=torches, 1=mushrooms, 2=both
-	if pick <= torch_weight:
-		lighting_style = 0
-	elif pick <= torch_weight + mushroom_weight:
-		lighting_style = 1
-	else:
-		lighting_style = 2
-	if lighting_style == 0:
-		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have TORCHES only")
-		_spawn_torches_in_room(room)
-	elif lighting_style == 1 and mushroom_scene:
-		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have MUSHROOMS only")
-		var mushrooms_to_spawn = randi_range(4, 7)
-		var half_map_x = map_size.x / 2
-		var half_map_y = map_size.y / 2
-		for i in range(mushrooms_to_spawn):
-			var random_pos = Vector2(
-				room.position.x + randf() * room.size.x,
-				room.position.y + randf() * room.size.y
-			)
-			var world_pos = Vector3(
-				(random_pos.x - half_map_x) * 2.0,
-				DEFAULT_OBJECT_HEIGHT,
-				(random_pos.y - half_map_y) * 2.0
-			)
-			print("[DEBUG] Mushroom at world pos: ", world_pos)
-			var mushroom_instance = mushroom_scene.instantiate()
-			add_child(mushroom_instance)
-			mushroom_instance.global_position = world_pos
-			generated_objects.append(mushroom_instance)
-		# Always spawn one in the center
-		var center = room.position + room.size / 2
-		var center_pos = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
-		print("[DEBUG] Center mushroom at: ", center_pos)
-		var center_mushroom = mushroom_scene.instantiate()
-		add_child(center_mushroom)
-		center_mushroom.global_position = center_pos
-		generated_objects.append(center_mushroom)
-	else:
-		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have BOTH torches and mushrooms")
-		_spawn_torches_in_room(room)
-		# Spawn fewer mushrooms for mix
-		if mushroom_scene:
-			var mushrooms_to_spawn = randi_range(2, 4)
-			var half_map_x = map_size.x / 2
-			var half_map_y = map_size.y / 2
-			for i in range(mushrooms_to_spawn):
-				var random_pos = Vector2(
-					room.position.x + randf() * room.size.x,
-					room.position.y + randf() * room.size.y
-				)
-				var world_pos = Vector3(
-					(random_pos.x - half_map_x) * 2.0,
-					DEFAULT_OBJECT_HEIGHT,
-					(random_pos.y - half_map_y) * 2.0
-				)
-				print("[DEBUG] (Mix) Mushroom at world pos: ", world_pos)
-				var mushroom_instance = mushroom_scene.instantiate()
-				add_child(mushroom_instance)
-				mushroom_instance.global_position = world_pos
-				generated_objects.append(mushroom_instance)
-
 func generate_starting_room():
 	_clear_everything()
-	rooms_with_lights_spawned.clear()
 	_fill_with_walls()
 	_mark_boundary_walls()
 	var safe_area_start = boundary_thickness + safe_zone_margin
@@ -408,30 +177,25 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
-	# Only spawn mushrooms in starter room, never torches
-	_spawn_mushrooms_in_room(starting_room)
-	rooms_with_lights_spawned.append(starting_room)
-	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
+	# --- Recruiter NPC and weapon/altar/cage logic unchanged ---
 	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
 	var recruiter = recruiter_scene.instantiate()
 	add_child(recruiter)
 	var center = starting_room.position + starting_room.size / 2
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
-	var offset = Vector2(2, 0) # Offset by +2 units on X axis
+	var offset = Vector2(2, 0)
 	var spawn_pos = center + offset
 	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
-	# --- Spawn 4 weapons in the starter room, each with an altar below ---
 	var center_vec = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
 	var weapon_offsets = [
 		Vector3(2.5, 0, 0),
 		Vector3(-1.5, 0, 2.2),
 		Vector3(-1.5, 0, -2.2),
-		Vector3(0, 0, 2.8) # New weapon offset
+		Vector3(0, 0, 2.8)
 	]
 	for weapon_offset in weapon_offsets:
 		var weapon_pos = center_vec + weapon_offset
-		# Spawn altar under weapon
 		if altar_scene:
 			var altar = altar_scene.instantiate()
 			add_child(altar)
@@ -440,7 +204,6 @@ func generate_starting_room():
 			altar.global_position = altar_pos
 			generated_objects.append(altar)
 		_spawn_weapon_pickup(weapon_pos)
-	# --- Spawn 2 cages in the starter room at random valid positions ---
 	if preload("res://Scenes/recruiter_npc.tscn"):
 		var cage_scene = preload("res://Scenes/recruiter_npc.tscn")
 		var cages_spawned = 0
@@ -476,10 +239,6 @@ func generate_starting_room():
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:
 			enemy_spawner.set_newest_spawning_room(first_wave_room)
-			_spawn_torches_in_room(first_wave_room)
-			if corridor_connections.size() > 0:
-				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
-				_spawn_torches_in_corridor(latest_corridor)
 
 func create_connected_room():
 	if rooms.is_empty():
@@ -499,10 +258,15 @@ func create_connected_room():
 	current_room_count += 1
 	new_room_generated.emit(new_room)
 	_spawn_destructible_objects_in_room(new_room)
-	_spawn_lights_in_room(new_room)
+	# Spawn a basic light at the center of the new room
+	if room_light_manager and basic_light_scene:
+		var center = new_room.get_center()
+		var half_map_x = map_size.x / 2
+		var half_map_y = map_size.y / 2
+		var light_pos = Vector3((center.x - half_map_x) * 2.0, 2.5, (center.y - half_map_y) * 2.0)
+		room_light_manager.spawn_lights_in_room(self, basic_light_scene, [light_pos])
 	if corridor_connections.size() > 0:
-		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
-		_spawn_torches_in_corridor(latest_corridor)
+		var _latest_corridor = corridor_connections[corridor_connections.size() - 1]
 	return new_room
 
 func _clear_everything():
@@ -596,19 +360,6 @@ func _is_valid_carve_position(x: int, y: int) -> bool:
 	if boundary_walls.has(grid_key):
 		return false
 	return true
-
-func _is_valid_torch_position(grid_pos: Vector2, room: Rect2) -> bool:
-	var grid_x = int(grid_pos.x)
-	var grid_y = int(grid_pos.y)
-	if grid_x < 0 or grid_x >= terrain_grid.size():
-		return false
-	if grid_y < 0 or grid_y >= terrain_grid[grid_x].size():
-		return false
-	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-		return false
-	if not room.has_point(Vector2(grid_x, grid_y)):
-		return false
-	return terrain_grid[grid_x][grid_y] == TileType.FLOOR
 
 func _carve_room_shape(room: Rect2, shape: RoomShape):
 	match shape:
@@ -788,7 +539,6 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 		spawned += 1
 
 func _on_wave_completed(wave_number: int):
-	current_wave = wave_number
 	if randf() < 0.5:
 		var weapon_room = _create_weapon_room()
 		if weapon_room != Rect2():
@@ -873,9 +623,13 @@ func _create_weapon_room() -> Rect2:
 	room_types.append(RoomType.WEAPON)
 	current_room_count += 1
 	_spawn_weapon_room_content(new_room)
-	if corridor_connections.size() > 0:
-		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
-		_spawn_torches_in_corridor(latest_corridor)
+	# Spawn a basic light at the center of the weapon room
+	if room_light_manager and basic_light_scene:
+		var center = new_room.get_center()
+		var half_map_x = map_size.x / 2
+		var half_map_y = map_size.y / 2
+		var light_pos = Vector3((center.x - half_map_x) * 2.0, 2.5, (center.y - half_map_y) * 2.0)
+		room_light_manager.spawn_lights_in_room(self, basic_light_scene, [light_pos])
 	return new_room
 
 func _spawn_weapon_room_content(room: Rect2):
@@ -887,7 +641,6 @@ func _spawn_weapon_room_content(room: Rect2):
 		DEFAULT_OBJECT_HEIGHT,
 		(room_center.y - half_map_y) * 2.0
 	)
-	# Spawn altar/slab under weapon, slightly lower for visibility
 	if altar_scene:
 		var altar = altar_scene.instantiate()
 		add_child(altar)
@@ -896,10 +649,6 @@ func _spawn_weapon_room_content(room: Rect2):
 		altar.global_position = altar_pos
 		generated_objects.append(altar)
 	_spawn_weapon_pickup(weapon_world_pos)
-	# Spawn torches in weapon room just like other rooms
-	_spawn_torches_in_room(room)
-	# Spawn mushrooms in weapon room
-	_spawn_mushrooms_in_room(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:
@@ -908,22 +657,6 @@ func _spawn_weapon_pickup(spawn_pos: Vector3):
 	add_child(weapon_pickup)
 	weapon_pickup.global_position = spawn_pos
 	generated_objects.append(weapon_pickup)
-
-func _spawn_torch_circle_around_weapon(center_pos: Vector3, room: Rect2):
-	var torch_count = 6
-	var angle_step = TAU / torch_count
-	for i in range(torch_count):
-		var angle = i * angle_step
-		var torch_offset = Vector3(
-			cos(angle) * 3.0,
-			0,
-			sin(angle) * 3.0
-		)
-		var torch_pos = center_pos + torch_offset
-		torch_pos.y = torch_height_offset
-		var grid_pos = _world_to_grid_position(torch_pos)
-		if _is_valid_torch_position(grid_pos, room):
-			spawn_torch_at_position(torch_pos)
 
 func _world_to_grid_position(world_pos: Vector3) -> Vector2:
 	var half_map_x = map_size.x / 2
