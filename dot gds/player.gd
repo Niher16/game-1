@@ -53,6 +53,9 @@ var nearby_weapon_pickup = null
 var camera: Camera3D = null
 var mouse_position_3d: Vector3
 
+# --- Look direction ---
+var current_look_direction: Vector3 = Vector3.FORWARD
+
 # Visual components
 var mesh_instance: MeshInstance3D
 

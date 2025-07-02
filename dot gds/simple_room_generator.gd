@@ -60,6 +60,8 @@ var _spawner_retry_count := 0
 const _SPAWNER_MAX_RETRIES := 10
 const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
+var rooms_with_lights_spawned: Array = []
+var current_wave: int = 1
 
 func _ready():
 	print("=== SIMPLE ROOM GENERATOR READY ===")
@@ -294,9 +296,44 @@ func _spawn_mushrooms_in_room(room: Rect2):
 		generated_objects.append(mushroom_instance)
 
 func _spawn_lights_in_room(room: Rect2):
+	# Prevent torches in starter room, and prevent any further mushrooms after first wave
+	if rooms_with_lights_spawned.has(room):
+		return
+	if room_types.size() > 0 and rooms.size() > 0 and room == rooms[0]:
+		# Always mark starter room as spawned, only allow mushrooms on first wave
+		rooms_with_lights_spawned.append(room)
+		if current_wave == 1:
+			_spawn_mushrooms_in_room(room)
+		return
+	rooms_with_lights_spawned.append(room)
 	print("=== _spawn_lights_in_room CALLED ===")
-	# Randomly decide lighting style: 0 = torches, 1 = mushrooms, 2 = both
-	var lighting_style := randi() % 3
+	# Weighted lighting style based on wave
+	var torch_weight := 1
+	var mushroom_weight := 1
+	var both_weight := 1
+	if current_wave <= 5:
+		torch_weight = 1
+		mushroom_weight = 4
+		both_weight = 1
+	elif current_wave <= 10:
+		torch_weight = 1 + (current_wave - 5) * 2 # 3,5,7,9,11 for waves 6-10
+		mushroom_weight = 5 - (current_wave - 5) # 4,3,2,1,0 for waves 6-10
+		if mushroom_weight < 0:
+			mushroom_weight = 0
+		both_weight = 2
+	else:
+		torch_weight = 10
+		mushroom_weight = 0
+		both_weight = 2
+	var total_weight = torch_weight + mushroom_weight + both_weight
+	var pick = randi_range(1, total_weight)
+	var lighting_style = 0 # 0=torches, 1=mushrooms, 2=both
+	if pick <= torch_weight:
+		lighting_style = 0
+	elif pick <= torch_weight + mushroom_weight:
+		lighting_style = 1
+	else:
+		lighting_style = 2
 	if lighting_style == 0:
 		print("[DEBUG] Room at ", room.position, " size ", room.size, " will have TORCHES only")
 		_spawn_torches_in_room(room)
@@ -354,6 +391,7 @@ func _spawn_lights_in_room(room: Rect2):
 
 func generate_starting_room():
 	_clear_everything()
+	rooms_with_lights_spawned.clear()
 	_fill_with_walls()
 	_mark_boundary_walls()
 	var safe_area_start = boundary_thickness + safe_zone_margin
@@ -370,23 +408,9 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
-	_spawn_lights_in_room(starting_room)
-
-	# Ensure at least one torch in starter room
-	var torch_found := false
-	var torch_script = preload("res://dot gds/enhanced_torch.gd")
-	for obj in generated_objects:
-		if obj.get_script() == torch_script:
-			torch_found = true
-			break
-	if not torch_found:
-		# Spawn a torch at the center of the room
-		var center_torch = starting_room.position + starting_room.size / 2
-		var half_map_x_torch = map_size.x / 2
-		var half_map_y_torch = map_size.y / 2
-		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
-		spawn_torch_at_position(center_pos)
-
+	# Only spawn mushrooms in starter room, never torches
+	_spawn_mushrooms_in_room(starting_room)
+	rooms_with_lights_spawned.append(starting_room)
 	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
 	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
 	var recruiter = recruiter_scene.instantiate()
@@ -397,7 +421,6 @@ func generate_starting_room():
 	var offset = Vector2(2, 0) # Offset by +2 units on X axis
 	var spawn_pos = center + offset
 	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
-
 	# --- Spawn 4 weapons in the starter room, each with an altar below ---
 	var center_vec = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
 	var weapon_offsets = [
@@ -417,7 +440,6 @@ func generate_starting_room():
 			altar.global_position = altar_pos
 			generated_objects.append(altar)
 		_spawn_weapon_pickup(weapon_pos)
-
 	# --- Spawn 2 cages in the starter room at random valid positions ---
 	if preload("res://Scenes/recruiter_npc.tscn"):
 		var cage_scene = preload("res://Scenes/recruiter_npc.tscn")
@@ -450,7 +472,6 @@ func generate_starting_room():
 				continue
 			_spawn_object(cage_scene, world_pos, "Cage")
 			cages_spawned += 1
-
 	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
 		var first_wave_room = create_connected_room()
 		if first_wave_room != null:
@@ -767,6 +788,7 @@ func _spawn_destructible_objects_in_room(room: Rect2):
 		spawned += 1
 
 func _on_wave_completed(wave_number: int):
+	current_wave = wave_number
 	if randf() < 0.5:
 		var weapon_room = _create_weapon_room()
 		if weapon_room != Rect2():
