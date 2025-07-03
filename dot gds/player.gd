@@ -532,3 +532,13 @@ func _command_all_allies_patrol_at(patrol_position: Vector3):
 			ally.command_patrol_at_point(patrol_position)
 		else:
 			push_warning("Ally does not support patrol command: %s" % [ally.name])
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

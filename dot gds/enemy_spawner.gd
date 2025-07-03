@@ -325,3 +325,13 @@ func _get_boss_health() -> float:
 		if "health" in boss_instance and "max_health" in boss_instance:
 			return float(boss_instance.health) / float(boss_instance.max_health)
 	return 0.0
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

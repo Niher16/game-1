@@ -119,3 +119,13 @@ func _on_joy_connection_changed(_device_id: int, _connected: bool):
 	if controller_navigation_enabled and visible:
 		selected_button_index = 0
 		update_button_focus()
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

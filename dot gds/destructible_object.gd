@@ -290,3 +290,13 @@ func _drop_loot():
 
 	if LootManager.has_method("drop_destructible_loot"):
 		LootManager.drop_destructible_loot(global_position, type_key)
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

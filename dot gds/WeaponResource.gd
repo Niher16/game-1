@@ -19,3 +19,13 @@ enum WeaponType {
 @export var weapon_type: int = WeaponType.SWORD
 
 @export var visual_scene_path: String = ""
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

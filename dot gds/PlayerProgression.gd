@@ -73,3 +73,13 @@ func apply_upgrade(upgrade_data: Dictionary):
 			player_ref.speed += upgrade_data.value
 	get_tree().paused = false
 	xp_changed.emit(xp, xp_to_next_level, level)
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

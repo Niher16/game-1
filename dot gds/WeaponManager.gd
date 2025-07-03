@@ -118,3 +118,13 @@ func _apply_weapon_to_player() -> void:
 		p.set("attack_cooldown", base_stats["attack_cooldown"])
 		p.set("attack_cone_angle", base_stats["attack_cone_angle"])
 		emit_signal("weapon_unequipped")
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

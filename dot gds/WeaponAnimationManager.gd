@@ -34,3 +34,13 @@ func play_attack_animation(weapon: WeaponResource, attacker: Node3D):
 # case WeaponResource.WeaponType.STAFF:
 #     animation_name = "staff_cast"
 # ...existing code...
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

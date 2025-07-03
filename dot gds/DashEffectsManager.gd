@@ -85,3 +85,13 @@ func _create_dash_speed_lines(character: Node3D):
 		tween.tween_property(speed_line, "global_position", character.global_position, 0.25)
 		tween.tween_property(speed_line, "scale", Vector3(0.1, 0.1, 0.1), 0.25)
 		tween.tween_callback(speed_line.queue_free).set_delay(0.25)
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.

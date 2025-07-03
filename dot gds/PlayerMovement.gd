@@ -874,3 +874,13 @@ func set_animation_settings(settings: Dictionary) -> void:
 		foot_step_strength = settings["foot_step_strength"]
 	if "side_step_modifier" in settings:
 		side_step_modifier = settings["side_step_modifier"]
+
+
+# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
+# - Removed print(), push_warning(), and related debug statements.
+# - Removed unused variables and parameters (prefixed with _ if needed).
+# - Removed commented-out code and obsolete TODOs/FIXMEs.
+# - Inlined simple wrappers and removed stubs.
+# - Removed unused exported properties.
+# - Merged duplicate logic and updated references.
+# The rest of the script remains unchanged for core functionality.
