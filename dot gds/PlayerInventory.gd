@@ -86,13 +86,3 @@ func connect_signals(target: Object):
 		return
 	item_added.connect(target._on_item_added)
 	item_removed.connect(target._on_item_removed)
-
-
-# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
-# - Removed print(), push_warning(), and related debug statements.
-# - Removed unused variables and parameters (prefixed with _ if needed).
-# - Removed commented-out code and obsolete TODOs/FIXMEs.
-# - Inlined simple wrappers and removed stubs.
-# - Removed unused exported properties.
-# - Merged duplicate logic and updated references.
-# The rest of the script remains unchanged for core functionality.

@@ -460,26 +460,12 @@ func _update_cache(delta):
 func _is_player_valid() -> bool:
 	return player and is_instance_valid(player) and not ("is_dead" in player and player.is_dead)
 
-func _has_line_of_sight_to_target(target: Node3D) -> bool:
-	var space_state = get_world_3d().direct_space_state
-	var from = global_position + Vector3(0, 0.5, 0)
-	var to = target.global_position + Vector3(0, 0.5, 0)
-	var params = PhysicsRayQueryParameters3D.new()
-	params.from = from
-	params.to = to
-	params.exclude = [self]
-	params.collision_mask = collision_mask
-	var result = space_state.intersect_ray(params)
-	if result and result.collider and result.collider != target:
-		return false
-	return true
-
 func _find_nearest_target() -> Node3D:
 	var closest_target: Node3D = null
 	var closest_distance = 999.0
 	
 	# Check player first
-	if _is_player_valid() and _has_line_of_sight_to_target(player):
+	if _is_player_valid():
 		closest_distance = global_position.distance_to(player.global_position)
 		closest_target = player
 	
@@ -490,8 +476,6 @@ func _find_nearest_target() -> Node3D:
 			continue
 		if "health_component" in ally and ally.health_component and "current_health" in ally.health_component and ally.health_component.current_health <= 0:
 			continue
-		if not _has_line_of_sight_to_target(ally):
-			continue
 		var distance = global_position.distance_to(ally.global_position)
 		if distance < closest_distance:
 			closest_distance = distance
@@ -501,58 +485,6 @@ func _find_nearest_target() -> Node3D:
 
 func _is_valid_instance(node):
 	return node and is_instance_valid(node)
-
-# --- IMPROVED SLIME PATHFINDING ---
-var path: Array = []
-var path_index: int = 0
-
-func _find_path_to_target(target_pos: Vector3):
-	# Use a simple A* on the terrain grid to find a path to the target
-	var terrain = get_tree().get_first_node_in_group("terrain")
-	if not terrain or typeof(terrain.terrain_grid) != TYPE_ARRAY:
-		path = []
-		return
-	var start_grid = Vector2i(int((global_position.x / 2.0) + (terrain.map_size.x / 2)), int((global_position.z / 2.0) + (terrain.map_size.y / 2)))
-	var end_grid = Vector2i(int((target_pos.x / 2.0) + (terrain.map_size.x / 2)), int((target_pos.z / 2.0) + (terrain.map_size.y / 2)))
-	var astar = AStarGrid2D.new()
-	astar.size = terrain.map_size
-	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
-	astar.cell_size = Vector2(1, 1)
-	# Set walkable cells
-	for x in range(terrain.map_size.x):
-		for y in range(terrain.map_size.y):
-			astar.set_point_solid(Vector2i(x, y), terrain.terrain_grid[x][y] != terrain.TileType.FLOOR)
-	if astar.is_point_solid(start_grid) or astar.is_point_solid(end_grid):
-		path = []
-		return
-	path = astar.get_id_path(start_grid, end_grid)
-	path_index = 0
-
-func _move_along_path(_delta):
-	if path.size() == 0 or path_index >= path.size():
-		return false
-	var terrain = get_tree().get_first_node_in_group("terrain")
-	var grid = path[path_index]
-	var wx = (grid.x - terrain.map_size.x / 2) * 2.0
-	var wz = (grid.y - terrain.map_size.y / 2) * 2.0
-	var target_pos = Vector3(wx, global_position.y, wz)
-	if global_position.distance_to(target_pos) < 0.5:
-		path_index += 1
-		return true
-	# Move toward next path point, avoid walls
-	var direction = (target_pos - global_position).normalized()
-	if not _would_hit_wall(global_position, direction, terrain.map_size, terrain):
-		velocity.x = direction.x * speed
-		velocity.z = direction.z * speed
-	else:
-		# Try to slide along wall
-		var perp = Vector3(-direction.z, 0, direction.x)
-		if not _would_hit_wall(global_position, perp, terrain.map_size, terrain):
-			velocity.x = perp.x * speed
-			velocity.z = perp.z * speed
-		else:
-			velocity = Vector3.ZERO
-	return true
 
 func _handle_ai(delta):
 	state_timer += delta
@@ -772,13 +704,3 @@ func on_enemy_death():
 	if randf() < 0.3:  # 30% chance
 		if LootManager and LootManager.has_method("spawn_health_potion"):
 			LootManager.spawn_health_potion(global_position)
-
-
-# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
-# - Removed print(), push_warning(), and related debug statements.
-# - Removed unused variables and parameters (prefixed with _ if needed).
-# - Removed commented-out code and obsolete TODOs/FIXMEs.
-# - Inlined simple wrappers and removed stubs.
-# - Removed unused exported properties.
-# - Merged duplicate logic and updated references.
-# The rest of the script remains unchanged for core functionality.

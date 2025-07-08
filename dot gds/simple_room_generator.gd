@@ -1,4 +1,4 @@
-# simple_room_generator.gd
+# simple_room_generator.gd - ENHANCED: Fixed torch spawning in corridors
 extends Node3D
 
 signal new_room_generated(room_rect: Rect2)
@@ -17,6 +17,18 @@ signal new_room_generated(room_rect: Rect2)
 @export_group("Boundary Protection")
 @export var boundary_thickness = 2
 @export var safe_zone_margin = 4
+
+@export_group("Torch Settings")
+@export var torch_spacing_in_corridors: float = 8.0
+@export var torch_height_offset: float = 1.5
+@export var corridor_torch_side_offset: float = 0.8
+@export var max_torches_per_corridor: int = 4
+
+@export_group("Enhanced Lighting Settings")
+#@export var chandelier_spawn_chance: float = 0.3  # 30% chance in large rooms
+#@export var brazier_spawn_chance: float = 0.4     # 40% chance in room centers
+@export var mushroom_spawn_chance: float = 0.2    # 20% chance in corners
+@export var large_room_threshold: float = 64.0    # Room area for chandelier eligibility
 
 enum TileType { WALL, FLOOR, CORRIDOR }
 enum RoomShape { SQUARE, RECTANGLE, L_SHAPE, T_SHAPE, PLUS_SHAPE, U_SHAPE, LONG_HALL, SMALL_SQUARE }
@@ -42,9 +54,11 @@ var weapon_pickup_scene: PackedScene
 @export var crate_scene: PackedScene
 @export var barrel_scene: PackedScene
 @export var altar_scene: PackedScene
-@export var basic_light_scene: PackedScene
-@export var enhanced_torch_scene: PackedScene
-@export var enhanced_mushrooms_scene: PackedScene
+
+# Enhanced lighting scene references
+var chandelier_scene: PackedScene
+var brazier_scene: PackedScene
+var mushroom_scene: PackedScene
 
 const PLAYER_HEIGHT: float = 1.5
 const WALL_LAYER: int = 1 << 1
@@ -56,10 +70,8 @@ var _spawner_retry_count := 0
 const _SPAWNER_MAX_RETRIES := 10
 const _SPAWNER_RETRY_DELAY := 0.5
 var _pending_generate_starting_room := false
-var room_light_manager: RoomLightManager
 
 func _ready():
-	print("=== SIMPLE ROOM GENERATOR READY ===")
 	add_to_group("terrain")
 	terrain_grid = []
 	for x in range(map_size.x):
@@ -69,21 +81,10 @@ func _ready():
 		terrain_grid.append(col)
 	_create_materials()
 	_find_references()
-	# Set default crate and barrel scenes if not assigned in the editor
-	if not crate_scene and ResourceLoader.exists("res://Scenes/DestructibleCrate.tscn"):
-		crate_scene = load("res://Scenes/DestructibleCrate.tscn")
-	if not barrel_scene and ResourceLoader.exists("res://Scenes/destructible_barrel.tscn"):
-		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	if ResourceLoader.exists("res://Scenes/weapon_pickup.tscn"):
 		weapon_pickup_scene = load("res://Scenes/weapon_pickup.tscn")
-	if not basic_light_scene and ResourceLoader.exists("res://Scenes/BasicLight.tscn"):
-		basic_light_scene = load("res://Scenes/BasicLight.tscn")
-	if not enhanced_torch_scene and ResourceLoader.exists("res://Scenes/EnhancedTorch.tscn"):
-		enhanced_torch_scene = load("res://Scenes/EnhancedTorch.tscn")
-	if not enhanced_mushrooms_scene and ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
-		enhanced_mushrooms_scene = load("res://Scenes/EnhancedMushrooms.tscn")
-	room_light_manager = RoomLightManager.new()
-	add_child(room_light_manager)
+	# Load new lighting scenes
+	_load_lighting_scenes()
 	if auto_generate_on_start:
 		_pending_generate_starting_room = true
 		_try_generate_starting_room_when_spawner_ready()
@@ -164,16 +165,97 @@ func _create_simple_corridor_protected(room_a: Rect2, room_b: Rect2):
 		"corridor_rect": corridor_bounds,
 		"corridor_path": corridor_path
 	})
-	# Spawn mushrooms only on the floor in the corridor after creation
-	if room_light_manager and enhanced_mushrooms_scene:
-		room_light_manager.spawn_mushrooms_in_room(self, enhanced_mushrooms_scene, corridor_bounds, map_size, 2)
+
+func spawn_torch_at_position(pos: Vector3):
+	var torch_scene = preload("res://Scenes/EnhancedTorch.tscn")
+	var torch = torch_scene.instantiate()
+	add_child(torch)
+	torch.global_position = pos
+	generated_objects.append(torch)
+
+# --- TORCH SPAWNING: DUNGEON STYLE ---
+
+func _spawn_torches_in_corridor(corridor_connection: Dictionary):
+	# Place torches at regular intervals on corridor walls, alternating sides
+	var path = corridor_connection.corridor_path
+	if path.size() < 2:
+		return
+	var interval = int(torch_spacing_in_corridors)
+	if interval < 2:
+		interval = 2
+	var side = 1
+	var placed_positions = {}
+	for i in range(0, path.size(), interval):
+		var pos = path[i]
+		# Find wall tile adjacent to corridor tile
+		var wall_pos = _find_adjacent_wall(pos, side)
+		if wall_pos != null and not placed_positions.has(wall_pos):
+			_spawn_torch_on_wall(wall_pos)
+			placed_positions[wall_pos] = true
+			side *= -1  # Alternate sides
+
+func _find_adjacent_wall(pos: Vector2, side: int) -> Vector2:
+	# Check 4 directions, prefer left/right for horizontal, up/down for vertical
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var check = pos + dir * side
+		var x = int(check.x)
+		var y = int(check.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL:
+				return Vector2(x, y)
+	return Vector2()
+
+func _spawn_torch_on_wall(wall_grid_pos: Vector2):
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var world_pos = Vector3(
+		(wall_grid_pos.x - half_map_x) * 2.0,
+		torch_height_offset,
+		(wall_grid_pos.y - half_map_y) * 2.0
+	)
+	# Offset torch away from wall into room/corridor
+	var offset_amount = 1.4  # Increased offset for more pronounced placement
+	# Determine wall normal by checking adjacent floor/corridor tile
+	var normal = Vector3.ZERO
+	var dirs = [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]
+	for dir in dirs:
+		var x = int(wall_grid_pos.x + dir.x)
+		var y = int(wall_grid_pos.y + dir.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.FLOOR or terrain_grid[x][y] == TileType.CORRIDOR:
+				normal = Vector3(dir.x, 0, dir.y)
+				break
+	if normal != Vector3.ZERO:
+		world_pos += normal * offset_amount
+	spawn_torch_at_position(world_pos)
+
+func _spawn_torches_in_room(room: Rect2):
+	# Place torches near entrances/exits and at intervals along the room's walls
+	var wall_points = []
+	var interval = max(2, int(room.size.x / 2))
+	# Top and bottom walls
+	for x in range(int(room.position.x), int(room.position.x + room.size.x), interval):
+		wall_points.append(Vector2(x, room.position.y))
+		wall_points.append(Vector2(x, room.position.y + room.size.y - 1))
+	# Left and right walls
+	for y in range(int(room.position.y), int(room.position.y + room.size.y), interval):
+		wall_points.append(Vector2(room.position.x, y))
+		wall_points.append(Vector2(room.position.x + room.size.x - 1, y))
+	# Place torches only if wall is present
+	var placed = {}
+	for pt in wall_points:
+		var x = int(pt.x)
+		var y = int(pt.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.WALL and not placed.has(pt):
+				_spawn_torch_on_wall(pt)
+				placed[pt] = true
 
 func generate_starting_room():
 	_clear_everything()
 	_fill_with_walls()
 	_mark_boundary_walls()
-	var half_map_x = map_size.x / 2
-	var half_map_y = map_size.y / 2
 	var safe_area_start = boundary_thickness + safe_zone_margin
 	var safe_area_size = map_size - Vector2(safe_area_start * 2, safe_area_start * 2)
 	var room_pos = Vector2(
@@ -188,66 +270,52 @@ func generate_starting_room():
 	current_room_count = 1
 	_generate_all_walls_with_boundary_protection()
 	_spawn_destructible_objects_in_room(starting_room)
-	# --- Recruiter NPC and weapon/altar/cage logic unchanged ---
+	_spawn_torches_in_room(starting_room)
+
+	# Ensure at least one torch in starter room
+	var torch_found := false
+	var torch_script = preload("res://dot gds/enhanced_torch.gd")
+	for obj in generated_objects:
+		if obj.get_script() == torch_script:
+			torch_found = true
+			break
+	if not torch_found:
+		# Spawn a torch at the center of the room
+		var center_torch = starting_room.position + starting_room.size / 2
+		var half_map_x_torch = map_size.x / 2
+		var half_map_y_torch = map_size.y / 2
+		var center_pos = Vector3((center_torch.x - half_map_x_torch) * 2.0, torch_height_offset, (center_torch.y - half_map_y_torch) * 2.0)
+		spawn_torch_at_position(center_pos)
+
+	# --- Spawn recruiter NPC in the center of the first room (with offset) ---
 	var recruiter_scene = preload("res://Scenes/recruiter_npc.tscn")
 	var recruiter = recruiter_scene.instantiate()
 	add_child(recruiter)
 	var center = starting_room.position + starting_room.size / 2
-	var offset = Vector2(2, 0)
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var offset = Vector2(2, 0) # Offset by +2 units on X axis
 	var spawn_pos = center + offset
 	recruiter.global_position = Vector3((spawn_pos.x - half_map_x) * 2.0, 1.2, (spawn_pos.y - half_map_y) * 2.0)
+
+	# --- Spawn a few weapons in the starter room ---
 	var center_vec = Vector3((center.x - half_map_x) * 2.0, DEFAULT_OBJECT_HEIGHT, (center.y - half_map_y) * 2.0)
 	var weapon_offsets = [
 		Vector3(2.5, 0, 0),
 		Vector3(-1.5, 0, 2.2),
-		Vector3(-1.5, 0, -2.2),
-		Vector3(0, 0, 2.8)
+		Vector3(-1.5, 0, -2.2)
 	]
 	for weapon_offset in weapon_offsets:
-		var weapon_pos = center_vec + weapon_offset
-		if altar_scene:
-			var altar = altar_scene.instantiate()
-			add_child(altar)
-			var altar_pos = weapon_pos
-			altar_pos.y -= 0.6
-			altar.global_position = altar_pos
-			generated_objects.append(altar)
-		_spawn_weapon_pickup(weapon_pos)
-	if preload("res://Scenes/recruiter_npc.tscn"):
-		var cage_scene = preload("res://Scenes/recruiter_npc.tscn")
-		var cages_spawned = 0
-		var attempts = 0
-		var max_attempts = 20
-		while cages_spawned < 2 and attempts < max_attempts:
-			attempts += 1
-			var random_pos = Vector2(
-				starting_room.position.x + randf() * starting_room.size.x,
-				starting_room.position.y + randf() * starting_room.size.y
-			)
-			var grid_x = int(random_pos.x)
-			var grid_y = int(random_pos.y)
-			if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-				continue
-			if terrain_grid[grid_x][grid_y] != TileType.FLOOR:
-				continue
-			var world_pos = Vector3(
-				(random_pos.x - half_map_x) * 2.0,
-				DEFAULT_OBJECT_HEIGHT,
-				(random_pos.y - half_map_y) * 2.0
-			)
-			var too_close = false
-			for obj in generated_objects:
-				if obj and obj.global_position.distance_to(world_pos) < 2.0:
-					too_close = true
-					break
-			if too_close:
-				continue
-			_spawn_object(cage_scene, world_pos, "Cage")
-			cages_spawned += 1
-	# Spawn mushrooms only on the floor in the starting room (after all other objects and after room_light_manager is set up)
-	if room_light_manager and is_instance_valid(room_light_manager) and room_light_manager.is_inside_tree() and enhanced_mushrooms_scene:
-		room_light_manager.spawn_mushrooms_in_room(self, enhanced_mushrooms_scene, starting_room, map_size, 3)
-		room_light_manager.spawn_mushroom_center_in_room(self, enhanced_mushrooms_scene, starting_room, map_size)
+		_spawn_weapon_pickup(center_vec + weapon_offset)
+
+	if enemy_spawner and enemy_spawner.has_method("set_newest_spawning_room"):
+		var first_wave_room = create_connected_room()
+		if first_wave_room != null:
+			enemy_spawner.set_newest_spawning_room(first_wave_room)
+			_spawn_torches_in_room(first_wave_room)
+			if corridor_connections.size() > 0:
+				var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+				_spawn_torches_in_corridor(latest_corridor)
 
 func create_connected_room():
 	if rooms.is_empty():
@@ -267,18 +335,18 @@ func create_connected_room():
 	current_room_count += 1
 	new_room_generated.emit(new_room)
 	_spawn_destructible_objects_in_room(new_room)
-	# Spawn a basic light at the center of the new room
-	if room_light_manager:
-		# var center = new_room.get_center() # Removed unused variable
-		# Spawn mushrooms only on the floor in the new room
-		if room_light_manager and enhanced_mushrooms_scene:
-			room_light_manager.spawn_mushrooms_in_room(self, enhanced_mushrooms_scene, new_room, map_size, 3)
-			room_light_manager.spawn_mushroom_center_in_room(self, enhanced_mushrooms_scene, new_room, map_size)
+	_spawn_torches_in_room(new_room)
 	if corridor_connections.size() > 0:
-		var _latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		var latest_corridor = corridor_connections[corridor_connections.size() - 1]
+		_spawn_torches_in_corridor(latest_corridor)
 	return new_room
 
 func _clear_everything():
+	for obj in generated_objects:
+		if obj and is_instance_valid(obj):
+			if obj.is_in_group("enhanced_lighting"):
+				obj.queue_free()
+	# ...rest of existing clear code...
 	for obj in generated_objects:
 		if is_instance_valid(obj):
 			obj.queue_free()
@@ -326,29 +394,11 @@ func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = fals
 	wall.collision_mask = WALL_COLLISION_MASK
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = BoxMesh.new()
-	# Randomize wall height and color for dungeon feel
-	var min_height = 2.0
-	var max_height = 5.0
-	var random_height = randf_range(min_height, max_height)
-	mesh_instance.mesh.size = Vector3(2, random_height, 2)
-	# Dungeon color palette: muted, earthy, mossy, stone, etc.
-	var dungeon_colors = [
-		Color(0.35, 0.32, 0.28), # brown/earth
-		Color(0.25, 0.25, 0.3),  # dark stone
-		Color(0.18, 0.22, 0.18), # mossy
-		Color(0.4, 0.4, 0.45),   # default
-		Color(0.2, 0.2, 0.3),    # boundary
-		Color(0.3, 0.35, 0.25),  # olive
-		Color(0.22, 0.18, 0.15)  # deep brown
-	]
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = dungeon_colors[randi() % dungeon_colors.size()]
-	mat.roughness = 0.8 + randf() * 0.2
-	mat.metallic = 0.05 + randf() * 0.1
-	mesh_instance.material_override = mat if not is_boundary else boundary_wall_material
+	mesh_instance.mesh.size = Vector3(2, wall_height, 2)
+	mesh_instance.material_override = boundary_wall_material if is_boundary else wall_material
 	var collision_shape = CollisionShape3D.new()
 	collision_shape.shape = BoxShape3D.new()
-	collision_shape.shape.size = Vector3(2, random_height, 2)
+	collision_shape.shape.size = Vector3(2, wall_height, 2)
 	wall.add_child(mesh_instance)
 	wall.add_child(collision_shape)
 	add_child(wall)
@@ -356,7 +406,7 @@ func _create_wall_at_position(grid_x: int, grid_y: int, is_boundary: bool = fals
 	var half_map_y = map_size.y / 2
 	wall.position = Vector3(
 		(grid_x - half_map_x) * 2.0,
-		random_height / 2.0,
+		wall_height / 2.0,
 		(grid_y - half_map_y) * 2.0
 	)
 	generated_objects.append(wall)
@@ -369,6 +419,19 @@ func _is_valid_carve_position(x: int, y: int) -> bool:
 	if boundary_walls.has(grid_key):
 		return false
 	return true
+
+func _is_valid_torch_position(grid_pos: Vector2, room: Rect2) -> bool:
+	var grid_x = int(grid_pos.x)
+	var grid_y = int(grid_pos.y)
+	if grid_x < 0 or grid_x >= terrain_grid.size():
+		return false
+	if grid_y < 0 or grid_y >= terrain_grid[grid_x].size():
+		return false
+	if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
+		return false
+	if not room.has_point(Vector2(grid_x, grid_y)):
+		return false
+	return terrain_grid[grid_x][grid_y] == TileType.FLOOR
 
 func _carve_room_shape(room: Rect2, shape: RoomShape):
 	match shape:
@@ -460,8 +523,8 @@ func _move_player_to_room(room: Rect2):
 		player = get_tree().get_first_node_in_group("player")
 		if not player:
 			return
-	var half_map_x = int(map_size.x / 2)
-	var half_map_y = int(map_size.y / 2)
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
 	var room_center_world = Vector3(
 		(room.get_center().x - half_map_x) * 2.0,
 		PLAYER_HEIGHT,
@@ -491,83 +554,28 @@ func _remove_walls_by_grid_lookup():
 				wall.queue_free()
 			wall_lookup.erase(grid_key)
 
-func _spawn_object(scene: PackedScene, world_pos: Vector3, object_name: String = "") -> Node3D:
-	if not scene:
-		push_warning("Missing scene for " + object_name)
-		return null
-	var instance = scene.instantiate()
-	add_child(instance)
-	instance.global_position = world_pos
-	if object_name:
-		instance.name = object_name
-	generated_objects.append(instance)
-	return instance
-
 func _spawn_destructible_objects_in_room(room: Rect2):
-	# Ensure crate and barrel scenes are always loaded
-	if not crate_scene and ResourceLoader.exists("res://Scenes/DestructibleCrate.tscn"):
-		crate_scene = load("res://Scenes/DestructibleCrate.tscn")
-	if not barrel_scene and ResourceLoader.exists("res://Scenes/destructible_barrel.tscn"):
-		barrel_scene = load("res://Scenes/destructible_barrel.tscn")
 	var objects_to_spawn = randi_range(2, 4)
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
-	var attempts = 0
-	var max_attempts = 30
-	var spawned = 0
-	var last_object_scene = null
-	while spawned < objects_to_spawn and attempts < max_attempts:
-		attempts += 1
+	for i in range(objects_to_spawn):
 		var object_scene = crate_scene if randf() < 0.6 else barrel_scene
 		if not object_scene:
-			print("[Destructible Spawn] Missing crate or barrel scene in room at ", room.position)
 			continue
+		var object_instance = object_scene.instantiate()
+		add_child(object_instance)
 		var random_pos = Vector2(
 			room.position.x + randf() * room.size.x,
 			room.position.y + randf() * room.size.y
 		)
-		var grid_x = int(random_pos.x)
-		var grid_y = int(random_pos.y)
-		if grid_x < 0 or grid_x >= map_size.x or grid_y < 0 or grid_y >= map_size.y:
-			print("[Destructible Spawn] Out of bounds: ", grid_x, grid_y)
-			continue
-		# Allow spawning on FLOOR or CORRIDOR
-		if terrain_grid[grid_x][grid_y] != TileType.FLOOR and terrain_grid[grid_x][grid_y] != TileType.CORRIDOR:
-			print("[Destructible Spawn] Not floor/corridor at: ", grid_x, grid_y)
-			continue
-		# Avoid overlapping with other objects (loosened to 1.0)
 		var world_pos = Vector3(
 			(random_pos.x - half_map_x) * 2.0,
-			DEFAULT_OBJECT_HEIGHT, # Reverted to DEFAULT_OBJECT_HEIGHT for crate/barrel spawn height
+			DEFAULT_OBJECT_HEIGHT,
 			(random_pos.y - half_map_y) * 2.0
 		)
-		var too_close = false
-		for obj in generated_objects:
-			if obj and obj.global_position.distance_to(world_pos) < 1.0:
-				too_close = true
-				break
-		if too_close:
-			print("[Destructible Spawn] Too close to another object at: ", world_pos)
-			continue
-		print("[Destructible Spawn] Spawning ", object_scene.resource_path, " at ", world_pos, " in room at ", room.position)
-		_spawn_object(object_scene, world_pos)
-		last_object_scene = object_scene
-		spawned += 1
-	# Fallback: if nothing spawned, force one at room center if possible
-	if spawned == 0 and last_object_scene:
-		var center_pos = room.position + room.size / 2
-		var grid_x = int(center_pos.x)
-		var grid_y = int(center_pos.y)
-		if grid_x >= 0 and grid_x < map_size.x and grid_y >= 0 and grid_y < map_size.y:
-			if terrain_grid[grid_x][grid_y] == TileType.FLOOR or terrain_grid[grid_x][grid_y] == TileType.CORRIDOR:
-				var world_pos = Vector3(
-					(center_pos.x - half_map_x) * 2.0,
-					DEFAULT_OBJECT_HEIGHT,
-					(center_pos.y - half_map_y) * 2.0
-				)
-				print("[Destructible Spawn] Fallback spawn at center ", world_pos, " in room at ", room.position)
-				_spawn_object(last_object_scene, world_pos)
-	# ...existing code...
+		object_instance.global_position = world_pos
+		generated_objects.append(object_instance)
+
 func _on_wave_completed(wave_number: int):
 	if randf() < 0.5:
 		var weapon_room = _create_weapon_room()
@@ -653,24 +661,20 @@ func _create_weapon_room() -> Rect2:
 	room_types.append(RoomType.WEAPON)
 	current_room_count += 1
 	_spawn_weapon_room_content(new_room)
-	# Spawn a basic light at the center of the weapon room
-	if room_light_manager:
-		# var center = new_room.get_center() # Removed unused variable
-		# Spawn mushrooms only on the floor in the weapon room
-		if room_light_manager and enhanced_mushrooms_scene:
-			room_light_manager.spawn_mushrooms_in_room(self, enhanced_mushrooms_scene, new_room, map_size, 3)
-			room_light_manager.spawn_mushroom_center_in_room(self, enhanced_mushrooms_scene, new_room, map_size)
+	# Add after weapon room content spawning
+	_spawn_enhanced_lighting_in_room(new_room, RoomType.WEAPON)
 	return new_room
 
 func _spawn_weapon_room_content(room: Rect2):
+	var room_center = room.get_center()
 	var half_map_x = map_size.x / 2
 	var half_map_y = map_size.y / 2
-	var room_center = room.get_center()
 	var weapon_world_pos = Vector3(
 		(room_center.x - half_map_x) * 2.0,
 		DEFAULT_OBJECT_HEIGHT,
 		(room_center.y - half_map_y) * 2.0
 	)
+	# Spawn altar/slab under weapon, slightly lower for visibility
 	if altar_scene:
 		var altar = altar_scene.instantiate()
 		add_child(altar)
@@ -679,6 +683,8 @@ func _spawn_weapon_room_content(room: Rect2):
 		altar.global_position = altar_pos
 		generated_objects.append(altar)
 	_spawn_weapon_pickup(weapon_world_pos)
+	# Spawn torches in weapon room just like other rooms
+	_spawn_torches_in_room(room)
 
 func _spawn_weapon_pickup(spawn_pos: Vector3):
 	if not weapon_pickup_scene:
@@ -687,6 +693,22 @@ func _spawn_weapon_pickup(spawn_pos: Vector3):
 	add_child(weapon_pickup)
 	weapon_pickup.global_position = spawn_pos
 	generated_objects.append(weapon_pickup)
+
+func _spawn_torch_circle_around_weapon(center_pos: Vector3, room: Rect2):
+	var torch_count = 6
+	var angle_step = TAU / torch_count
+	for i in range(torch_count):
+		var angle = i * angle_step
+		var torch_offset = Vector3(
+			cos(angle) * 3.0,
+			0,
+			sin(angle) * 3.0
+		)
+		var torch_pos = center_pos + torch_offset
+		torch_pos.y = torch_height_offset
+		var grid_pos = _world_to_grid_position(torch_pos)
+		if _is_valid_torch_position(grid_pos, room):
+			spawn_torch_at_position(torch_pos)
 
 func _world_to_grid_position(world_pos: Vector3) -> Vector2:
 	var half_map_x = map_size.x / 2
@@ -703,13 +725,119 @@ func get_rooms(include_weapon_rooms := true) -> Array:
 			result.append(rooms[i])
 	return result
 
+func _load_lighting_scenes():
+	"""Load the new lighting scene files"""
+	if ResourceLoader.exists("res://Scenes/EnhancedChandelier.tscn"):
+		chandelier_scene = load("res://Scenes/EnhancedChandelier.tscn")
+	if ResourceLoader.exists("res://Scenes/EnhancedBrazier.tscn"):
+		brazier_scene = load("res://Scenes/EnhancedBrazier.tscn")
+	if ResourceLoader.exists("res://Scenes/EnhancedMushrooms.tscn"):
+		mushroom_scene = load("res://Scenes/EnhancedMushrooms.tscn")
 
-# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
-# - Removed print(), push_warning(), and related debug statements.
-# - Removed unused variable _latest_corridor.
-# - Prefixed unused function parameters with _.
-# - Removed commented-out code and obsolete TODOs/FIXMEs.
-# - Inlined simple wrappers and removed stubs.
-# - Removed unused exported properties.
-# - Merged duplicate logic and updated references.
-# The rest of the script remains unchanged for core functionality.
+# --- ENHANCED LIGHTING SPAWNING ---
+func _spawn_enhanced_lighting_in_room(room: Rect2, room_type: RoomType):
+	"""Spawn enhanced lighting based on room type and size"""
+	# Removed unused variables after chandelier/brazier removal
+	# var room_area = room.size.x * room.size.y
+	# var room_center = room.get_center()
+	# var half_map_x = map_size.x / 2
+	# var half_map_y = map_size.y / 2
+	# var world_center = Vector3(
+	# 	(room_center.x - half_map_x) * 2.0,
+	# 	0,
+	# 	(room_center.y - half_map_y) * 2.0
+	# )
+	match room_type:
+		RoomType.STARTING:
+			#_spawn_brazier_at_position(world_center + Vector3(0, 0, 2.0))
+			pass
+		RoomType.WEAPON:
+			#_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
+			_spawn_mushrooms_in_room_corners(room)
+		RoomType.NORMAL:
+			# if room_area >= large_room_threshold and randf() < chandelier_spawn_chance:
+			# 	_spawn_chandelier_at_position(world_center + Vector3(0, 3.5, 0))
+			# elif randf() < brazier_spawn_chance:
+			# 	_spawn_brazier_at_position(world_center)
+			if randf() < mushroom_spawn_chance:
+				_spawn_mushrooms_in_room_corners(room)
+
+func _spawn_chandelier_at_position(pos: Vector3):
+	if not chandelier_scene:
+		push_error("Chandelier scene not loaded!")
+		return
+	var chandelier = chandelier_scene.instantiate()
+	if not chandelier:
+		push_error("Failed to instantiate chandelier")
+		return
+	add_child(chandelier)
+	chandelier.global_position = pos
+	generated_objects.append(chandelier)
+	print("💡 Spawned chandelier at: ", pos)
+
+func _spawn_brazier_at_position(pos: Vector3):
+	if not brazier_scene:
+		push_error("Brazier scene not loaded!")
+		return
+	var brazier = brazier_scene.instantiate()
+	if not brazier:
+		push_error("Failed to instantiate brazier")
+		return
+	add_child(brazier)
+	brazier.global_position = pos
+	generated_objects.append(brazier)
+	print("🔥 Spawned brazier at: ", pos)
+
+func _spawn_mushrooms_in_room_corners(room: Rect2):
+	if not mushroom_scene:
+		return
+	var half_map_x = map_size.x / 2
+	var half_map_y = map_size.y / 2
+	var corner_positions = [
+		Vector2(room.position.x + 1, room.position.y + 1),
+		Vector2(room.position.x + room.size.x - 2, room.position.y + 1),
+		Vector2(room.position.x + 1, room.position.y + room.size.y - 2),
+		Vector2(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
+	]
+	corner_positions.shuffle()
+	var mushroom_count = randi_range(1, 2)
+	for i in range(min(mushroom_count, corner_positions.size())):
+		var corner_grid_pos = corner_positions[i]
+		var x = int(corner_grid_pos.x)
+		var y = int(corner_grid_pos.y)
+		if x >= 0 and x < map_size.x and y >= 0 and y < map_size.y:
+			if terrain_grid[x][y] == TileType.FLOOR:
+				var world_pos = Vector3(
+					(corner_grid_pos.x - half_map_x) * 2.0,
+					0.1,
+					(corner_grid_pos.y - half_map_y) * 2.0
+				)
+				_spawn_mushrooms_at_position(world_pos)
+
+func _spawn_mushrooms_at_position(pos: Vector3):
+	if not mushroom_scene:
+		return
+	var mushrooms = mushroom_scene.instantiate()
+	if not mushrooms:
+		push_error("Failed to instantiate mushrooms")
+		return
+	add_child(mushrooms)
+	mushrooms.global_position = pos
+	generated_objects.append(mushrooms)
+	print("🍄 Spawned mushrooms at: ", pos)
+
+func _spawn_enhanced_corridor_lighting(_corridor_connection: Dictionary):
+	# Removed unused variable after brazier removal
+	# var corridor_rect = corridor_connection.corridor_rect
+	# var corridor_length = max(corridor_rect.size.x, corridor_rect.size.y)
+	# if corridor_length > 12 and randf() < 0.3:
+	# 	var corridor_center = corridor_rect.get_center()
+	# 	var half_map_x = map_size.x / 2
+	# 	var half_map_y = map_size.y / 2
+	# 	var world_center = Vector3(
+	# 		(corridor_center.x - half_map_x) * 2.0,
+	# 		0,
+	# 		(corridor_center.y - half_map_y) * 2.0
+	# 	)
+	# 	_spawn_brazier_at_position(world_center)
+	pass

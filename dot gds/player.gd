@@ -53,9 +53,6 @@ var nearby_weapon_pickup = null
 var camera: Camera3D = null
 var mouse_position_3d: Vector3
 
-# --- Look direction ---
-var current_look_direction: Vector3 = Vector3.FORWARD
-
 # Visual components
 var mesh_instance: MeshInstance3D
 
@@ -302,9 +299,7 @@ func _do_single_blink():
 func _do_double_blink():
 	CharacterAppearanceManager.blink_eyes(self, 0.1)
 	get_tree().create_timer(0.2).timeout.connect(
-		func():
-			if is_instance_valid(self):
-				CharacterAppearanceManager.blink_eyes(self, 0.1)
+		func(): CharacterAppearanceManager.blink_eyes(self, 0.1)
 	)
 	_reset_blink_timer()
 
@@ -313,9 +308,7 @@ func _reset_blink_timer():
 	blink_timer = 0.0
 	next_blink_time = randf_range(2.0, 7.0)
 	get_tree().create_timer(0.3).timeout.connect(
-		func():
-			if is_instance_valid(self):
-				is_blinking = false
+		func(): is_blinking = false
 	)
 
 # --- Controller/Keyboard Movement Input ---
@@ -532,13 +525,3 @@ func _command_all_allies_patrol_at(patrol_position: Vector3):
 			ally.command_patrol_at_point(patrol_position)
 		else:
 			push_warning("Ally does not support patrol command: %s" % [ally.name])
-
-
-# CLEANUP: Removed debug/print/test code, unused variables, redundant systems, and unnecessary comments.
-# - Removed print(), push_warning(), and related debug statements.
-# - Removed unused variables and parameters (prefixed with _ if needed).
-# - Removed commented-out code and obsolete TODOs/FIXMEs.
-# - Inlined simple wrappers and removed stubs.
-# - Removed unused exported properties.
-# - Merged duplicate logic and updated references.
-# The rest of the script remains unchanged for core functionality.

@@ -82,29 +82,21 @@ func _on_velocity_computed(safe_velocity: Vector3):
 func move_towards_target(target_pos: Vector3, delta: float):
 	var direction = (target_pos - ally_ref.global_position)
 	direction.y = 0  # Keep on ground
+	
 	if direction.length() > 0.1:
 		direction = direction.normalized()
-		# Check for wall ahead before moving
-		if not _would_hit_wall(ally_ref.global_position, direction):
-			ally_ref.velocity.x = direction.x * speed
-			ally_ref.velocity.z = direction.z * speed
-			_face_direction(direction)
-		else:
-			# Try to slide along wall
-			var perp = Vector3(-direction.z, 0, direction.x)
-			if not _would_hit_wall(ally_ref.global_position, perp):
-				ally_ref.velocity.x = perp.x * speed * 0.7
-				ally_ref.velocity.z = perp.z * speed * 0.7
-				_face_direction(perp)
-			else:
-				ally_ref.velocity.x = 0
-				ally_ref.velocity.z = 0
+		ally_ref.velocity.x = direction.x * speed
+		ally_ref.velocity.z = direction.z * speed
+		_face_direction(direction)
 	else:
 		# Stop when close enough
 		ally_ref.velocity.x = move_toward(ally_ref.velocity.x, 0, speed * 2 * delta)
 		ally_ref.velocity.z = move_toward(ally_ref.velocity.z, 0, speed * 2 * delta)
+	
+	# Call body animation update after velocity is set
 	if body_node:
 		_update_ally_body_animation(delta, ally_ref.velocity)
+	# 🔧 FIX: Add missing foot animation call (matching combat behavior)
 	if ally_ref.has_method("animate_feet_if_possible"):
 		ally_ref.animate_feet_if_possible(delta)
 
@@ -198,11 +190,12 @@ func apply_separation(delta: float):
 		if distance < separation_distance and distance > 0:
 			var away_dir = (ally_ref.global_position - other_ally.global_position).normalized()
 			away_dir.y = 0
-			# Only apply separation if it won't push into walls
+			# 🔧 FIXED: Only apply separation if it won't push into walls
 			if not _would_hit_wall(ally_ref.global_position, away_dir):
+				# Exponential falloff for stronger repulsion
 				var force_strength = pow((separation_distance - distance) / separation_distance, 2) * 3.0
 				separation_force += away_dir * force_strength
-	# Limit separation force and validate against walls
+	# 🔧 FIXED: Limit separation force and validate against walls
 	var max_separation_force = speed * 0.8
 	separation_force.x = clamp(separation_force.x, -max_separation_force, max_separation_force)
 	separation_force.z = clamp(separation_force.z, -max_separation_force, max_separation_force)
@@ -217,10 +210,6 @@ func apply_separation(delta: float):
 	if movement_dir.length() > 0.1 and not _would_hit_wall(ally_ref.global_position, movement_dir):
 		ally_ref.velocity.x = intended_velocity.x
 		ally_ref.velocity.z = intended_velocity.z
-	# Extra: If stuck, nudge away from wall
-	if _would_hit_wall(ally_ref.global_position, Vector3(ally_ref.velocity.x, 0, ally_ref.velocity.z)):
-		ally_ref.velocity.x *= 0.5
-		ally_ref.velocity.z *= 0.5
 
 func _face_direction(direction: Vector3):
 	if direction.length() < 0.1:

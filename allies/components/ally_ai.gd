@@ -106,8 +106,7 @@ func _update_ai_state():
 	if is_patrolling and current_state == State.PATROLLING:
 		# Stay in PATROLLING until cancelled
 		return
-	# Use LOS-aware enemy search
-	enemy_target = find_nearest_enemy_with_los()
+	enemy_target = ally_ref.combat_component.find_nearest_enemy()
 	var _previous_state = current_state
 	if mode == null:
 		mode = 1 # fallback to ATTACK
@@ -127,24 +126,6 @@ func _update_ai_state():
 				current_state = State.MOVING_TO_TARGET
 	else:
 		current_state = State.FOLLOWING
-
-# Helper: Only returns enemies with line of sight
-func find_nearest_enemy_with_los() -> Node3D:
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	var nearest_enemy: Node3D = null
-	var nearest_distance := 999.0
-	for enemy in enemies:
-		if not is_instance_valid(enemy):
-			continue
-		if "is_dead" in enemy and enemy.is_dead:
-			continue
-		if not ally_ref._has_line_of_sight_to_target(enemy):
-			continue
-		var distance = ally_ref.global_position.distance_to(enemy.global_position)
-		if distance < nearest_distance and distance <= ally_ref.combat_component.detection_range:
-			nearest_distance = distance
-			nearest_enemy = enemy
-	return nearest_enemy
 
 func _execute_current_state(delta: float):
 	match current_state:

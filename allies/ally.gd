@@ -196,23 +196,8 @@ func _setup_foot_references() -> void:
 
 func _find_player():
 	player_ref = get_tree().get_first_node_in_group("player")
-	if player_ref and _has_line_of_sight_to_target(player_ref):
+	if player_ref:
 		ai_component.set_player_target(player_ref)
-
-# Add this helper to Ally (matches enemy.gd)
-func _has_line_of_sight_to_target(target: Node3D) -> bool:
-	var space_state = get_world_3d().direct_space_state
-	var from = global_position + Vector3(0, 0.5, 0)
-	var to = target.global_position + Vector3(0, 0.5, 0)
-	var params = PhysicsRayQueryParameters3D.new()
-	params.from = from
-	params.to = to
-	params.exclude = [self]
-	params.collision_mask = collision_mask
-	var result = space_state.intersect_ray(params)
-	if result and result.collider and result.collider != target:
-		return false
-	return true
 
 func _prevent_wall_clipping():
 	"""Prevent allies from being pushed through walls - similar to enemy system"""
